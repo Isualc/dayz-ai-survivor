@@ -1,0 +1,7 @@
+{
+  "_comment": "Microphone for push-to-talk voice input. device_index = the index printed by `python daemon/mic_select.py` (-1 = system default). device_name is informational only. mode: 'ptt' (push-to-talk) or 'vad' (voice activity detection). ptt_key: any single key name, e.g. CAPSLOCK, F1, MOUSE4.",
+  "device_index": -1,
+  "device_name": "",
+  "mode": "ptt",
+  "ptt_key": "CAPSLOCK"
+}

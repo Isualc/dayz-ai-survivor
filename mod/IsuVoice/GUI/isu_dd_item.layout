@@ -1,0 +1,13 @@
+ButtonWidgetClass IsuDdItem {
+ position 0 0
+ size 296 40
+ hexactpos 1
+ vexactpos 1
+ hexactsize 1
+ vexactsize 1
+ color 0.13 0.16 0.22 1
+ text ""
+ font "gui/fonts/sdf_MetronBook24"
+ "text halign" left
+ "text valign" center
+}

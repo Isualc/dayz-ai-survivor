@@ -1,0 +1,245 @@
+PanelWidgetClass IsuRadialRoot {
+ size 1 1
+ halign center_ref
+ valign center_ref
+ hexactpos 0
+ vexactpos 0
+ hexactsize 0
+ vexactsize 0
+ style blank
+ {
+  PanelWidgetClass Dim {
+   ignorepointer 1
+   color 0 0 0 0.6
+   size 1 1
+   hexactpos 0
+   vexactpos 0
+   hexactsize 0
+   vexactsize 0
+  }
+  FrameWidgetClass Wheel {
+   clipchildren 0
+   position 0 0
+   size 640 640
+   halign center_ref
+   valign center_ref
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   {
+    ImageWidgetClass RingEdge {
+     ignorepointer 1
+     color 0.55 0.86 0.47 0.30
+     position 0 0
+     size 612 612
+     halign center_ref
+     valign center_ref
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     imageTexture "{F150456F37AF9CA2}gui/textures/radial8.edds"
+     mode blend
+     "src alpha" 1
+     "clamp mode" clamp
+     "stretch mode" stretch_w_h
+     filter 1
+    }
+    ImageWidgetClass Ring {
+     ignorepointer 1
+     color 0.07 0.09 0.13 0.97
+     position 0 0
+     size 580 580
+     halign center_ref
+     valign center_ref
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     imageTexture "{F150456F37AF9CA2}gui/textures/radial8.edds"
+     mode blend
+     "src alpha" 1
+     "clamp mode" clamp
+     "stretch mode" stretch_w_h
+     filter 1
+    }
+    ImageWidgetClass ChipBg0 {
+     ignorepointer 1
+     color 0.14 0.17 0.23 1
+     position 214 60
+     size 212 60
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass ChipBg1 {
+     ignorepointer 1
+     color 0.14 0.17 0.23 1
+     position 433 219
+     size 212 60
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass ChipBg2 {
+     ignorepointer 1
+     color 0.14 0.17 0.23 1
+     position 349 476
+     size 212 60
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass ChipBg3 {
+     ignorepointer 1
+     color 0.14 0.17 0.23 1
+     position 79 476
+     size 212 60
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass ChipBg4 {
+     ignorepointer 1
+     color 0.14 0.17 0.23 1
+     position 0 219
+     size 212 60
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    FrameWidgetClass Selector {
+     visible 0
+     ignorepointer 1
+     clipchildren 0
+     position 0 0
+     size 580 580
+     halign center_ref
+     valign center_ref
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     {
+      ImageWidgetClass SelectorSlice {
+       ignorepointer 1
+       color 0.55 0.86 0.47 0.85
+       position 0 14
+       size 290 145
+       halign center_ref
+       hexactpos 1
+       vexactpos 1
+       hexactsize 1
+       vexactsize 1
+       image0 "set:dayz_gui image:radial_selector"
+       mode blend
+       "src alpha" 1
+       "clamp mode" clamp
+       "stretch mode" stretch_w_h
+       filter 1
+      }
+     }
+    }
+    ButtonWidgetClass BtnAct0 {
+     position 220 65
+     size 200 50
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text "Follow"
+     font "gui/fonts/sdf_MetronBook24"
+     "text halign" center
+     "text valign" center
+    }
+    ButtonWidgetClass BtnAct1 {
+     position 439 224
+     size 200 50
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text "Hold"
+     font "gui/fonts/sdf_MetronBook24"
+     "text halign" center
+     "text valign" center
+    }
+    ButtonWidgetClass BtnAct2 {
+     position 355 481
+     size 200 50
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text "Regroup"
+     font "gui/fonts/sdf_MetronBook24"
+     "text halign" center
+     "text valign" center
+    }
+    ButtonWidgetClass BtnAct3 {
+     position 85 481
+     size 200 50
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text "Loot"
+     font "gui/fonts/sdf_MetronBook24"
+     "text halign" center
+     "text valign" center
+    }
+    ButtonWidgetClass BtnAct4 {
+     position 1 224
+     size 200 50
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text "Attack"
+     font "gui/fonts/sdf_MetronBook24"
+     "text halign" center
+     "text valign" center
+    }
+    TextWidgetClass RadialCenter {
+     ignorepointer 1
+     position 110 290
+     size 420 40
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text "Target: -"
+     font "gui/fonts/sdf_MetronBook24"
+     color 0.65 0.92 0.55 1
+     "text halign" center
+     "text valign" center
+    }
+    TextWidgetClass RadialHint {
+     ignorepointer 1
+     position 120 332
+     size 400 26
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text "Choose a command  -  ESC closes"
+     font "gui/fonts/sdf_MetronBook24"
+     color 0.70 0.73 0.78 1
+     "text halign" center
+     "text valign" center
+    }
+   }
+  }
+ }
+}

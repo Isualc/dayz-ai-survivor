@@ -1,0 +1,57 @@
+{
+  "comment": "Arena-Roster: vier Slots. name/character sind nur DEFAULTS - das In-Game-Menue (Einfg) darf pro Slot Name und Persona frei waehlen (Personas = daemon/characters/<key>.md: jaeger, bauer, sanitaeter, exmilitaer, kampfmaschine; alle namens-agnostisch mit {NAME}-Platzhalter). Modell-Tiering nach Rolle (Kosten-Nutzen-Analyse 2026-06-15): ortsgebundene/passive Rollen (Sanitaeterin Birgit, Bauer Igor) brauchen wenig Reasoning -> haiku (~5x guenstiger als sonnet); Koordinator/Spaeher (Viktor) und Kaempfer (Konrad) -> sonnet. opus war fuer den Bauern Overkill (4-5x teurer ohne Mehrwert). claude-fable-5 ist seit 2026-06-14 API-tot (kein Zugriff, Sofort-Abbruch) und wurde gestrichen. Spawns rund um das Basislager bei 4233/8512.",
+  "agents": [
+    {
+      "id": "viktor",
+      "name": "Viktor",
+      "model": "sonnet",
+      "voice": "Helmut - German Epic",
+      "character": "daemon/characters/jaeger.md",
+      "spawn": [
+        4220.0,
+        8498.0
+      ],
+      "faction_hostile": "west",
+      "loadout": "IsuViktorLoadout.json"
+    },
+    {
+      "id": "birgit",
+      "name": "Birgit",
+      "model": "haiku",
+      "voice": "Sarah",
+      "character": "daemon/characters/sanitaeter.md",
+      "spawn": [
+        4248.0,
+        8498.0
+      ],
+      "faction_hostile": "east",
+      "loadout": "IsuBirgitLoadout.json"
+    },
+    {
+      "id": "igor",
+      "name": "Igor",
+      "model": "haiku",
+      "voice": "George",
+      "character": "daemon/characters/bauer.md",
+      "spawn": [
+        4220.0,
+        8528.0
+      ],
+      "faction_hostile": "mercenaries",
+      "loadout": "IsuIgorLoadout.json"
+    },
+    {
+      "id": "konrad",
+      "name": "Konrad",
+      "model": "sonnet",
+      "voice": "Liam",
+      "character": "daemon/characters/exmilitaer.md",
+      "spawn": [
+        4248.0,
+        8528.0
+      ],
+      "faction_hostile": "raiders",
+      "loadout": "IsuKonradLoadout.json"
+    }
+  ]
+}

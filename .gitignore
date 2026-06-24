@@ -1,0 +1,81 @@
+# ---------------------------------------------------------------------------
+# dayz-ai-survivor — .gitignore
+# Keeps secrets, personal data, runtime state and large binaries OUT of git.
+# ---------------------------------------------------------------------------
+
+# --- Secrets / local environment (NEVER commit) ---
+.env
+.env.*
+!.env.example
+*.key
+*.token
+secrets.json
+arena/*.local.json
+
+# --- Local / per-machine Claude Code settings ---
+.claude/settings.local.json
+.claude/*.lock
+.claude/scheduled_tasks*
+
+# --- Generated MCP config (written at runtime by run_agent.py) ---
+**/.isu-mcp.json
+
+# --- LLM model weights (download separately, multi-GB) ---
+models/
+*.gguf
+*.litertlm
+*.task
+*.onnx
+*.safetensors
+
+# --- Third-party reference sources (clone separately, see docs) ---
+reference/
+
+# --- Vendored binaries (download separately) ---
+tools/llama-bin/
+
+# --- Build artifacts (packed mods) ---
+build/
+*.pbo
+*.bin.bak
+
+# --- Runtime state / journals / live caches ---
+agent_home/journal/
+agent_home/voice_outbox.jsonl
+agent_home/voice_inbox.jsonl
+agent_home/*.flag
+agent_home/last_inventory.json
+agent_home/learned_recipes.json
+agent_home/world_gen.txt
+agent_homes/
+arena/active_*.json
+arena/active_*.txt
+arena/squad_state.json
+arena/*.jsonl
+
+# --- Backups (the project's iterative-backup habit) ---
+*_BACKUP*/
+*- Kopie*/
+*_memory_backup*/
+**/_memory_backup_pre_restructure/
+
+# --- Logs ---
+*.log
+*.rpt
+*.RPT
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# --- OS / editor cruft ---
+Thumbs.db
+desktop.ini
+.DS_Store
+*.swp
+.idea/
+.vscode/

@@ -1,0 +1,10 @@
+{
+  "comment": "Discord voice: each slot uses its OWN bot (its own Discord application, token read from the named environment variable). 'channel' = the voice channel the bot joins. Default: all bots share one channel ('DayZ') so you can sit there and hear all four overlap like real radio chatter; split them into different channels if you want separate squads. A slot with no token set falls back to the collective bot (DISCORD_BOT_TOKEN) in default_channel. See docs/discord_bot_setup_en.md.",
+  "default_channel": "DayZ",
+  "bots": {
+    "viktor": { "token_env": "DISCORD_TOKEN_VIKTOR", "channel": "DayZ" },
+    "birgit": { "token_env": "DISCORD_TOKEN_BIRGIT", "channel": "DayZ" },
+    "igor": { "token_env": "DISCORD_TOKEN_IGOR", "channel": "DayZ" },
+    "konrad": { "token_env": "DISCORD_TOKEN_KONRAD", "channel": "DayZ" }
+  }
+}

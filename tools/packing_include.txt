@@ -1,0 +1,7 @@
+*.c
+*.cpp
+*.json
+*.xml
+*.csv
+*.layout
+*.ogg

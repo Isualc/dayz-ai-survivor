@@ -1,0 +1,200 @@
+{
+  "greet_01": {
+    "soundset": "IsuVoice_viktor_greet_01_SoundSet",
+    "text": "He. Wer bist du?",
+    "category": "gruss",
+    "ogg": "mod/IsuVoice/sounds/viktor/greet_01.ogg"
+  },
+  "greet_02": {
+    "soundset": "IsuVoice_viktor_greet_02_SoundSet",
+    "text": "Schon gut. Ich tu dir nichts.",
+    "category": "gruss",
+    "ogg": "mod/IsuVoice/sounds/viktor/greet_02.ogg"
+  },
+  "greet_03": {
+    "soundset": "IsuVoice_viktor_greet_03_SoundSet",
+    "text": "Hmpf. Noch einer, der lebt.",
+    "category": "gruss",
+    "ogg": "mod/IsuVoice/sounds/viktor/greet_03.ogg"
+  },
+  "greet_04": {
+    "soundset": "IsuVoice_viktor_greet_04_SoundSet",
+    "text": "Bleib ruhig. Ich bin Viktor.",
+    "category": "gruss",
+    "ogg": "mod/IsuVoice/sounds/viktor/greet_04.ogg"
+  },
+  "warn_01": {
+    "soundset": "IsuVoice_viktor_warn_01_SoundSet",
+    "text": "Bleib weg!",
+    "category": "warnung",
+    "ogg": "mod/IsuVoice/sounds/viktor/warn_01.ogg"
+  },
+  "warn_02": {
+    "soundset": "IsuVoice_viktor_warn_02_SoundSet",
+    "text": "Letzte Warnung!",
+    "category": "warnung",
+    "ogg": "mod/IsuVoice/sounds/viktor/warn_02.ogg"
+  },
+  "warn_03": {
+    "soundset": "IsuVoice_viktor_warn_03_SoundSet",
+    "text": "Waffe runter. Sofort.",
+    "category": "warnung",
+    "ogg": "mod/IsuVoice/sounds/viktor/warn_03.ogg"
+  },
+  "warn_04": {
+    "soundset": "IsuVoice_viktor_warn_04_SoundSet",
+    "text": "Komm nicht näher!",
+    "category": "warnung",
+    "ogg": "mod/IsuVoice/sounds/viktor/warn_04.ogg"
+  },
+  "warn_05": {
+    "soundset": "IsuVoice_viktor_warn_05_SoundSet",
+    "text": "Das war keine Bitte.",
+    "category": "warnung",
+    "ogg": "mod/IsuVoice/sounds/viktor/warn_05.ogg"
+  },
+  "follow_01": {
+    "soundset": "IsuVoice_viktor_follow_01_SoundSet",
+    "text": "Geh voran.",
+    "category": "folgen",
+    "ogg": "mod/IsuVoice/sounds/viktor/follow_01.ogg"
+  },
+  "follow_02": {
+    "soundset": "IsuVoice_viktor_follow_02_SoundSet",
+    "text": "Gut. Ich komme mit.",
+    "category": "folgen",
+    "ogg": "mod/IsuVoice/sounds/viktor/follow_02.ogg"
+  },
+  "follow_03": {
+    "soundset": "IsuVoice_viktor_follow_03_SoundSet",
+    "text": "Ich bleib hinter dir.",
+    "category": "folgen",
+    "ogg": "mod/IsuVoice/sounds/viktor/follow_03.ogg"
+  },
+  "follow_04": {
+    "soundset": "IsuVoice_viktor_follow_04_SoundSet",
+    "text": "Hier trennen sich unsere Wege.",
+    "category": "folgen",
+    "ogg": "mod/IsuVoice/sounds/viktor/follow_04.ogg"
+  },
+  "combat_01": {
+    "soundset": "IsuVoice_viktor_combat_01_SoundSet",
+    "text": "Verdammt!",
+    "category": "kampf",
+    "ogg": "mod/IsuVoice/sounds/viktor/combat_01.ogg"
+  },
+  "combat_02": {
+    "soundset": "IsuVoice_viktor_combat_02_SoundSet",
+    "text": "Die Dinger schon wieder!",
+    "category": "kampf",
+    "ogg": "mod/IsuVoice/sounds/viktor/combat_02.ogg"
+  },
+  "combat_03": {
+    "soundset": "IsuVoice_viktor_combat_03_SoundSet",
+    "text": "Runter!",
+    "category": "kampf",
+    "ogg": "mod/IsuVoice/sounds/viktor/combat_03.ogg"
+  },
+  "combat_04": {
+    "soundset": "IsuVoice_viktor_combat_04_SoundSet",
+    "text": "Lauf! Ich halt sie auf!",
+    "category": "kampf",
+    "ogg": "mod/IsuVoice/sounds/viktor/combat_04.ogg"
+  },
+  "combat_05": {
+    "soundset": "IsuVoice_viktor_combat_05_SoundSet",
+    "text": "Erledigt.",
+    "category": "kampf",
+    "ogg": "mod/IsuVoice/sounds/viktor/combat_05.ogg"
+  },
+  "help_01": {
+    "soundset": "IsuVoice_viktor_help_01_SoundSet",
+    "text": "Hilfe! Hierher!",
+    "category": "hilfe",
+    "ogg": "mod/IsuVoice/sounds/viktor/help_01.ogg"
+  },
+  "help_02": {
+    "soundset": "IsuVoice_viktor_help_02_SoundSet",
+    "text": "Ich brauch einen Verband!",
+    "category": "hilfe",
+    "ogg": "mod/IsuVoice/sounds/viktor/help_02.ogg"
+  },
+  "help_03": {
+    "soundset": "IsuVoice_viktor_help_03_SoundSet",
+    "text": "Hast du was zu essen?",
+    "category": "hilfe",
+    "ogg": "mod/IsuVoice/sounds/viktor/help_03.ogg"
+  },
+  "help_04": {
+    "soundset": "IsuVoice_viktor_help_04_SoundSet",
+    "text": "Wasser. Bitte.",
+    "category": "hilfe",
+    "ogg": "mod/IsuVoice/sounds/viktor/help_04.ogg"
+  },
+  "talk_01": {
+    "soundset": "IsuVoice_viktor_talk_01_SoundSet",
+    "text": "Schöner Tag. Für Tschernarus-Verhältnisse.",
+    "category": "smalltalk",
+    "ogg": "mod/IsuVoice/sounds/viktor/talk_01.ogg"
+  },
+  "talk_02": {
+    "soundset": "IsuVoice_viktor_talk_02_SoundSet",
+    "text": "Früher war ich Fernfahrer. Jetzt fahr ich gar nichts mehr.",
+    "category": "smalltalk",
+    "ogg": "mod/IsuVoice/sounds/viktor/talk_02.ogg"
+  },
+  "talk_03": {
+    "soundset": "IsuVoice_viktor_talk_03_SoundSet",
+    "text": "Trau keinem an der Küste.",
+    "category": "smalltalk",
+    "ogg": "mod/IsuVoice/sounds/viktor/talk_03.ogg"
+  },
+  "talk_04": {
+    "soundset": "IsuVoice_viktor_talk_04_SoundSet",
+    "text": "Hmpf.",
+    "category": "smalltalk",
+    "ogg": "mod/IsuVoice/sounds/viktor/talk_04.ogg"
+  },
+  "talk_05": {
+    "soundset": "IsuVoice_viktor_talk_05_SoundSet",
+    "text": "Die Städte sind voll mit den Dingern. Bleib in den Wäldern.",
+    "category": "smalltalk",
+    "ogg": "mod/IsuVoice/sounds/viktor/talk_05.ogg"
+  },
+  "bye_01": {
+    "soundset": "IsuVoice_viktor_bye_01_SoundSet",
+    "text": "Pass auf dich auf.",
+    "category": "abschied",
+    "ogg": "mod/IsuVoice/sounds/viktor/bye_01.ogg"
+  },
+  "bye_02": {
+    "soundset": "IsuVoice_viktor_bye_02_SoundSet",
+    "text": "Man sieht sich. Oder auch nicht.",
+    "category": "abschied",
+    "ogg": "mod/IsuVoice/sounds/viktor/bye_02.ogg"
+  },
+  "bye_03": {
+    "soundset": "IsuVoice_viktor_bye_03_SoundSet",
+    "text": "Ich zieh weiter.",
+    "category": "abschied",
+    "ogg": "mod/IsuVoice/sounds/viktor/bye_03.ogg"
+  },
+  "yes_01": {
+    "soundset": "IsuVoice_viktor_yes_01_SoundSet",
+    "text": "Ja.",
+    "category": "antwort",
+    "ogg": "mod/IsuVoice/sounds/viktor/yes_01.ogg"
+  },
+  "no_01": {
+    "soundset": "IsuVoice_viktor_no_01_SoundSet",
+    "text": "Nein.",
+    "category": "antwort",
+    "ogg": "mod/IsuVoice/sounds/viktor/no_01.ogg"
+  },
+  "maybe_01": {
+    "soundset": "IsuVoice_viktor_maybe_01_SoundSet",
+    "text": "Mal sehen.",
+    "category": "antwort",
+    "ogg": "mod/IsuVoice/sounds/viktor/maybe_01.ogg"
+  }
+}

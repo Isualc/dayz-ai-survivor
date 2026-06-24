@@ -1,0 +1,1384 @@
+FrameWidgetClass IsuArenaRoot {
+ clipchildren 0
+ position 0 0
+ size 1480 792
+ halign center_ref
+ valign center_ref
+ hexactpos 1
+ vexactpos 1
+ hexactsize 1
+ vexactsize 1
+ {
+  ImageWidgetClass Background {
+   ignorepointer 1
+   color 0.04 0.05 0.07 0.97
+   position 0 0
+   size 1480 792
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  TextWidgetClass Title {
+   ignorepointer 1
+   position 24 16
+   size 560 32
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "ISU SURVIVOR  -  ARENA SETUP"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.55 0.86 0.47 1
+  }
+  ImageWidgetClass StatusPill {
+   ignorepointer 1
+   color 0.09 0.11 0.14 0.95
+   position 980 12
+   size 480 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  ImageWidgetClass StatusDot {
+   ignorepointer 1
+   color 0.45 0.45 0.48 1
+   position 994 24
+   size 12 12
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  TextWidgetClass StatusText {
+   ignorepointer 1
+   position 1016 12
+   size 444 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Status: unknown"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.85 0.88 0.90 1
+  }
+
+  TextWidgetClass HdrName {
+   ignorepointer 1
+   position 84 64
+   size 140 20
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "NAME"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.5 0.52 0.56 1
+  }
+  TextWidgetClass HdrProvider {
+   ignorepointer 1
+   position 238 64
+   size 188 20
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "PROVIDER"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.5 0.52 0.56 1
+  }
+  TextWidgetClass HdrModel {
+   ignorepointer 1
+   position 434 64
+   size 244 20
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "MODEL"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.5 0.52 0.56 1
+  }
+  TextWidgetClass HdrRole {
+   ignorepointer 1
+   position 686 64
+   size 234 20
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "ROLE"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.5 0.52 0.56 1
+  }
+  TextWidgetClass HdrVoice {
+   ignorepointer 1
+   position 928 64
+   size 182 20
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "VOICE"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.5 0.52 0.56 1
+  }
+  TextWidgetClass HdrLang {
+   ignorepointer 1
+   position 1118 64
+   size 172 20
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "LANG"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.5 0.52 0.56 1
+  }
+  TextWidgetClass HdrStatus {
+   ignorepointer 1
+   position 1298 64
+   size 165 20
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "STATUS"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.5 0.52 0.56 1
+  }
+
+  ImageWidgetClass Card0 {
+   ignorepointer 1
+   color 0.075 0.090 0.120 0.95
+   position 8 90
+   size 1464 40
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  ImageWidgetClass Accent0 {
+   ignorepointer 1
+   color 0.94 0.62 0.15 1
+   position 8 90
+   size 6 40
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  ButtonWidgetClass BtnAgent0 {
+   position 20 91
+   size 56 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "ON"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ImageWidgetClass NameBg0 {
+   ignorepointer 1
+   color 0.10 0.12 0.16 0.95
+   position 80 91
+   size 150 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  EditBoxWidgetClass EditName0 {
+   position 84 91
+   size 142 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Viktor"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass ProviderHead0 {
+   position 236 91
+   size 190 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Anthropic"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass ModelHead0 {
+   position 432 91
+   size 246 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Sonnet 4.6"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass RoleHead0 {
+   position 684 91
+   size 238 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Hunter"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass VoiceHead0 {
+   position 926 91
+   size 184 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Helmut"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass LangHead0 {
+   position 1116 91
+   size 172 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Deutsch"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass Live0 {
+   ignorepointer 1
+   position 1296 91
+   size 165 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "idle"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.5 0.5 0.52 1
+  }
+
+  ImageWidgetClass Card1 {
+   ignorepointer 1
+   color 0.075 0.090 0.120 0.95
+   position 8 142
+   size 1464 40
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  ImageWidgetClass Accent1 {
+   ignorepointer 1
+   color 0.36 0.79 0.65 1
+   position 8 142
+   size 6 40
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  ButtonWidgetClass BtnAgent1 {
+   position 20 143
+   size 56 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "ON"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ImageWidgetClass NameBg1 {
+   ignorepointer 1
+   color 0.10 0.12 0.16 0.95
+   position 80 143
+   size 150 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  EditBoxWidgetClass EditName1 {
+   position 84 143
+   size 142 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Birgit"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass ProviderHead1 {
+   position 236 143
+   size 190 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Anthropic"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass ModelHead1 {
+   position 432 143
+   size 246 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Haiku 4.5"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass RoleHead1 {
+   position 684 143
+   size 238 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Medic"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass VoiceHead1 {
+   position 926 143
+   size 184 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Sarah"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass LangHead1 {
+   position 1116 143
+   size 172 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Deutsch"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass Live1 {
+   ignorepointer 1
+   position 1296 143
+   size 165 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "idle"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.5 0.5 0.52 1
+  }
+
+  ImageWidgetClass Card2 {
+   ignorepointer 1
+   color 0.075 0.090 0.120 0.95
+   position 8 194
+   size 1464 40
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  ImageWidgetClass Accent2 {
+   ignorepointer 1
+   color 0.59 0.77 0.35 1
+   position 8 194
+   size 6 40
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  ButtonWidgetClass BtnAgent2 {
+   position 20 195
+   size 56 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "ON"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ImageWidgetClass NameBg2 {
+   ignorepointer 1
+   color 0.10 0.12 0.16 0.95
+   position 80 195
+   size 150 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  EditBoxWidgetClass EditName2 {
+   position 84 195
+   size 142 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Igor"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass ProviderHead2 {
+   position 236 195
+   size 190 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Anthropic"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass ModelHead2 {
+   position 432 195
+   size 246 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Haiku 4.5"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass RoleHead2 {
+   position 684 195
+   size 238 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Farmer"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass VoiceHead2 {
+   position 926 195
+   size 184 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "George"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass LangHead2 {
+   position 1116 195
+   size 172 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Deutsch"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass Live2 {
+   ignorepointer 1
+   position 1296 195
+   size 165 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "idle"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.5 0.5 0.52 1
+  }
+
+  ImageWidgetClass Card3 {
+   ignorepointer 1
+   color 0.075 0.090 0.120 0.95
+   position 8 246
+   size 1464 40
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  ImageWidgetClass Accent3 {
+   ignorepointer 1
+   color 0.22 0.54 0.87 1
+   position 8 246
+   size 6 40
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  ButtonWidgetClass BtnAgent3 {
+   position 20 247
+   size 56 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "ON"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ImageWidgetClass NameBg3 {
+   ignorepointer 1
+   color 0.10 0.12 0.16 0.95
+   position 80 247
+   size 150 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  EditBoxWidgetClass EditName3 {
+   position 84 247
+   size 142 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Konrad"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass ProviderHead3 {
+   position 236 247
+   size 190 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Anthropic"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass ModelHead3 {
+   position 432 247
+   size 246 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Sonnet 4.6"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass RoleHead3 {
+   position 684 247
+   size 238 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Ex-military"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass VoiceHead3 {
+   position 926 247
+   size 184 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Liam"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass LangHead3 {
+   position 1116 247
+   size 172 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Deutsch"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass Live3 {
+   ignorepointer 1
+   position 1296 247
+   size 165 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "idle"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.5 0.5 0.52 1
+  }
+
+  TextWidgetClass GrpRound {
+   ignorepointer 1
+   position 20 300
+   size 200 22
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "ROUND"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.55 0.86 0.47 1
+  }
+  TextWidgetClass GrpControls {
+   ignorepointer 1
+   position 600 300
+   size 200 22
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "CONTROLS"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.55 0.86 0.47 1
+  }
+
+  TextWidgetClass LblMode {
+   ignorepointer 1
+   position 20 330
+   size 160 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Mode"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.78 0.80 0.84 1
+   "text valign" center
+  }
+  ButtonWidgetClass BtnMode {
+   position 188 330
+   size 360 32
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Neutral"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass ModeNote {
+   ignorepointer 1
+   position 188 362
+   size 360 16
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "(co-op)"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.55 0.57 0.60 1
+   "text valign" center
+  }
+  TextWidgetClass LblIdle {
+   ignorepointer 1
+   position 20 380
+   size 160 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Idle"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.78 0.80 0.84 1
+   "text valign" center
+  }
+  ButtonWidgetClass IdleHead {
+   position 188 380
+   size 360 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "120s"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass LblTurns {
+   ignorepointer 1
+   position 20 430
+   size 160 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Turns"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.78 0.80 0.84 1
+   "text valign" center
+  }
+  ButtonWidgetClass TurnsHead {
+   position 188 430
+   size 360 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "10 turns"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass LblSpawn {
+   ignorepointer 1
+   position 20 480
+   size 160 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Spawn"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.78 0.80 0.84 1
+   "text valign" center
+  }
+  ButtonWidgetClass BtnSpawn {
+   position 188 480
+   size 360 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Separate"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass LblCamp {
+   ignorepointer 1
+   position 20 530
+   size 160 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Camp"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.78 0.80 0.84 1
+   "text valign" center
+  }
+  ButtonWidgetClass BtnCamp {
+   position 188 530
+   size 360 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "4234 / 8512"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+
+  TextWidgetClass LblKeyStop {
+   ignorepointer 1
+   position 600 330
+   size 160 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Stop"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.78 0.80 0.84 1
+   "text valign" center
+  }
+  ButtonWidgetClass KeyStopHead {
+   position 768 330
+   size 360 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Num 5"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass LblKeyGoto {
+   ignorepointer 1
+   position 600 380
+   size 160 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Go-to"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.78 0.80 0.84 1
+   "text valign" center
+  }
+  ButtonWidgetClass KeyGotoHead {
+   position 768 380
+   size 360 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Num 0"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass LblKeyRadial {
+   ignorepointer 1
+   position 600 430
+   size 160 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Radial"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.78 0.80 0.84 1
+   "text valign" center
+  }
+  ButtonWidgetClass KeyRadialHead {
+   position 768 430
+   size 360 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Num ,"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass LblTarget {
+   ignorepointer 1
+   position 600 480
+   size 160 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Target"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.78 0.80 0.84 1
+   "text valign" center
+  }
+  ButtonWidgetClass BtnTarget {
+   position 768 480
+   size 360 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Aimed NPC"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass LblMic {
+   ignorepointer 1
+   position 600 530
+   size 120 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Mic"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.78 0.80 0.84 1
+   "text valign" center
+  }
+  ButtonWidgetClass BtnMic {
+   position 728 530
+   size 116 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "ON"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass LblComic {
+   ignorepointer 1
+   position 864 530
+   size 124 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Comic"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.78 0.80 0.84 1
+   "text valign" center
+  }
+  ButtonWidgetClass BtnComic {
+   position 996 530
+   size 132 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "ON"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+
+  TextWidgetClass LblOrch {
+   ignorepointer 1
+   position 20 578
+   size 160 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Orchestr."
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.78 0.80 0.84 1
+   "text valign" center
+  }
+  ButtonWidgetClass BtnOrch {
+   position 188 578
+   size 360 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "OFF"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass OrchNote {
+   ignorepointer 1
+   position 188 610
+   size 360 16
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "(squad observer - no commands)"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.55 0.57 0.60 1
+   "text valign" center
+  }
+  TextWidgetClass LblPatrol {
+   ignorepointer 1
+   position 600 578
+   size 160 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Patrols"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.78 0.80 0.84 1
+   "text valign" center
+  }
+  ButtonWidgetClass BtnPatrol {
+   position 768 578
+   size 170 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "OFF"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass CostText {
+   ignorepointer 1
+   position 20 632
+   size 1140 24
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Round cost: -  (shown once supervisor reports)"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.55 0.57 0.60 1
+  }
+  ImageWidgetClass StartAccent {
+   ignorepointer 1
+   color 0.30 0.62 0.18 1
+   position 20 664
+   size 560 4
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  ButtonWidgetClass BtnStart {
+   position 20 670
+   size 368 46
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "START (neutral)"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass BtnMission {
+   position 406 670
+   size 368 46
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Mission: Birgit"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ImageWidgetClass StopAccent {
+   ignorepointer 1
+   color 0.70 0.22 0.20 1
+   position 792 664
+   size 368 4
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  ButtonWidgetClass BtnStop {
+   position 792 670
+   size 368 46
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "STOP"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass BtnClose {
+   position 20 726
+   size 1140 34
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Close  (key: Ins)"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass HintLine1 {
+   ignorepointer 1
+   position 20 768
+   size 1300 22
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "Klick auf ein Feld (Provider/Model/Role/Voice/Lang) klappt die Liste auf. Stop/Go/Radial wirken auf den anvisierten NPC."
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.5 0.5 0.52 1
+  }
+
+  PanelWidgetClass ProviderList0 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 236 129
+   size 190 220
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass ProviderList1 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 236 181
+   size 190 220
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass ProviderList2 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 236 233
+   size 190 220
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass ProviderList3 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 236 285
+   size 190 220
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass ModelList0 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 432 129
+   size 246 320
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 105
+  }
+  PanelWidgetClass ModelList1 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 432 181
+   size 246 320
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 105
+  }
+  PanelWidgetClass ModelList2 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 432 233
+   size 246 320
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 105
+  }
+  PanelWidgetClass ModelList3 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 432 285
+   size 246 320
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 105
+  }
+  PanelWidgetClass RoleList0 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 684 129
+   size 238 220
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass RoleList1 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 684 181
+   size 238 220
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass RoleList2 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 684 233
+   size 238 220
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass RoleList3 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 684 285
+   size 238 220
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass IdleList {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 188 418
+   size 360 132
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass TurnsList {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 188 468
+   size 360 132
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass KeyStopList {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 768 368
+   size 360 290
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass KeyGotoList {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 768 418
+   size 360 290
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass KeyRadialList {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 768 468
+   size 360 290
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass VoiceList0 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 440 168
+   size 700 320
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 110
+  }
+  PanelWidgetClass VoiceList1 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 440 168
+   size 700 320
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 110
+  }
+  PanelWidgetClass VoiceList2 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 440 168
+   size 700 320
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 110
+  }
+  PanelWidgetClass VoiceList3 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 440 168
+   size 700 320
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 110
+  }
+  PanelWidgetClass LangList0 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 1098 129
+   size 300 420
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass LangList1 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 1098 181
+   size 300 420
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass LangList2 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 1098 233
+   size 300 420
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+  PanelWidgetClass LangList3 {
+   visible 0
+   clipchildren 0
+   color 0.06 0.08 0.11 1
+   position 1098 285
+   size 300 420
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+   priority 100
+  }
+ }
+}
