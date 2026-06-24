@@ -2,6 +2,10 @@
 
 An autonomous DayZ survivor driven by Claude Code. The architecture has three layers: **reflexes** run on the server in the DayZ-Expansion AI (EnforceScript), **tactics** run in a local Python daemon, and **strategy + speech** come from Claude over MCP. What began as pure locomotion is now a full **multi-agent system**: up to four Claude-driven NPCs at once, each with its own memory, model, and voice, plus audible speech (Discord + 3D in-game), floating nameplates, an in-game setup menu, and direct commands via hotkeys and a command wheel.
 
+![Viktor on patrol, with his floating nameplate showing name, current action, HP, and the thought line "Erkundet die Gegend" (exploring the area)](docs/images/nameplate.jpg)
+
+*Viktor, a Claude-driven survivor, exploring on his own — the floating nameplate shows his name, action, HP bar, and current intent.*
+
 > **This is the public, sanitized copy.** All keys, tokens, personal data and machine-specific settings have been removed — you supply your own (see the guides below). Large/derived assets are **not** in the repo and are fetched on first run: the LLM model weights (`models/`), the llama.cpp binaries (`tools/llama-bin/`), the third-party DayZ/Expansion reference sources (`reference/`), and the packed mods (`build/`).
 >
 > Deutsche Fassung mit voller Phasen-Historie: **[README.de.md](README.de.md)**.
