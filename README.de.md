@@ -71,14 +71,14 @@ powershell -ExecutionPolicy Bypass -File tools\start_server.ps1
 
 Erster Start dauert 1 bis 3 Minuten, Expansion generiert dabei seine Settings und Loadouts unter `profiles\ExpansionMod\`. Sobald der Server steht, taucht `profiles\IsuSurvivor\state.json` auf und wird sekündlich aktualisiert. Das ist das Lebenszeichen der Bridge.
 
-## Alles mit einem Klick starten
+## Spiel starten und beenden (Doppelklick)
 
 ```
-start_all.bat                       (Doppelklick im Projektordner)
-start_all.bat --idle 300            (Argumente gehen an run_agent.py durch)
+start_game.bat     Dev-Server + Supervisor + DayZ-Client starten (Karte wählen, NPCs im Spiel hinzufügen)
+close_game.bat     alles sauber herunterfahren (schont die Server-Persistenz)
 ```
 
-Startet den Dev-Server (falls er nicht läuft), wartet auf die Bridge, warnt sichtbar bei fehlenden Discord/ElevenLabs-Keys und startet dann den Agenten im selben Fenster. Strg+C beendet nur den Agenten, der Server läuft weiter.
+`start_game.bat` bringt Server, Supervisor und Client hoch; die NPCs startest du danach IM SPIEL über das Setup-Menü (Taste Einfg). Einzelne Bausteine lassen sich für Power-User auch direkt über die PowerShell-Skripte in `tools\` fahren (z. B. `tools\start_server.ps1`, `tools\start_arena.ps1` für das CLI-Arena-Menü, `tools\start_all.ps1` für den Ein-Fenster-Start).
 
 ## Der Akzeptanztest
 
@@ -218,12 +218,12 @@ Einmaliges Setup (nur der Serverbesitzer kann das): discord.com/developers → N
 
 ## Die Modell-Arena (v0.7)
 
-Vier Survivor, vier Claude-Modelle, vier Stimmen, ein Server:
+Vier Survivor, vier Claude-Modelle, vier Stimmen, ein Server. Der normale Weg ist das **Setup-Menü im Spiel** (Taste Einfg): dort Agenten, Modelle, Rollen und Gesinnung wählen und starten. Für die Kommandozeile gibt es zusätzlich das Skript:
 
 ```
-start_arena.bat                 (Menü: Agenten wählen, Gesinnung n/f)
-start_arena.bat alle n          (alle vier, neutral)
-start_arena.bat viktor,igor f   (zwei Agenten, feindlich)
+powershell -ExecutionPolicy Bypass -File tools\start_arena.ps1            (Menü: Agenten wählen, Gesinnung n/f)
+powershell -ExecutionPolicy Bypass -File tools\start_arena.ps1 alle n     (alle vier, neutral)
+powershell -ExecutionPolicy Bypass -File tools\start_arena.ps1 viktor,igor f
 ```
 
 **Das Roster** ([arena/agents.json](arena/agents.json)): vier Slots mit Defaults — Viktor (Sonnet, Jäger), Birgit (Haiku, Sanitäterin), Igor (Opus, Bauer), Konrad (Fable, Ex-Militär). Name und Rolle sind pro Slot im In-Game-Menü (Einfg) frei wählbar; die Rollen-Presets liegen in `daemon/characters/` (jaeger, bauer, sanitaeter, exmilitaer, kampfmaschine — namens-agnostisch mit `{NAME}`-Platzhalter). Jeder Slot hat eigenes Gedächtnis (`agent_homes/<id>/CLAUDE.md`), eigene Stimme und eigenes Journal-Fenster.

@@ -100,28 +100,23 @@ The first start takes 1–3 minutes while Expansion generates its settings and l
 
 ## Running it
 
-**Everything in one shot** (starts the dev server if needed, waits for the bridge, warns about missing keys, then runs an agent):
+**Play — just two double-clicks:**
 
 ```
-start_all.bat
-start_all.bat --idle 300        (arguments pass through to run_agent.py)
+start_game.bat     start the dev server + supervisor + DayZ client (pick the map; add NPCs in-game)
+close_game.bat     shut everything down gracefully (preserves server persistence)
 ```
 
-**The brain on its own:**
+`start_game.bat` brings up server, supervisor and client. Once you're in, open the **setup menu** (Insert key) to add up to four NPCs and configure everything: model, role, idle cadence, turn limit, hotkeys, disposition (co-op vs. battle-royale), spawn mode, and per-NPC name/voice. Each NPC runs its own model, voice and memory.
+
+**The brain on its own (headless, no client):**
 
 ```powershell
 python daemon\run_agent.py --once "Do a situation assessment, then act on priorities."
 python daemon\run_agent.py            (continuous; Ctrl+C exits cleanly)
 ```
 
-**The model arena** (up to four NPCs, each its own model/voice/memory):
-
-```
-start_arena.bat                  (menu: pick agents + disposition)
-start_arena.bat all n            (all four, neutral)
-```
-
-In-game you configure everything from the **setup menu** (Insert key): model, role, idle cadence, turn limit, hotkeys, disposition (co-op vs. battle-royale), spawn mode, and per-NPC name/voice.
+Power users can also drive individual pieces from `tools\` directly (e.g. `tools\start_server.ps1`, `tools\start_arena.ps1` for the CLI arena menu).
 
 ### Model selection (the prefix system)
 
