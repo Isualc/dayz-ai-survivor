@@ -168,6 +168,10 @@ The full phase-by-phase history (v0.4 through v1.0) is documented in **[README.d
 <td width="50%"><img src="docs/images/command_wheel.jpg" alt="The in-game radial command wheel with Follow, Attack, Hold, Loot and Regroup"><br><sub><b>Command wheel</b> — direct orders to the targeted NPC: Follow / Attack / Hold / Loot / Regroup.</sub></td>
 <td width="50%"><img src="docs/images/arena_menu.jpg" alt="The in-game arena setup menu showing per-NPC model, role, voice and language"><br><sub><b>Arena setup menu</b> (Insert key) — per-NPC provider, model, role, voice and language, all configured in-game.</sub></td>
 </tr>
+<tr>
+<td width="50%"><img src="docs/images/coop.jpg" alt="Two NPCs trading ammo while another searches nearby"><br><sub><b>They cooperate</b> — an NPC hands off ammo it can't use (&ldquo;wrong caliber for me, but useful for someone&rdquo;) while the squad searches the area.</sub></td>
+<td width="50%"><img src="docs/images/camp.jpg" alt="The squad at its home camp with a tent, the orchestrator radioing a situation report"><br><sub><b>Home base &amp; orchestrator</b> — agents regroup at the camp; the optional orchestrator radios a squad-wide situation picture.</sub></td>
+</tr>
 </table>
 
 > NPCs think and speak in a **per-NPC configurable language** (set in the menu — note Viktor=Filipino, Birgit=Polski, Igor=Chinese, Konrad=Deutsch above). The German speech in these shots is just the language those slots were set to.
