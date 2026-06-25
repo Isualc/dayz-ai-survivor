@@ -4,9 +4,9 @@
 
 Ein autonomer DayZ-Survivor, gesteuert von Claude Code. Die Architektur hat drei Schichten: Reflexe macht die Expansion-AI auf dem Server (EnforceScript), Taktik macht ein lokaler Daemon, Strategie und Chat macht Claude über MCP. Aus Phase 1 (reine Motorik) ist inzwischen ein vollständiges **Mehr-Agenten-System** geworden: bis zu vier von Claude gesteuerte NPCs gleichzeitig, je mit eigenem Gedächtnis, Modell und Stimme, dazu hörbare Sprache (Discord + 3D im Spiel), schwebende Namensschilder, ein In-Game-Setup-Menü und Direktbefehle per Tastatur/Befehlsrad. Die Phasen-Historie unten dokumentiert den Weg dahin; die jüngsten Features stehen unter „v0.8" am Ende.
 
-![Viktor auf Patrouille, mit schwebendem Namensschild: Name, Aktion, HP-Balken und Gedankenzeile „Erkundet die Gegend"](docs/images/nameplate.jpg)
+![Ein Trupp von Claude-gesteuerten NPCs im Feld, je mit schwebendem Namensschild (Name, Aktion, HP, Gedankenzeile), die sich gegenseitig zufunken](docs/images/squad.jpg)
 
-*Viktor, ein von Claude gesteuerter Survivor, erkundet selbstständig die Gegend — das schwebende Namensschild zeigt Name, Aktion, HP-Balken und aktuelle Absicht.*
+*Ein Trupp Claude-gesteuerter Survivor koordiniert sich im Feld — jedes schwebende Namensschild zeigt Name, aktuelle Aktion, HP-Balken und eine Live-Gedankenzeile, und sie funken einander zu.*
 
 **Schnelltest der Motorik (Phase 1):** `python daemon\test_driver.py demo` spawnt einen NPC und schickt ihn 80 m weit. Steht am Ende `ERFOLG`, ist die Bridge in Ordnung.
 
