@@ -57,6 +57,19 @@ class IsuNameplateHud
 			m_Speeches.Insert(TextWidget.Cast(m_Root.FindAnyWidget("Speech" + i.ToString())));
 			if (tag)
 				tag.Show(false);
+
+			// Dunkler 1px-Umriss um jede Glyphe (SDF-Font), EINMALIG beim Anlegen.
+			// Macht den hellen Text (Name/Aktion/Absicht) auf hellem Tageslicht-
+			// Hintergrund (Beton/Gras) lesbar - ohne Hintergrundpanel, ohne Pro-
+			// Frame-Kosten. 0xC0000000 = 75% Schwarz. Der Umriss ist unabhaengig
+			// vom Pro-Frame-SetColor des Namens und ueberlebt jeden Update-Tick.
+			// Speech bleibt aussen vor: hat schon seinen eigenen SpeechBg.
+			if (m_Names[i])
+				m_Names[i].SetOutline(1, 0xC0000000);
+			if (m_Acts[i])
+				m_Acts[i].SetOutline(1, 0xC0000000);
+			if (m_Intents[i])
+				m_Intents[i].SetOutline(1, 0xC0000000);
 		}
 	}
 
