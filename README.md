@@ -6,7 +6,7 @@ An autonomous DayZ survivor driven by Claude Code. The architecture has three la
 
 *A squad of Claude-driven survivors coordinating in the field — each floating nameplate shows the NPC's name, current action, HP bar and a live thought line, and they radio each other.*
 
-**▶ On the Steam Workshop:** [ISU Survivor Agent Bridge](https://steamcommunity.com/sharedfiles/filedetails/?id=3751378445) · [ISU Survivor Voice](https://steamcommunity.com/sharedfiles/filedetails/?id=3751379952) — the in-game half of the project. You still need the companion daemon (this repo) and DayZ-Expansion-AI.
+**▶ On the Steam Workshop:** [ISU Survivor — AI Companions](https://steamcommunity.com/sharedfiles/filedetails/?id=3751378445) (core) · [ISU Survivor — Voice & Menu](https://steamcommunity.com/sharedfiles/filedetails/?id=3751379952) — the in-game half of the project. You still need the companion daemon (this repo) and DayZ-Expansion-AI.
 
 > **This is the public, sanitized copy.** All keys, tokens, personal data and machine-specific settings have been removed — you supply your own (see the guides below). Large/derived assets are **not** in the repo and are fetched on first run: the LLM model weights (`models/`), the llama.cpp binaries (`tools/llama-bin/`), the third-party DayZ/Expansion reference sources (`reference/`), and the packed mods (`build/`).
 >
