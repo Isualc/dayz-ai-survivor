@@ -157,6 +157,21 @@ Spawns an NPC and walks it ~80 m. If it ends with `ERFOLG`, the bridge to the se
 
 The full phase-by-phase history (v0.4 through v1.0) is documented in **[README.de.md](README.de.md)**.
 
+## Screenshots
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/squad.jpg" alt="A squad of Claude-driven NPCs with floating nameplates, sharing radio updates"><br><sub><b>Squad coordination</b> — each NPC acts on its own; nameplates show name, action, HP and current intent, and they radio each other.</sub></td>
+<td width="50%"><img src="docs/images/combat.jpg" alt="NPCs looting and providing covering fire in the field"><br><sub><b>In the field</b> — autonomous looting, ammo runs and covering fire, all decided by the agents.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/images/command_wheel.jpg" alt="The in-game radial command wheel with Follow, Attack, Hold, Loot and Regroup"><br><sub><b>Command wheel</b> — direct orders to the targeted NPC: Follow / Attack / Hold / Loot / Regroup.</sub></td>
+<td width="50%"><img src="docs/images/arena_menu.jpg" alt="The in-game arena setup menu showing per-NPC model, role, voice and language"><br><sub><b>Arena setup menu</b> (Insert key) — per-NPC provider, model, role, voice and language, all configured in-game.</sub></td>
+</tr>
+</table>
+
+> NPCs think and speak in a **per-NPC configurable language** (set in the menu — note Viktor=Filipino, Birgit=Polski, Igor=Chinese, Konrad=Deutsch above). The German speech in these shots is just the language those slots were set to.
+
 ## Troubleshooting
 
 | Symptom | Cause / fix |
