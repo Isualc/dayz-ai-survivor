@@ -2,9 +2,9 @@
 
 An autonomous DayZ survivor driven by Claude Code. The architecture has three layers: **reflexes** run on the server in the DayZ-Expansion AI (EnforceScript), **tactics** run in a local Python daemon, and **strategy + speech** come from Claude over MCP. What began as pure locomotion is now a full **multi-agent system**: up to four Claude-driven NPCs at once, each with its own memory, model, and voice, plus audible speech (Discord + 3D in-game), floating nameplates, an in-game setup menu, and direct commands via hotkeys and a command wheel.
 
-![A squad of Claude-driven NPCs in the field, each with a floating nameplate showing name, action, HP and a live thought line, radioing each other](docs/images/squad.jpg)
+![ISU Survivor key art — a squad of Claude-driven survivors in the field, with the tagline "DayZ NPCs with a real AI brain"](docs/images/cover.jpg)
 
-*A squad of Claude-driven survivors coordinating in the field — each floating nameplate shows the NPC's name, current action, HP bar and a live thought line, and they radio each other.*
+*Up to four AI-driven survivors per server — each with its own memory, model, and voice.*
 
 **▶ On the Steam Workshop:** [ISU Survivor — AI Companions](https://steamcommunity.com/sharedfiles/filedetails/?id=3751378445) (core) · [ISU Survivor — Voice & Menu](https://steamcommunity.com/sharedfiles/filedetails/?id=3751379952) — the in-game half of the project. You still need the companion daemon (this repo) and DayZ-Expansion-AI.
 
