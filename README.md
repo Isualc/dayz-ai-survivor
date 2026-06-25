@@ -2,9 +2,9 @@
 
 An autonomous DayZ survivor driven by Claude Code. The architecture has three layers: **reflexes** run on the server in the DayZ-Expansion AI (EnforceScript), **tactics** run in a local Python daemon, and **strategy + speech** come from Claude over MCP. What began as pure locomotion is now a full **multi-agent system**: up to four Claude-driven NPCs at once, each with its own memory, model, and voice, plus audible speech (Discord + 3D in-game), floating nameplates, an in-game setup menu, and direct commands via hotkeys and a command wheel.
 
-![Viktor on patrol, with his floating nameplate showing name, current action, HP, and the thought line "Erkundet die Gegend" (exploring the area)](docs/images/nameplate.jpg)
+![A squad of Claude-driven NPCs in the field, each with a floating nameplate showing name, action, HP and a live thought line, radioing each other](docs/images/squad.jpg)
 
-*Viktor, a Claude-driven survivor, exploring on his own — the floating nameplate shows his name, action, HP bar, and current intent.*
+*A squad of Claude-driven survivors coordinating in the field — each floating nameplate shows the NPC's name, current action, HP bar and a live thought line, and they radio each other.*
 
 > **This is the public, sanitized copy.** All keys, tokens, personal data and machine-specific settings have been removed — you supply your own (see the guides below). Large/derived assets are **not** in the repo and are fetched on first run: the LLM model weights (`models/`), the llama.cpp binaries (`tools/llama-bin/`), the third-party DayZ/Expansion reference sources (`reference/`), and the packed mods (`build/`).
 >
@@ -161,7 +161,7 @@ The full phase-by-phase history (v0.4 through v1.0) is documented in **[README.d
 
 <table>
 <tr>
-<td width="50%"><img src="docs/images/squad.jpg" alt="A squad of Claude-driven NPCs with floating nameplates, sharing radio updates"><br><sub><b>Squad coordination</b> — each NPC acts on its own; nameplates show name, action, HP and current intent, and they radio each other.</sub></td>
+<td width="50%"><img src="docs/images/townsweep.jpg" alt="The squad sweeping a built-up town, NPCs spread out to cover ground"><br><sub><b>Town sweep</b> — the squad spreads out to search a built-up area, each NPC scouting on its own.</sub></td>
 <td width="50%"><img src="docs/images/combat.jpg" alt="NPCs looting and providing covering fire in the field"><br><sub><b>In the field</b> — autonomous looting, ammo runs and covering fire, all decided by the agents.</sub></td>
 </tr>
 <tr>
