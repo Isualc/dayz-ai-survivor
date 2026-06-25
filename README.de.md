@@ -8,6 +8,8 @@ Ein autonomer DayZ-Survivor, gesteuert von Claude Code. Die Architektur hat drei
 
 *Ein Trupp Claude-gesteuerter Survivor koordiniert sich im Feld — jedes schwebende Namensschild zeigt Name, aktuelle Aktion, HP-Balken und eine Live-Gedankenzeile, und sie funken einander zu.*
 
+**▶ Im Steam Workshop:** [ISU Survivor Agent Bridge](https://steamcommunity.com/sharedfiles/filedetails/?id=3751378445) · [ISU Survivor Voice](https://steamcommunity.com/sharedfiles/filedetails/?id=3751379952) — die In-Game-Hälfte des Projekts. Du brauchst zusätzlich den Daemon (dieses Repo) und DayZ-Expansion-AI.
+
 **Schnelltest der Motorik (Phase 1):** `python daemon\test_driver.py demo` spawnt einen NPC und schickt ihn 80 m weit. Steht am Ende `ERFOLG`, ist die Bridge in Ordnung.
 
 ## Projektlayout
