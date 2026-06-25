@@ -452,19 +452,19 @@ class IsuArenaMenu extends UIScriptedMenu
 		int pillCol = ARGBF(0.95, 0.09, 0.11, 0.14);
 		int txtCol = ARGBF(1.0, 0.85, 0.88, 0.90);
 
-		if (raw.IndexOf("LAEUFT") > -1)
+		if (raw.IndexOf("RUNNING") > -1)
 		{
 			dotCol = ARGBF(1.0, 0.48, 0.78, 0.30);
 			pillCol = ARGBF(0.95, 0.06, 0.13, 0.06);
 			txtCol = ARGBF(1.0, 0.66, 0.90, 0.58);
 		}
-		else if (raw.IndexOf("FEHLER") > -1 || raw.IndexOf("ABGEBROCHEN") > -1)
+		else if (raw.IndexOf("ERROR") > -1 || raw.IndexOf("ABORTED") > -1)
 		{
 			dotCol = ARGBF(1.0, 0.88, 0.30, 0.28);
 			pillCol = ARGBF(0.95, 0.16, 0.06, 0.06);
 			txtCol = ARGBF(1.0, 0.95, 0.62, 0.60);
 		}
-		else if (raw.IndexOf("WARTE") > -1 || raw.IndexOf("STARTE") > -1 || raw.IndexOf("STOPPE") > -1 || raw.IndexOf("sent") > -1)
+		else if (raw.IndexOf("WAIT") > -1 || raw.IndexOf("STARTING") > -1 || raw.IndexOf("STOPPING") > -1 || raw.IndexOf("sent") > -1)
 		{
 			dotCol = ARGBF(1.0, 0.94, 0.70, 0.25);
 			pillCol = ARGBF(0.95, 0.14, 0.11, 0.04);

@@ -364,10 +364,10 @@ def wait_port(port: int, timeout_s: int, label: str) -> bool:
             log(f"{label} ist bereit (Port {port}).")
             return True
         if request_seq() != LAST_SEQ["seq"]:
-            write_status(f"ABGEBROCHEN: neuer Befehl waehrend {label}-Start")
+            write_status(f"ABORTED: new command during {label} start")
             return False
         remaining = int(deadline - time.monotonic())
-        write_status(f"WARTE auf {label} (Port {port}, noch {remaining}s)...")
+        write_status(f"WAIT for {label} (port {port}, {remaining}s left)...")
         time.sleep(5)
     return False
 
@@ -391,19 +391,19 @@ def ensure_backends(cfg: dict) -> bool:
     needs_llama = any(m.startswith("local/") for m in models)
 
     if needs_ccr and not port_open(CCR_PORT):
-        write_status("STARTE Cloud-Router (OpenAI/Google/Grok)...")
+        write_status("STARTING cloud router (OpenAI/Google/Grok)...")
         spawn_backend("ccr", "start_router.ps1")
         if not wait_port(CCR_PORT, 120, "Cloud-Router"):
-            write_status("FEHLER/ABBRUCH: Cloud-Router nicht bereit - "
-                         "Fenster 'start_router' pruefen (npm/API-Keys).")
+            write_status("ERROR: cloud router not ready - "
+                         "check the 'start_router' window (npm/API keys).")
             return False
 
     if needs_llama and not port_open(LLAMA_PORT):
-        write_status("STARTE llama-server (1. Mal: ~5 GB Gemma-Download!)...")
+        write_status("STARTING llama-server (first time: ~5 GB Gemma download!)...")
         spawn_backend("llama", "start_llama_gemma.ps1")
         if not wait_port(LLAMA_PORT, 1200, "llama-server"):
-            write_status("FEHLER/ABBRUCH: llama-server nicht bereit - "
-                         "Fenster 'start_llama_gemma' pruefen.")
+            write_status("ERROR: llama-server not ready - "
+                         "check the 'start_llama_gemma' window.")
             return False
 
     return True
@@ -839,12 +839,12 @@ class Arena:
             log(f"WARNUNG: {len(dead_bots)} Voice-Bot(s) sofort wieder "
                 f"beendet - Token/Kanal im jeweiligen Fenster pruefen.")
 
-        mode = "FEINDLICH" if cfg["hostile"] else "neutral"
+        mode = "HOSTILE" if cfg["hostile"] else "neutral"
         orch_note = " +Orch" if (cfg.get("orch") and started) else ""
         if started:
-            write_status(f"LAEUFT ({mode}){orch_note}: " + ", ".join(started))
+            write_status(f"RUNNING ({mode}){orch_note}: " + ", ".join(started))
         else:
-            write_status("GESTOPPT (keine Agenten gewaehlt)")
+            write_status("STOPPED (no agents selected)")
 
 
 def ensure_br_loadout() -> None:
@@ -986,7 +986,7 @@ def main() -> int:
             pass
 
     LAST_SEQ["seq"] = last_seq
-    write_status("BEREIT - Menue im Spiel: Einfg")
+    write_status("READY - in-game menu: Insert")
     log(f"Supervisor laeuft. Warte auf Befehle in {REQUEST_FILE}")
 
     bad_tries = 0
@@ -1016,7 +1016,7 @@ def main() -> int:
                     last_seq = seq
                     LAST_SEQ["seq"] = seq
                     bad_tries = 0
-                    write_status(f"FEHLER: Befehl unlesbar ({e})")
+                    write_status(f"ERROR: unreadable command ({e})")
                 else:
                     log(f"Befehl unlesbar ({e}) - Versuch {bad_tries}/3.")
                 continue
@@ -1024,22 +1024,22 @@ def main() -> int:
             last_seq = seq
             LAST_SEQ["seq"] = seq
             if not cfg:
-                write_status("FEHLER: Befehl nicht verstanden")
+                write_status("ERROR: command not understood")
                 continue
             if cfg["action"] == "stop":
-                write_status("STOPPE...")
+                write_status("STOPPING...")
                 arena.stop()
-                write_status("GESTOPPT")
+                write_status("STOPPED")
             else:
-                write_status("STARTE...")
+                write_status("STARTING...")
                 try:
                     arena.start(cfg)
                 except Exception as e:
-                    write_status(f"FEHLER beim Start: {e}")
+                    write_status(f"ERROR on start: {e}")
     except KeyboardInterrupt:
         log("Supervisor beendet - stoppe Agenten...")
         arena.stop()
-        write_status("SUPERVISOR AUS")
+        write_status("SUPERVISOR OFF")
         return 0
 
 

@@ -1050,7 +1050,7 @@ FrameWidgetClass IsuArenaRoot {
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "Klick auf ein Feld (Provider/Model/Role/Voice/Lang) klappt die Liste auf. Stop/Go/Radial wirken auf den anvisierten NPC."
+   text "Click a field (Provider/Model/Role/Voice/Lang) to open its list. Stop/Go/Radial act on the targeted NPC."
    font "gui/fonts/sdf_MetronBook24"
    color 0.5 0.5 0.52 1
   }
