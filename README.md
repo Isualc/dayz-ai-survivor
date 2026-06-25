@@ -19,6 +19,7 @@ An autonomous DayZ survivor driven by Claude Code. The architecture has three la
 | **[docs/api_keys_en.md](docs/api_keys_en.md)** | Every API key — which ones, where to get them, how to set them |
 | **[docs/discord_bot_setup_en.md](docs/discord_bot_setup_en.md)** | Creating the Discord voice bots step by step (one per NPC) |
 | **[docs/claude_cli_setup_en.md](docs/claude_cli_setup_en.md)** | Installing the Claude Code CLI, authenticating, and how model selection routes |
+| [docs/steam_workshop_publish_en.md](docs/steam_workshop_publish_en.md) | Publishing the two mod halves to the Steam Workshop |
 | [docs/protocol.md](docs/protocol.md) | The JSON file-bridge protocol between the daemon and the mod |
 | [.env.example](.env.example) | The complete catalog of environment variables |
 
