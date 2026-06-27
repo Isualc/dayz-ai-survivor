@@ -213,7 +213,7 @@ def move_to(x: float, z: float) -> str:
             d = (dx * dx + dz * dz) ** 0.5
             return (f"Du bist bereits am Ziel (Distanz {d:.0f} m) - kein erneuter "
                     f"Marsch noetig. Mach etwas anderes oder beende den Zug.")
-    result = BRIDGE.run("move_to", x=x, z=z, timeout=35, interruptible=True)
+    result = BRIDGE.run("move_to", x=x, z=z, timeout=75, interruptible=True)
     return _outcome(result, "Angekommen.")
 
 

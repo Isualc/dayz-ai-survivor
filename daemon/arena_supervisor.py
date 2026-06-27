@@ -245,17 +245,17 @@ def start_voice_bots(cfg: dict, roster: dict) -> list:
     return procs
 
 # Spawn-Versatz der vier Agenten um den Lagerpunkt (NW, NO, SW, SO)
-# "Getrennt": die Agenten spawnen WEIT auseinander (~90 m in die vier
-# Diagonalen, also 180-250 m Abstand) und marschieren dann selbststaendig zum
+# "Getrennt": die Agenten spawnen WEIT auseinander (~45 m in die vier
+# Diagonalen, also 90-130 m Abstand) und marschieren dann selbststaendig zum
 # Treffpunkt (= Lager), wo sie sich im Coop vereinen - ohne den Spieler (der
 # Konvergenz-Auftrag kommt per --rally an run_agent). Distanz bewusst moderat,
 # damit alle vier Punkte am Orts-/Stadtlager auf Land bleiben (ResolvePos in der
 # Mod prueft kein Wasser; am Sakhal-Stadtlager 7680/7800 verifiziert).
 SPAWN_OFFSETS = {
-    "viktor": (-90.0, -90.0),
-    "birgit": (90.0, -90.0),
-    "igor": (-90.0, 90.0),
-    "konrad": (90.0, 90.0),
+    "viktor": (-45.0, -45.0),
+    "birgit": (45.0, -45.0),
+    "igor": (-45.0, 45.0),
+    "konrad": (45.0, 45.0),
 }
 # "Als Gruppe": enger Cluster am Lager statt der ~14-m-Streuung, damit die
 # Agenten direkt beisammen starten (Menue-Schalter "Spawn: als Gruppe").
@@ -270,7 +270,7 @@ GROUP_OFFSETS = {
 # ABSOLUTE Koordinaten pro Karte (NICHT lagerrelativ). Aus den Server-Mission-
 # Dateien (mapgrouppos.xml) als dichte Gebaeude-Cluster verifiziert = Land.
 # Fehlt eine Karte/ein Slot hier, faellt der getrennte Spawn auf SPAWN_OFFSETS
-# (~90 m) zurueck. Distanz bewusst <= ~5 km, damit der Marsch (auf Sakhal in
+# (~45 m) zurueck. Distanz bewusst <= ~5 km, damit der Marsch (auf Sakhal in
 # toedlicher Kaelte) machbar bleibt.
 SCATTER_TOWNS = {
     # Punkte sind gebaeudefreie Stellen (>=9 m Abstand) im jeweiligen Stadtkern,
@@ -633,7 +633,7 @@ class Arena:
                 f"spawnt in einer anderen Stadt und marschiert zum Treffpunkt "
                 f"{camp_x:.0f}/{camp_z:.0f} (Coop, ohne Spieler).")
         elif separate:
-            log(f"Spawn-Modus: GETRENNT (~90 m) - Agenten spawnen verstreut und "
+            log(f"Spawn-Modus: GETRENNT (~45 m) - Agenten spawnen verstreut und "
                 f"sammeln sich am Treffpunkt {camp_x:.0f}/{camp_z:.0f}.")
         else:
             log("Spawn-Modus: GRUPPE - Agenten spawnen eng beisammen am Lager.")

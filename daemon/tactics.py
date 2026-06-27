@@ -534,11 +534,11 @@ def explore_step(bridge: Bridge, log=print) -> str:
     tx = x + math.sin(bearing) * dist
     tz = z + math.cos(bearing) * dist
 
-    result = bridge.run("move_to", x=tx, z=tz, timeout=240)
+    result = bridge.run("move_to", x=tx, z=tz, timeout=90)
     move_note = "Angekommen" if result.get("status") == "done" \
         else f"Bewegung: {result.get('detail')}"
 
-    loot = loot_area(bridge, max_items=4, time_budget=150, log=log)
+    loot = loot_area(bridge, max_items=4, time_budget=60, log=log)
     haul = ", ".join(loot["haul"]) if loot["haul"] else "nichts Lohnendes"
     return f"{move_note} bei x={tx:.0f} z={tz:.0f}. Eingesammelt: {haul}."
 

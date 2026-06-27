@@ -236,7 +236,7 @@ class IsuArenaMenu extends UIScriptedMenu
 	static bool s_CampFromPlayer = false;
 	static ref array<int> s_IdleValues = {60, 120, 180, 300};
 	static int s_IdleIdx = 1;
-	static ref array<int> s_TurnValues = {6, 10, 15, 0};
+	static ref array<int> s_TurnValues = {6, 10, 15, 20, 0};
 	static int s_TurnsIdx = 1;
 	static bool s_Mic = true;
 	static bool s_GroupSpawn = false;   // false = getrennt spawnen, true = eng als Gruppe
