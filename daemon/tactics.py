@@ -105,6 +105,18 @@ def classify_melee(classname: str) -> int:
     return 0
 
 
+# Reine Bau-/Grab-/Farm-Werkzeuge: taugen als Notnagel-Melee, sollen aber NICHT
+# als "beste Waffe" gelten (sonst stand der NPC mit einer Pickaxe am Lager rum
+# und equip_best meldete faelschlich "schon bewaffnet", statt sich ein Gewehr/
+# Messer zu holen). Aus der Waffen-/Melee-WAHL ausschliessen; Looten/Bauen
+# bleibt davon unberuehrt (classify_melee aendert sich nicht).
+TOOL_PATTERNS = ("Pickaxe", "Shovel", "FieldShovel", "Hoe")
+
+
+def is_tool(classname: str) -> bool:
+    return any(t.lower() in classname.lower() for t in TOOL_PATTERNS)
+
+
 def score_ground_item(entry: dict, inventory: list[dict]) -> int:
     """Wie lohnend ist ein Bodenitem? 0 = liegen lassen."""
     cn = entry.get("classname", "")
@@ -237,6 +249,8 @@ def pick_best_weapon(inventory: list[dict]) -> str:
     melee_cn, melee_score = "", 0
     for item in usable:
         cn = item.get("classname", "")
+        if is_tool(cn):
+            continue   # Pickaxe/Shovel etc. sind keine Waffe
         score = classify_melee(cn)
         if score > melee_score:
             melee_cn, melee_score = cn, score
@@ -273,6 +287,8 @@ def pick_best_melee(inventory: list[dict]) -> str:
     melee_cn, melee_score = "", 0
     for item in usable:
         cn = item.get("classname", "")
+        if is_tool(cn):
+            continue   # Pickaxe/Shovel etc. sind keine Kampfwaffe
         score = classify_melee(cn)
         if score > melee_score:
             melee_cn, melee_score = cn, score

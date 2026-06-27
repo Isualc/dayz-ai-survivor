@@ -1115,9 +1115,12 @@ def restore_inventory(bridge: Bridge, journal: Journal, snapshot: dict) -> None:
     # unbandagiert und verblutet sofort wieder (Todesspirale). Frueher stand
     # Kleidung an Rang 0 ("schafft erst Kapazitaet/Rucksack"), aber give_item
     # traegt Kleidung nicht zwingend und in den Logs (20:28/20:33) verlor die
-    # Sanitaeterin trotzdem 5 Bandagen. Also: Medizin -> Kleidung -> Waffen ->
-    # Munition -> Rest. Verloren geht dann hoechstens redundante Kleidung, nie
-    # Medizin. Der Mod klassifiziert Medizin als kind=="other" (ClassifyItem kennt
+    # Sanitaeterin trotzdem 5 Bandagen. Reihenfolge jetzt: Medizin -> Waffen ->
+    # Kleidung -> Munition -> Rest. Feuerwaffen VOR Kleidung (dedizierte Waffenslots,
+    # kein Cargo noetig) - standen sie dahinter, gingen sie bei Platzmangel verloren
+    # und der Waffen-NPC respawnte unbewaffnet (Viktors "Gewehre weg"-Symptom).
+    # Verloren geht so hoechstens redundante Kleidung/Munition, nie Medizin/Waffe.
+    # Der Mod klassifiziert Medizin als kind=="other" (ClassifyItem kennt
     # nur food/firearm/ammo/clothing), darum hier zusaetzlich per Classname.
     _MEDICAL = ("bandage", "rag", "bloodbag", "saline", "morphine",
                 "epinephrine", "tetracycline", "charcoal", "vitamin",
@@ -1128,9 +1131,13 @@ def restore_inventory(bridge: Bridge, journal: Journal, snapshot: dict) -> None:
         cn = i.get("classname", "").lower()
         if any(m in cn for m in _MEDICAL):
             return 0          # zuerst: lebenswichtig, winzig, passt immer
+        if i.get("kind") == "firearm":
+            return 1          # Waffe VOR Kleidung: belegt dedizierte Waffenslots
+                              # (Schulter/Ruecken/Hand), braucht keinen Cargo - ging
+                              # sonst bei Platzmangel verloren (unbewaffneter NPC).
         if i.get("kind") == "clothing":
-            return 1          # danach Kleidung (Rucksack/Vest = Kapazitaet fuer den Rest)
-        return {"firearm": 2, "ammo": 3}.get(i.get("kind", "other"), 4)
+            return 2          # danach Kleidung (Rucksack/Vest = Kapazitaet fuer den Rest)
+        return {"ammo": 3}.get(i.get("kind", "other"), 4)
 
     items.sort(key=_restore_rank)
 

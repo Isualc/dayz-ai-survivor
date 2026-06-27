@@ -2067,6 +2067,63 @@ class IsuBridge
 		return cargo.GetItemCount() == 0;
 	}
 
+	// Naechsten eigenstaendigen Container am Boden (Zelt/Kiste/Fass/Rucksack)
+	// im Umkreis finden - dasselbe Kriterium wie CmdStore, nur als Helfer.
+	private EntityAI FindNearbyContainer(float radius)
+	{
+		EntityAI best = null;
+		float nearest = radius + 1.0;
+		array<Object> objects = new array<Object>();
+		array<CargoBase> cargos = new array<CargoBase>();
+		GetGame().GetObjectsAtPosition3D(m_Npc.GetPosition(), radius, objects, cargos);
+		foreach (Object obj : objects)
+		{
+			ItemBase cont = ItemBase.Cast(obj);
+			if (!cont || cont == m_Npc)
+				continue;
+			if (cont.GetHierarchyParent() || !cont.GetInventory() || !cont.GetInventory().GetCargo())
+				continue;
+			float dist = vector.Distance(m_Npc.GetPosition(), cont.GetPosition());
+			if (dist < nearest)
+			{
+				nearest = dist;
+				best = cont;
+			}
+		}
+		return best;
+	}
+
+	// Inhalt eines (getragenen) Kleidungsstuecks sicher ausraeumen, damit es
+	// danach LEER abgelegt werden kann - ohne Inhaltsverlust (der alte
+	// Kleidungswechsel-Bug). Reihenfolge: erst in einen nahen Container, sonst
+	// einzeln auf den Boden (dort wieder aufhebbar). Liefert die Anzahl
+	// geretteter Items. Rueckwaerts iterieren, weil Entfernen die Indizes schiebt.
+	private int EmptyGarmentCargo(EntityAI garment)
+	{
+		if (!garment || !garment.GetInventory())
+			return 0;
+		CargoBase cargo = garment.GetInventory().GetCargo();
+		if (!cargo)
+			return 0;
+
+		EntityAI container = FindNearbyContainer(30.0);
+		int moved = 0;
+		for (int i = cargo.GetItemCount() - 1; i >= 0; i--)
+		{
+			EntityAI inner = cargo.GetItem(i);
+			if (!inner)
+				continue;
+			bool ok = false;
+			if (container && container.GetInventory())
+				ok = container.GetInventory().TakeEntityToInventory(InventoryMode.SERVER, FindInventoryLocationType.CARGO, inner);
+			if (!ok)
+				ok = m_Npc.eAI_DropItem(inner, true);
+			if (ok)
+				moved++;
+		}
+		return moved;
+	}
+
 	private void CmdWear(IsuCommand cmd)
 	{
 		if (!NpcReady())
@@ -2152,9 +2209,26 @@ class IsuBridge
 			}
 			else
 			{
-				m_CmdStatus = "failed";
-				m_CmdDetail = "kein Platz fuers gefuellte " + blockerType + " - erst Inhalt per store_container ins Zelt/Kiste, dann " + cmd.text + " anziehen";
-				return;
+				// Alte Kleidung ist gefuellt und passt nicht ins eigene Inventar.
+				// FRUEHER: harter Abbruch -> der Agent drehte Schleifen, weil er den
+				// Inhalt der GETRAGENEN Kleidung nicht gezielt wegraeumen konnte
+				// (store_container erfasst ihn nur teilweise, das Zelt war oft voll).
+				// JETZT: Inhalt selbst ausraeumen (naher Container, sonst Boden -
+				// nie im Stueck lassen), dann das geleerte Stueck ablegen und tauschen.
+				int emptied = EmptyGarmentCargo(blocker);
+				if (!CargoIsEmpty(blocker))
+				{
+					m_CmdStatus = "failed";
+					m_CmdDetail = "konnte die alte " + blockerType + " nicht komplett leeren - manuell per store_container/drop ausraeumen, dann erneut";
+					return;
+				}
+				if (!m_Npc.eAI_DropItem(blocker, true))
+				{
+					m_CmdStatus = "failed";
+					m_CmdDetail = "alte " + blockerType + " geleert (" + emptied.ToString() + " Item(s) gesichert), aber Ausziehen scheiterte";
+					return;
+				}
+				disposal = blockerType + " geleert (" + emptied.ToString() + " Item(s) gesichert) und abgelegt";
 			}
 
 			if (TakeToBodySlot(wanted))
