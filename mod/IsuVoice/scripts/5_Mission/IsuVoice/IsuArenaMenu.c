@@ -175,8 +175,8 @@ class IsuArenaMenu extends UIScriptedMenu
 	// openai/ google/ xai/ = claude-code-router, local/ = llama-server.
 	// Modelle 2026-06-20 gegen die Provider-APIs verifiziert (echte Calls -> 200).
 	static ref TStringArray s_Providers = {"Anthropic", "OpenAI", "Google", "xAI", "Local"};
-	static ref TStringArray s_AnthropicModels = {"sonnet", "haiku", "opus", "api/sonnet", "api/haiku", "api/opus"};
-	static ref TStringArray s_AnthropicLabels = {"Sonnet 4.6", "Haiku 4.5", "Opus 4.8", "Sonnet (API)", "Haiku (API)", "Opus (API)"};
+	static ref TStringArray s_AnthropicModels = {"sonnet", "haiku", "opus", "claude-opus-4-7", "claude-opus-4-8", "api/sonnet", "api/haiku", "api/opus"};
+	static ref TStringArray s_AnthropicLabels = {"Sonnet 4.6", "Haiku 4.5", "Opus (auto)", "Opus 4.7", "Opus 4.8", "Sonnet (API)", "Haiku (API)", "Opus (API)"};
 	static ref TStringArray s_OpenAIModels = {"openai/gpt-5.5", "openai/gpt-5.4", "openai/gpt-5.4-mini", "openai/gpt-5.1", "openai/gpt-5-mini", "openai/gpt-4.1-mini", "openai/gpt-4o-mini"};
 	static ref TStringArray s_OpenAILabels = {"GPT-5.5", "GPT-5.4", "GPT-5.4-mini", "GPT-5.1", "GPT-5-mini", "GPT-4.1-mini", "GPT-4o-mini"};
 	static ref TStringArray s_GoogleModels = {"google/gemini-3.5-flash", "google/gemini-3.1-pro-preview", "google/gemini-3.1-flash-lite", "google/gemini-2.5-pro", "google/gemini-2.5-flash"};
