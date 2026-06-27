@@ -486,7 +486,7 @@ def water_run(bridge: Bridge, log=print) -> str:
     steps: list[str] = []
 
     if well.get("distance", 0) > 3.5:
-        result = bridge.run("move_to", x=well.get("x"), z=well.get("z"), timeout=240)
+        result = bridge.run("move_to", x=well.get("x"), z=well.get("z"), timeout=90)
         if result.get("status") != "done":
             return f"Komme nicht zum Brunnen: {result.get('detail')}"
         steps.append("Am Brunnen.")
