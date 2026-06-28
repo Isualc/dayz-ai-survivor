@@ -27,10 +27,31 @@ An autonomous DayZ survivor driven by Claude Code. The architecture has three la
 
 ---
 
+## Quick install (recommended)
+
+> Heard the setup is fiddly? It used to be. **Now there is a one-click installer.**
+
+Grab the **`dayz-ai-survivor-Setup.zip`** from the [latest release](https://github.com/Isualc/dayz-ai-survivor/releases), unzip it anywhere, and **double-click `INSTALL.bat`**. A guided wizard then does, in order, everything the individual scripts below do — with live progress and full path auto-detection:
+
+1. **Tools** — detects Python, Node.js and the Claude Code CLI; installs missing ones via `winget`.
+2. **Paths** — finds your Steam library, DayZ and DayZ Server automatically (no hard-coded `D:\...`) and stores the `DAYZ_*` variables for you.
+3. **Workshop mods** — opens a helper page with all eight dependencies and waits, with a live checklist, until Steam has downloaded them.
+4. **Server** — links the mods into the server and **deploys the pre-packed `IsuSurvivor` + `IsuVoice` PBOs that ship inside the ZIP**, so you do **not** need DayZ Tools.
+5. **Python packages** — installs everything from [`requirements.txt`](requirements.txt).
+6. **Claude + extras** — walks you through the Claude login, and (optional) the ElevenLabs, Discord and cloud-model keys, with the right links.
+
+The only things that stay manual are the **API keys** and the **Discord bot** — and the wizard opens the right pages and prompts for each. When it finishes it offers to launch `start_game.bat`. Re-running it is safe: every step skips work that is already done.
+
+*Building the ZIP yourself (maintainers): `powershell -ExecutionPolicy Bypass -File tools\make_release.ps1` bundles the freshly packed PBOs into `dist\dayz-ai-survivor-Setup.zip`.*
+
+If you instead **clone this repo** (rather than using the Setup ZIP), the `build\` PBOs are not included — follow the manual one-time setup below, which packs them with DayZ Tools.
+
+---
+
 ## Prerequisites
 
 - **Windows** with PowerShell (the tooling is PowerShell/`.bat`; the daemon is Python).
-- **DayZ** + **DayZ Server** + **DayZ Tools** (from Steam).
+- **DayZ** + **DayZ Server** (from Steam). **DayZ Tools** is only needed if you clone the repo and pack the mods yourself — the Setup ZIP ships the packed PBOs.
 - The **DayZ-Expansion** mod chain (CF → Dabs Framework → Expansion-Core → Expansion-AI) — subscribed via Steam Workshop. See setup below.
 - **Python 3.11+** with the `mcp` package (`python -m pip install mcp`).
 - **Node.js 18+** and the **Claude Code CLI** (`npm install -g @anthropic-ai/claude-code`) — see [the CLI guide](docs/claude_cli_setup_en.md).
