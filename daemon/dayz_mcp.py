@@ -84,8 +84,10 @@ LAST_INV_SIG = None  # Inventar-Kennung des letzten observe (Delta-Erkennung)
 # Zuordnung beim Empfaenger). Die Bildschirm-/Audio-Pfade bleiben unveraendert.
 RADIO_NATIVE = os.path.join(REPO_DIR, "arena", "radio_native.jsonl")
 
-# equip_best-Circuit-Breaker: aufeinanderfolgende Fehlschlaege, damit der NPC
-# nicht stur dieselbe scheiternde Aktion wiederholt (Konrad-Muster, Logs 20:28).
+# equip-Circuit-Breaker (geteilt von equip_best UND equip_melee, beide rufen
+# denselben Mod-"equip"-Befehl): aufeinanderfolgende Fehlschlaege, damit der NPC
+# nicht stur dieselbe scheiternde Aktion wiederholt - z.B. die Spawn-Race
+# "Equip-Ziel verschwunden", die equip_melee bisher in Schleife lief.
 _EQUIP_FAILS = 0
 _EQUIP_LAST_FAIL = 0.0
 
@@ -321,7 +323,23 @@ def equip_melee() -> str:
     weitere an, die dich allein toeten). Danach engage. Bei Uebermacht (mehrere
     gleichzeitig), gegen Raubtiere (Wolf/Baer) oder wenn dein Squad bei dir ist
     (macht ohnehin Laerm), nimm lieber equip_best (Schusswaffe)."""
-    return tactics.equip_melee(BRIDGE, log=lambda m: None)
+    global _EQUIP_FAILS, _EQUIP_LAST_FAIL
+    now = time.time()
+    # Gleicher Circuit-Breaker wie equip_best: nach 2 Fehlschlaegen in Folge
+    # (z.B. "Equip-Ziel verschwunden" direkt nach Spawn) nicht stur wiederholen.
+    if _EQUIP_FAILS >= 2 and (now - _EQUIP_LAST_FAIL) < 90.0:
+        return ("equip ist gerade 2x in Folge gescheitert - ruf es JETZT nicht "
+                "noch einmal. Loese es anders: observe (liegt die Waffe wirklich "
+                "vor dir?), die Waffe per pickup in die Hand nehmen, oder funk dem "
+                "Spieler dein Problem. Erst wieder versuchen, wenn sich die Lage "
+                "geaendert hat.")
+    result = tactics.equip_melee(BRIDGE, log=lambda m: None)
+    if "fehlgeschlagen" in result.lower():
+        _EQUIP_FAILS += 1
+        _EQUIP_LAST_FAIL = now
+    else:
+        _EQUIP_FAILS = 0
+    return result
 
 
 @mcp.tool()
@@ -707,8 +725,10 @@ def _loot_key(classname: str) -> str:
 @mcp.tool()
 def loot_container(classname: str = "") -> str:
     """Naechsten Behaelter MIT INHALT ausraeumen (max. 50 m): Leichen,
-    liegende Rucksaecke, Kleidung mit Sachen drin, Kisten. In observe
-    erkennst du sie am Marker [enthaelt N]. Beispiel:
+    liegende Rucksaecke, Kleidung mit Sachen drin, Kisten. ZELTE werden NICHT
+    gepluendert - das Lager-Zelt ist euer gemeinsamer Stauraum, da legst du mit
+    store_container hinein (sonst raeumst du den anderen ihr Depot leer). In
+    observe erkennst du Loot am Marker [enthaelt N]. Beispiel:
     loot_container(classname="TaloonBag") oder ohne Filter den naechsten."""
     key = _loot_key(classname)
     now = time.time()

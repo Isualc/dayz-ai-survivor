@@ -1313,7 +1313,12 @@ class IsuBridge
 			if (!body && !corpsesOnly)
 			{
 				ItemBase ground = ItemBase.Cast(obj);
-				if (ground && !ground.GetHierarchyParent() && CountContents(ground) > 0)
+				// Zelte sind Lager-Stauraum (store_container), KEINE Loot-Quelle -
+				// sonst raeumt ein NPC am gemeinsamen Lager das Squad-Zelt leer (zog
+				// Birgits Bandagen raus). loot_container zielt nur auf Leichen/
+				// Rucksaecke/Kisten.
+				if (ground && !ground.GetHierarchyParent() && CountContents(ground) > 0
+					&& !Tent_Base.Cast(ground))
 					body = ground;
 			}
 
