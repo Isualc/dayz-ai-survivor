@@ -25,7 +25,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text "Name"
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      color 0.9 0.9 0.9 1
     }
     TextWidgetClass Act0 {
@@ -37,7 +37,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      color 0.7 0.7 0.72 1
     }
     ImageWidgetClass HpBg0 {
@@ -71,7 +71,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      "text color" 0.55 0.57 0.60 1
      wrap 1
     }
@@ -95,7 +95,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      "text color" 0.08 0.08 0.10 1
      wrap 1
     }
@@ -119,7 +119,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text "Name"
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      color 0.9 0.9 0.9 1
     }
     TextWidgetClass Act1 {
@@ -131,7 +131,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      color 0.7 0.7 0.72 1
     }
     ImageWidgetClass HpBg1 {
@@ -165,7 +165,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      "text color" 0.55 0.57 0.60 1
      wrap 1
     }
@@ -189,7 +189,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      "text color" 0.08 0.08 0.10 1
      wrap 1
     }
@@ -213,7 +213,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text "Name"
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      color 0.9 0.9 0.9 1
     }
     TextWidgetClass Act2 {
@@ -225,7 +225,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      color 0.7 0.7 0.72 1
     }
     ImageWidgetClass HpBg2 {
@@ -259,7 +259,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      "text color" 0.55 0.57 0.60 1
      wrap 1
     }
@@ -283,7 +283,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      "text color" 0.08 0.08 0.10 1
      wrap 1
     }
@@ -307,7 +307,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text "Name"
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      color 0.9 0.9 0.9 1
     }
     TextWidgetClass Act3 {
@@ -319,7 +319,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      color 0.7 0.7 0.72 1
     }
     ImageWidgetClass HpBg3 {
@@ -353,7 +353,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      "text color" 0.55 0.57 0.60 1
      wrap 1
     }
@@ -377,7 +377,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      "text color" 0.08 0.08 0.10 1
      wrap 1
     }
@@ -401,7 +401,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text "Name"
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      color 0.9 0.9 0.9 1
     }
     TextWidgetClass Act4 {
@@ -413,7 +413,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      color 0.7 0.7 0.72 1
     }
     ImageWidgetClass HpBg4 {
@@ -447,7 +447,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      "text color" 0.55 0.57 0.60 1
      wrap 1
     }
@@ -471,7 +471,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      "text color" 0.08 0.08 0.10 1
      wrap 1
     }
@@ -495,7 +495,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text "Name"
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      color 0.9 0.9 0.9 1
     }
     TextWidgetClass Act5 {
@@ -507,7 +507,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      color 0.7 0.7 0.72 1
     }
     ImageWidgetClass HpBg5 {
@@ -541,7 +541,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      "text color" 0.55 0.57 0.60 1
      wrap 1
     }
@@ -565,7 +565,7 @@ FrameWidgetClass IsuNameplateRoot {
      hexactsize 1
      vexactsize 1
      text ""
-     font "gui/fonts/sdf_MetronBook24"
+     font "gui/fonts/etelkatextpro22"
      "text color" 0.08 0.08 0.10 1
      wrap 1
     }
