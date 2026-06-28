@@ -8,8 +8,7 @@
 #  wizard guides those with links and prompts.
 #
 #  Safe to re-run: every step detects existing state and skips or repairs.
-#  ASCII only (PowerShell 5.1 safe), German UI with ae/oe/ue substitutes to
-#  match the other tools\*.ps1 scripts.
+#  ASCII only (PowerShell 5.1 safe).
 #
 #  Switches:
 #    -SkipTools     do not try to install Python/Node/Claude CLI
@@ -54,18 +53,18 @@ function Write-Phase($text) {
     $script:StepNo++
     Write-Host ""
     Write-Host ("=" * 74) -ForegroundColor DarkCyan
-    Write-Host (" SCHRITT {0}: {1}" -f $script:StepNo, $text) -ForegroundColor Cyan
+    Write-Host (" STEP {0}: {1}" -f $script:StepNo, $text) -ForegroundColor Cyan
     Write-Host ("=" * 74) -ForegroundColor DarkCyan
 }
 function Write-Ok($text)   { Write-Host "  [OK]   $text" -ForegroundColor Green }
 function Write-Info($text) { Write-Host "  [..]   $text" -ForegroundColor Gray }
 function Write-Warn($text) { Write-Host "  [WARN] $text" -ForegroundColor Yellow }
-function Write-Err($text)  { Write-Host "  [FEHL] $text" -ForegroundColor Red }
+function Write-Err($text)  { Write-Host "  [FAIL] $text" -ForegroundColor Red }
 function Ask-YesNo($question, $defaultYes = $true) {
-    $hint = if ($defaultYes) { "(J/n)" } else { "(j/N)" }
+    $hint = if ($defaultYes) { "(Y/n)" } else { "(y/N)" }
     $a = Read-Host "  $question $hint"
     if (-not $a) { return $defaultYes }
-    return ($a -match "^[jJyY]")
+    return ($a -match "^[yY]")
 }
 
 # Track what is set / missing for the final summary.
@@ -136,67 +135,66 @@ function Open-SteamInstall($appid) {
 Clear-Host
 Write-Host ""
 Write-Host "  ###########################################################" -ForegroundColor Cyan
-Write-Host "  #          dayz-ai-survivor  -  Setup-Assistent           #" -ForegroundColor Cyan
-Write-Host "  #              isualc AI  -  game ready in 7 Schritten     #" -ForegroundColor Cyan
+Write-Host "  #          dayz-ai-survivor  -  Setup wizard              #" -ForegroundColor Cyan
+Write-Host "  #              isualc AI  -  game ready in 7 steps        #" -ForegroundColor Cyan
 Write-Host "  ###########################################################" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  Dieser Assistent richtet alles ein, was du zum Hosten der KI-" -ForegroundColor Gray
-Write-Host "  Survivor brauchst: Werkzeuge, DayZ-Pfade, Workshop-Mods, Server-" -ForegroundColor Gray
-Write-Host "  Mods und die Python-Pakete. Nur die API-Keys und der optionale" -ForegroundColor Gray
-Write-Host "  Discord-Bot bleiben deine Sache - dabei fuehre ich dich Schritt" -ForegroundColor Gray
-Write-Host "  fuer Schritt durch." -ForegroundColor Gray
+Write-Host "  This wizard sets up everything you need to host the AI" -ForegroundColor Gray
+Write-Host "  survivors: tools, DayZ paths, workshop mods, server mods" -ForegroundColor Gray
+Write-Host "  and the Python packages. Only the API keys and the optional" -ForegroundColor Gray
+Write-Host "  Discord bot stay your job - and I walk you through those" -ForegroundColor Gray
+Write-Host "  step by step." -ForegroundColor Gray
 Write-Host ""
-Write-Host "  Du kannst den Assistenten jederzeit mit Strg+C abbrechen und" -ForegroundColor DarkGray
-Write-Host "  spaeter erneut starten - schon erledigte Schritte werden" -ForegroundColor DarkGray
-Write-Host "  uebersprungen." -ForegroundColor DarkGray
+Write-Host "  You can abort any time with Ctrl+C and run it again later -" -ForegroundColor DarkGray
+Write-Host "  steps that are already done get skipped." -ForegroundColor DarkGray
 Write-Host ""
-Write-Host ("  Projektordner: {0}" -f $RepoDir) -ForegroundColor DarkGray
-if (-not (Ask-YesNo "Jetzt starten?")) { Write-Host "Abgebrochen." ; exit 0 }
+Write-Host ("  Project folder: {0}" -f $RepoDir) -ForegroundColor DarkGray
+if (-not (Ask-YesNo "Start now?")) { Write-Host "Aborted." ; exit 0 }
 
 # ===========================================================================
-#  SCHRITT 1: Werkzeuge (Python, Node.js, Claude Code CLI)
+#  STEP 1: Tools (Python, Node.js, Claude Code CLI)
 # ===========================================================================
-Write-Phase "Werkzeuge pruefen (Python, Node.js, Claude Code CLI)"
+Write-Phase "Check tools (Python, Node.js, Claude Code CLI)"
 
 if ($SkipTools) {
-    Write-Warn "-SkipTools gesetzt: ueberspringe die Werkzeug-Installation."
+    Write-Warn "-SkipTools set: skipping the tool installation."
 } else {
     $haveWinget = Test-Cmd winget
     if (-not $haveWinget) {
-        Write-Warn "winget (App Installer) nicht gefunden. Fehlende Werkzeuge musst"
-        Write-Warn "du dann manuell installieren - ich sage gleich, welche."
+        Write-Warn "winget (App Installer) not found. You will have to install any"
+        Write-Warn "missing tools manually - I will tell you which ones."
     }
 
     # --- Python ---
     if (Test-Cmd python) {
         $pv = (& python --version) 2>&1
-        Write-Ok "Python gefunden: $pv"
+        Write-Ok "Python found: $pv"
     } else {
-        Write-Info "Python fehlt."
-        if ($haveWinget -and (Ask-YesNo "Python 3.12 jetzt per winget installieren?")) {
+        Write-Info "Python is missing."
+        if ($haveWinget -and (Ask-YesNo "Install Python 3.12 now via winget?")) {
             winget install -e --id Python.Python.3.12 --accept-source-agreements --accept-package-agreements
             Update-SessionPath
         }
         if (-not (Test-Cmd python)) {
-            Write-Err "Python weiterhin nicht im PATH. Bitte manuell installieren:"
-            Write-Err "  https://www.python.org/downloads/  (Haken 'Add to PATH' setzen!)"
-            Write-Err "Danach diesen Assistenten neu starten."
-        } else { Write-Ok "Python installiert." }
+            Write-Err "Python still not on PATH. Please install it manually:"
+            Write-Err "  https://www.python.org/downloads/  (tick 'Add to PATH'!)"
+            Write-Err "Then restart this wizard."
+        } else { Write-Ok "Python installed." }
     }
 
     # --- Node.js ---
     if (Test-Cmd node) {
-        Write-Ok "Node.js gefunden: $((& node --version) 2>&1)"
+        Write-Ok "Node.js found: $((& node --version) 2>&1)"
     } else {
-        Write-Info "Node.js fehlt (wird fuer die Claude Code CLI gebraucht)."
-        if ($haveWinget -and (Ask-YesNo "Node.js LTS jetzt per winget installieren?")) {
+        Write-Info "Node.js is missing (needed for the Claude Code CLI)."
+        if ($haveWinget -and (Ask-YesNo "Install Node.js LTS now via winget?")) {
             winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
             Update-SessionPath
         }
         if (-not (Test-Cmd node)) {
-            Write-Err "Node.js weiterhin nicht im PATH. Bitte manuell installieren:"
-            Write-Err "  https://nodejs.org/  (LTS-Version), danach Assistent neu starten."
-        } else { Write-Ok "Node.js installiert." }
+            Write-Err "Node.js still not on PATH. Please install it manually:"
+            Write-Err "  https://nodejs.org/  (LTS version), then restart the wizard."
+        } else { Write-Ok "Node.js installed." }
     }
 
     # --- Claude Code CLI ---
@@ -208,8 +206,8 @@ if ($SkipTools) {
             if (Test-Path $cand) { $claudeCli = $cand }
         } catch {}
         if (-not $claudeCli) {
-            Write-Info "Claude Code CLI fehlt."
-            if (Ask-YesNo "Claude Code CLI jetzt per npm global installieren?") {
+            Write-Info "Claude Code CLI is missing."
+            if (Ask-YesNo "Install the Claude Code CLI now via npm (global)?") {
                 & npm install -g "@anthropic-ai/claude-code"
                 try {
                     $npmRoot = (& npm root -g) 2>$null
@@ -220,32 +218,32 @@ if ($SkipTools) {
         }
         if ($claudeCli) { Write-Ok "Claude Code CLI: $claudeCli" }
     } else {
-        Write-Warn "npm nicht verfuegbar (Node.js fehlt) - Claude Code CLI uebersprungen."
+        Write-Warn "npm not available (Node.js missing) - Claude Code CLI skipped."
     }
 
     # Pin the resolved tool paths so the daemons do not have to guess.
     if (Test-Cmd node)   { Set-UserEnv "ISU_NODE_BIN"   (Get-Command node).Source }
     if ($claudeCli)      { Set-UserEnv "ISU_CLAUDE_CLI" $claudeCli }
 }
-Set-Status "Python"       $(if (Test-Cmd python) { "ok" } else { "FEHLT" })
-Set-Status "Node.js"      $(if (Test-Cmd node)   { "ok" } else { "FEHLT" })
-Set-Status "Claude CLI"   $(if ($env:ISU_CLAUDE_CLI) { "ok" } else { "pruefen" })
+Set-Status "Python"       $(if (Test-Cmd python) { "ok" } else { "MISSING" })
+Set-Status "Node.js"      $(if (Test-Cmd node)   { "ok" } else { "MISSING" })
+Set-Status "Claude CLI"   $(if ($env:ISU_CLAUDE_CLI) { "ok" } else { "check" })
 
 # ===========================================================================
-#  SCHRITT 2: DayZ-Pfade erkennen
+#  STEP 2: Detect DayZ paths
 # ===========================================================================
-Write-Phase "DayZ-Installation finden (Steam, DayZ, DayZ Server)"
+Write-Phase "Find the DayZ install (Steam, DayZ, DayZ Server)"
 
 $steam = Get-SteamPath
 if (-not $steam) {
-    Write-Err "Steam nicht gefunden. Bitte zuerst Steam installieren:"
+    Write-Err "Steam not found. Please install Steam first:"
     Write-Err "  https://store.steampowered.com/about/"
-    Write-Err "Danach diesen Assistenten neu starten."
-    Set-Status "DayZ-Pfade" "FEHLT (kein Steam)"
+    Write-Err "Then restart this wizard."
+    Set-Status "DayZ paths" "MISSING (no Steam)"
 } else {
     Write-Ok "Steam: $steam"
     $libs = Get-SteamLibraries $steam
-    Write-Info ("Steam-Bibliotheken: {0}" -f ($libs -join ", "))
+    Write-Info ("Steam libraries: {0}" -f ($libs -join ", "))
 
     # DayZ client (paid - must already be owned/installed)
     $dayzLib = Find-SteamApp $libs $APP_DAYZ
@@ -253,11 +251,11 @@ if (-not $steam) {
         $dayzDir = Join-Path $dayzLib "steamapps\common\DayZ"
         Set-UserEnv "DAYZ_DIR" $dayzDir
         Set-UserEnv "DAYZ_WORKSHOP_DIR" (Join-Path $dayzLib "steamapps\workshop\content\$WORKSHOP_APP")
-        Write-Ok "DayZ (Client): $dayzDir"
+        Write-Ok "DayZ (client): $dayzDir"
     } else {
-        Write-Warn "DayZ (Client) nicht installiert. DayZ ist kostenpflichtig - du"
-        Write-Warn "musst es besitzen und installieren, um spaeter selbst zuzuschauen."
-        if (Ask-YesNo "Steam-Installationsseite fuer DayZ jetzt oeffnen?" $false) { Open-SteamInstall $APP_DAYZ }
+        Write-Warn "DayZ (client) not installed. DayZ is a paid game - you must"
+        Write-Warn "own and install it to watch the survivors yourself in-game."
+        if (Ask-YesNo "Open the Steam install page for DayZ now?" $false) { Open-SteamInstall $APP_DAYZ }
     }
 
     # DayZ Server (free)
@@ -267,12 +265,12 @@ if (-not $steam) {
         Set-UserEnv "DAYZ_SERVER_DIR" $serverDir
         Write-Ok "DayZ Server: $serverDir"
     } else {
-        Write-Warn "DayZ Server (kostenlos) nicht installiert - er wird zum Hosten gebraucht."
-        if (Ask-YesNo "DayZ Server jetzt ueber Steam installieren (oeffnet Steam)?") {
+        Write-Warn "DayZ Server (free) not installed - it is required for hosting."
+        if (Ask-YesNo "Install DayZ Server now via Steam (opens Steam)?") {
             Open-SteamInstall $APP_SERVER
-            Write-Info "Warte auf den Server-Download... (Enter druecken, sobald Steam fertig ist; 's' = ueberspringen)"
+            Write-Info "Waiting for the server download... (press Enter once Steam is done; 's' = skip)"
             do {
-                $a = Read-Host "  Server installiert? Enter=pruefen, s=ueberspringen"
+                $a = Read-Host "  Server installed? Enter=re-check, s=skip"
                 if ($a -match "^[sS]") { break }
                 $libs = Get-SteamLibraries $steam
                 $srvLib = Find-SteamApp $libs $APP_SERVER
@@ -288,22 +286,22 @@ if (-not $steam) {
     if (-not $env:DAYZ_WORKSHOP_DIR -and $srvLib) {
         Set-UserEnv "DAYZ_WORKSHOP_DIR" (Join-Path $srvLib "steamapps\workshop\content\$WORKSHOP_APP")
     }
-    Set-Status "DayZ-Pfade" $(if ($env:DAYZ_SERVER_DIR) { "ok" } else { "unvollstaendig" })
+    Set-Status "DayZ paths" $(if ($env:DAYZ_SERVER_DIR) { "ok" } else { "incomplete" })
 }
 
 # ===========================================================================
-#  SCHRITT 3: Workshop-Mods abonnieren
+#  STEP 3: Subscribe to the workshop mods
 # ===========================================================================
-Write-Phase "Workshop-Mods abonnieren (8 Abhaengigkeiten)"
+Write-Phase "Subscribe to the workshop mods (8 dependencies)"
 
 if ($SkipWorkshop) {
-    Write-Warn "-SkipWorkshop gesetzt: ueberspringe das Abo der Workshop-Mods."
+    Write-Warn "-SkipWorkshop set: skipping the workshop subscriptions."
 } elseif (-not $env:DAYZ_WORKSHOP_DIR) {
-    Write-Warn "Workshop-Ordner unbekannt (DayZ-Pfade unvollstaendig) - uebersprungen."
+    Write-Warn "Workshop folder unknown (DayZ paths incomplete) - skipped."
 } else {
-    Write-Info "DayZ kann sich nicht selbst abonnieren - das macht der Steam-Client."
-    Write-Info "Ich oeffne eine Hilfsseite mit allen 8 Mods. Auf jeder Steam-Seite"
-    Write-Info "auf 'Abonnieren' klicken; Steam laedt sie dann herunter."
+    Write-Info "DayZ cannot subscribe itself - the Steam client does that."
+    Write-Info "I will open a helper page with all 8 mods. On each Steam page"
+    Write-Info "click 'Subscribe'; Steam then downloads them."
     Write-Host ""
     foreach ($m in $WORKSHOP_MODS) {
         Write-Host ("        - {0,-32} id {1}" -f $m.Name, $m.Id) -ForegroundColor Gray
@@ -313,11 +311,11 @@ if ($SkipWorkshop) {
     # Build a tiny local HTML page with clickable links (hands off to Steam).
     $html = New-Object System.Text.StringBuilder
     [void]$html.AppendLine('<!doctype html><html><head><meta charset="utf-8">')
-    [void]$html.AppendLine('<title>dayz-ai-survivor - Workshop-Mods abonnieren</title>')
+    [void]$html.AppendLine('<title>dayz-ai-survivor - subscribe to workshop mods</title>')
     [void]$html.AppendLine('<style>body{font-family:Segoe UI,Arial;background:#1b2838;color:#c7d5e0;max-width:760px;margin:30px auto;padding:0 16px}')
     [void]$html.AppendLine('h1{color:#66c0f4}a{display:inline-block;background:#2a475e;color:#fff;text-decoration:none;padding:8px 14px;border-radius:4px;margin:4px 0}a:hover{background:#66c0f4;color:#1b2838}li{margin:10px 0}</style></head><body>')
-    [void]$html.AppendLine('<h1>Workshop-Mods abonnieren</h1>')
-    [void]$html.AppendLine('<p>Auf jeden Button klicken und im Steam-Fenster <b>Abonnieren</b> druecken. Steam laedt die Mods automatisch herunter. Danach im Setup-Assistenten Enter druecken.</p><ol>')
+    [void]$html.AppendLine('<h1>Subscribe to the workshop mods</h1>')
+    [void]$html.AppendLine('<p>Click each button and press <b>Subscribe</b> in the Steam window. Steam downloads the mods automatically. Then press Enter back in the setup wizard.</p><ol>')
     foreach ($m in $WORKSHOP_MODS) {
         $url = "https://steamcommunity.com/sharedfiles/filedetails/?id=$($m.Id)"
         [void]$html.AppendLine(("<li><a href=""{0}"" target=""_blank"">{1}</a></li>" -f $url, $m.Name))
@@ -326,9 +324,9 @@ if ($SkipWorkshop) {
     $htmlPath = Join-Path $PSScriptRoot "_subscribe.html"
     [System.IO.File]::WriteAllText($htmlPath, $html.ToString(), (New-Object System.Text.UTF8Encoding($true)))
     Start-Process $htmlPath -ErrorAction SilentlyContinue
-    Write-Ok "Hilfsseite geoeffnet: $htmlPath"
+    Write-Ok "Helper page opened: $htmlPath"
     Write-Host ""
-    Write-Info "Ich pruefe jetzt, welche Mods schon heruntergeladen sind."
+    Write-Info "Now checking which mods have already downloaded."
 
     # Poll the workshop content folder until all 8 ids are present.
     do {
@@ -342,22 +340,22 @@ if ($SkipWorkshop) {
             $col  = if ($mark -eq "[OK]  ") { "Green" } else { "DarkGray" }
             Write-Host ("        {0}{1}" -f $mark, $m.Name) -ForegroundColor $col
         }
-        Write-Host ("  {0} von {1} bereit." -f $present.Count, $WORKSHOP_MODS.Count) -ForegroundColor Cyan
-        if ($missing.Count -eq 0) { Write-Ok "Alle Workshop-Mods heruntergeladen."; break }
-        $a = Read-Host "  Enter=erneut pruefen, s=trotzdem weiter"
-        if ($a -match "^[sS]") { Write-Warn "Weiter trotz fehlender Mods - der Server startet evtl. nicht."; break }
+        Write-Host ("  {0} of {1} ready." -f $present.Count, $WORKSHOP_MODS.Count) -ForegroundColor Cyan
+        if ($missing.Count -eq 0) { Write-Ok "All workshop mods downloaded."; break }
+        $a = Read-Host "  Enter=re-check, s=continue anyway"
+        if ($a -match "^[sS]") { Write-Warn "Continuing despite missing mods - the server may not start."; break }
     } while ($true)
-    Set-Status "Workshop-Mods" ("{0}/{1}" -f $present.Count, $WORKSHOP_MODS.Count)
+    Set-Status "Workshop mods" ("{0}/{1}" -f $present.Count, $WORKSHOP_MODS.Count)
 }
 
 # ===========================================================================
-#  SCHRITT 4: Server verlinken + Server-Mods deployen
+#  STEP 4: Link the mods + deploy the server mods
 # ===========================================================================
-Write-Phase "Server einrichten (Mods verlinken, Server-Mods deployen)"
+Write-Phase "Set up the server (link mods, deploy server mods)"
 
 if (-not $env:DAYZ_SERVER_DIR -or -not (Test-Path $env:DAYZ_SERVER_DIR)) {
-    Write-Err "DayZ-Server-Ordner fehlt - dieser Schritt wird uebersprungen."
-    Set-Status "Server-Setup" "FEHLT"
+    Write-Err "DayZ Server folder missing - this step is skipped."
+    Set-Status "Server setup" "MISSING"
 } else {
     # 4a) Junctions + bikeys + dev config (the existing one-time setup script).
     #     Run it in a CHILD powershell process: that script calls `exit 1` when
@@ -365,13 +363,13 @@ if (-not $env:DAYZ_SERVER_DIR -or -not (Test-Path $env:DAYZ_SERVER_DIR)) {
     #     otherwise terminate THIS wizard too. The child inherits our process env
     #     (DAYZ_SERVER_DIR/DAYZ_WORKSHOP_DIR are already set), so it finds the paths.
     $linkScript = Join-Path $RepoDir "tools\install_mods_to_server.ps1"
-    Write-Info "Verlinke Workshop-Mods in den Server (Junctions, Bikeys, Dev-Config)..."
+    Write-Info "Linking the workshop mods into the server (junctions, bikeys, dev config)..."
     & powershell -NoProfile -ExecutionPolicy Bypass -File $linkScript
     if ($LASTEXITCODE -eq 0) {
-        Write-Ok "Workshop-Mods verlinkt + Dev-Config deployt."
+        Write-Ok "Workshop mods linked + dev config deployed."
     } else {
-        Write-Warn "install_mods_to_server meldete einen Fehler (Code $LASTEXITCODE)."
-        Write-Warn "(Meist nur fehlende Workshop-Mods - Schritt 3 nachholen und neu starten.)"
+        Write-Warn "install_mods_to_server reported an error (code $LASTEXITCODE)."
+        Write-Warn "(Usually just missing workshop mods - redo step 3 and re-run.)"
     }
 
     # 4b) Deploy the PRE-PACKED server mods. This is the big simplification:
@@ -381,143 +379,143 @@ if (-not $env:DAYZ_SERVER_DIR -or -not (Test-Path $env:DAYZ_SERVER_DIR)) {
     foreach ($modName in @("IsuSurvivor", "IsuVoice")) {
         $srcPbo = Join-Path $RepoDir "build\@$modName\addons\$modName.pbo"
         if (-not (Test-Path $srcPbo)) {
-            Write-Warn "Mitgelieferte PBO fehlt: $srcPbo"
-            Write-Warn "(Im Release-ZIP enthalten; bei einem Git-Klon erst tools\pack_mod.ps1 laufen lassen.)"
+            Write-Warn "Bundled PBO missing: $srcPbo"
+            Write-Warn "(Shipped inside the release ZIP; from a git clone run tools\pack_mod.ps1 first.)"
             continue
         }
         $dstDir = Join-Path $env:DAYZ_SERVER_DIR "@$modName\addons"
         try {
             New-Item -ItemType Directory -Force $dstDir | Out-Null
             Copy-Item $srcPbo (Join-Path $dstDir "$modName.pbo") -Force -ErrorAction Stop
-            # bikey mitnehmen, falls vorhanden (Signaturpruefung ist im Dev-Cfg aus,
-            # aber sauberer ist es trotzdem).
+            # Take the bikey too if present (signature check is off in the dev
+            # config, but it is cleaner to have it anyway).
             $keySrc = Join-Path $RepoDir "build\@$modName\keys"
             if (Test-Path $keySrc) {
                 $keyDst = Join-Path $env:DAYZ_SERVER_DIR "keys"
                 New-Item -ItemType Directory -Force $keyDst | Out-Null
                 Copy-Item (Join-Path $keySrc "*.bikey") $keyDst -Force -ErrorAction SilentlyContinue
             }
-            Write-Ok "Deployt: @$modName"
+            Write-Ok "Deployed: @$modName"
             $deployed++
         } catch {
-            Write-Warn "@$modName konnte nicht deployt werden (laeuft der Server noch?): $_"
+            Write-Warn "@$modName could not be deployed (is the server still running?): $_"
         }
     }
-    Set-Status "Server-Setup" $(if ($deployed -eq 2) { "ok" } else { "$deployed/2 Mods" })
+    Set-Status "Server setup" $(if ($deployed -eq 2) { "ok" } else { "$deployed/2 mods" })
 }
 
 # ===========================================================================
-#  SCHRITT 5: Python-Pakete
+#  STEP 5: Python packages
 # ===========================================================================
-Write-Phase "Python-Pakete installieren"
+Write-Phase "Install the Python packages"
 
 if (-not (Test-Cmd python)) {
-    Write-Err "Python fehlt - dieser Schritt wird uebersprungen (Schritt 1 nachholen)."
-    Set-Status "Python-Pakete" "FEHLT"
+    Write-Err "Python missing - this step is skipped (redo step 1)."
+    Set-Status "Python packages" "MISSING"
 } else {
     $req = Join-Path $RepoDir "requirements.txt"
     if (Test-Path $req) {
-        Write-Info "Installiere die Pakete aus requirements.txt (kann 1-2 Minuten dauern)..."
+        Write-Info "Installing the packages from requirements.txt (may take 1-2 minutes)..."
         & python -m pip install --upgrade pip 2>&1 | Out-Null
         & python -m pip install -r $req
-        if ($LASTEXITCODE -eq 0) { Write-Ok "Python-Pakete installiert."; Set-Status "Python-Pakete" "ok" }
-        else { Write-Warn "pip meldete einen Fehler - Ausgabe oben pruefen."; Set-Status "Python-Pakete" "Fehler" }
+        if ($LASTEXITCODE -eq 0) { Write-Ok "Python packages installed."; Set-Status "Python packages" "ok" }
+        else { Write-Warn "pip reported an error - check the output above."; Set-Status "Python packages" "error" }
     } else {
-        Write-Warn "requirements.txt nicht gefunden - uebersprungen."
-        Set-Status "Python-Pakete" "?"
+        Write-Warn "requirements.txt not found - skipped."
+        Set-Status "Python packages" "?"
     }
 }
 
 # ===========================================================================
-#  SCHRITT 6: Claude-Anmeldung (das Gehirn)
+#  STEP 6: Claude login (the brain)
 # ===========================================================================
-Write-Phase "Claude anmelden (das Gehirn der Survivor)"
+Write-Phase "Sign in to Claude (the survivors' brain)"
 
-Write-Info "Claude Code ist der Motor der KI-Survivor. Es gibt zwei Wege:"
-Write-Host "        A) Max/Pro-Abo: im Terminal einmal  claude  tippen und  /login  -" -ForegroundColor Gray
-Write-Host "           keine Kosten pro Zug (fuer die Modelle sonnet/opus/haiku)." -ForegroundColor Gray
-Write-Host "        B) API-Key (Abrechnung pro Token): waehlt im Spiel ein 'api/'-Modell." -ForegroundColor Gray
+Write-Info "Claude Code is the engine behind the AI survivors. Two ways:"
+Write-Host "        A) Max/Pro plan: in a terminal, type  claude  then  /login  -" -ForegroundColor Gray
+Write-Host "           no per-turn cost (for the models sonnet/opus/haiku)." -ForegroundColor Gray
+Write-Host "        B) API key (pay per token): pick an 'api/' model in-game." -ForegroundColor Gray
 Write-Host ""
 if ($env:ANTHROPIC_API_KEY) {
-    Write-Ok "ANTHROPIC_API_KEY ist bereits gesetzt."
+    Write-Ok "ANTHROPIC_API_KEY is already set."
 } else {
-    if (Ask-YesNo "Hast du ein Max/Pro-Abo und willst dich per /login anmelden (Weg A)?" $true) {
-        Write-Info "Oeffne dazu nach dem Assistenten ein neues Terminal und tippe:  claude"
-        Write-Info "Dann  /login  und dem Browser-Flow folgen. Kein Key noetig."
+    if (Ask-YesNo "Do you have a Max/Pro plan and want to sign in via /login (way A)?" $true) {
+        Write-Info "After the wizard, open a NEW terminal and type:  claude"
+        Write-Info "Then  /login  and follow the browser flow. No key needed."
     } else {
-        $k = Read-Host "  ANTHROPIC_API_KEY eingeben (leer = ueberspringen)"
-        if ($k) { Set-UserEnv "ANTHROPIC_API_KEY" $k.Trim(); Write-Ok "API-Key gespeichert." }
+        $k = Read-Host "  Enter ANTHROPIC_API_KEY (empty = skip)"
+        if ($k) { Set-UserEnv "ANTHROPIC_API_KEY" $k.Trim(); Write-Ok "API key saved." }
     }
 }
-Set-Status "Claude-Login" $(if ($env:ANTHROPIC_API_KEY) { "API-Key" } else { "Abo /login (manuell)" })
+Set-Status "Claude login" $(if ($env:ANTHROPIC_API_KEY) { "API key" } else { "plan /login (manual)" })
 
 # ===========================================================================
-#  SCHRITT 7: Optionale Extras (Cloud-Modelle, Stimme, Discord)
+#  STEP 7: Optional extras (cloud models, voice, Discord)
 # ===========================================================================
-Write-Phase "Optionale Extras (gefuehrt) - Cloud-Modelle, Stimme, Discord"
+Write-Phase "Optional extras (guided) - cloud models, voice, Discord"
 
 # 7a) Cloud LLM provider keys
-if (Ask-YesNo "Fremd-Modelle (OpenAI/Gemini/Grok) im Arena-Menue nutzen?" $false) {
+if (Ask-YesNo "Use other models (OpenAI/Gemini/Grok) in the arena menu?" $false) {
     $sk = Join-Path $RepoDir "tools\set_api_keys.ps1"
-    if (Test-Path $sk) { & $sk } else { Write-Warn "set_api_keys.ps1 nicht gefunden." }
+    if (Test-Path $sk) { & $sk } else { Write-Warn "set_api_keys.ps1 not found." }
 }
 
 # 7b) ElevenLabs voice (TTS + microphone STT)
 if ($env:ELEVENLABS_API_KEY) {
-    Write-Ok "ELEVENLABS_API_KEY ist bereits gesetzt (Stimme + Mikro aktiv)."
-} elseif (Ask-YesNo "Stimmen + Mikrofon-Hoeren aktivieren (ElevenLabs-Key)?" $false) {
-    Write-Info "Key holen: https://elevenlabs.io  ->  Profile  ->  API Keys"
+    Write-Ok "ELEVENLABS_API_KEY is already set (voice + mic active)."
+} elseif (Ask-YesNo "Enable voices + microphone listening (ElevenLabs key)?" $false) {
+    Write-Info "Get a key: https://elevenlabs.io  ->  Profile  ->  API Keys"
     Start-Process "https://elevenlabs.io/app/settings/api-keys" -ErrorAction SilentlyContinue
-    $k = Read-Host "  ELEVENLABS_API_KEY eingeben (leer = ueberspringen)"
-    if ($k) { Set-UserEnv "ELEVENLABS_API_KEY" $k.Trim(); Write-Ok "ElevenLabs-Key gespeichert." }
+    $k = Read-Host "  Enter ELEVENLABS_API_KEY (empty = skip)"
+    if ($k) { Set-UserEnv "ELEVENLABS_API_KEY" $k.Trim(); Write-Ok "ElevenLabs key saved." }
 }
-Set-Status "Stimme (ElevenLabs)" $(if ($env:ELEVENLABS_API_KEY) { "ok" } else { "aus" })
+Set-Status "Voice (ElevenLabs)" $(if ($env:ELEVENLABS_API_KEY) { "ok" } else { "off" })
 
 # 7c) Discord voice bot
 if ($env:DISCORD_BOT_TOKEN) {
-    Write-Ok "DISCORD_BOT_TOKEN ist bereits gesetzt."
-} elseif (Ask-YesNo "Discord-Sprachausgabe einrichten (eigener Bot)?" $false) {
+    Write-Ok "DISCORD_BOT_TOKEN is already set."
+} elseif (Ask-YesNo "Set up Discord voice output (your own bot)?" $false) {
     $doc = Join-Path $RepoDir "docs\discord_bot_setup_en.md"
     if (-not (Test-Path $doc)) { $doc = Join-Path $RepoDir "docs\discord_bot_setup.md" }
-    Write-Info "Anleitung (Bot anlegen + Token holen):"
+    Write-Info "Guide (create the bot + get the token):"
     Write-Info "  $doc"
     if (Test-Path $doc) { Start-Process $doc -ErrorAction SilentlyContinue }
     Start-Process "https://discord.com/developers/applications" -ErrorAction SilentlyContinue
-    Write-Info "Kurz: New Application -> Bot -> Token kopieren -> OAuth2 URL Generator"
-    Write-Info "(Scope 'bot', Rechte 'Connect'+'Speak') -> Bot auf deinen Server einladen."
-    $k = Read-Host "  DISCORD_BOT_TOKEN eingeben (leer = ueberspringen)"
-    if ($k) { Set-UserEnv "DISCORD_BOT_TOKEN" $k.Trim(); Write-Ok "Discord-Token gespeichert." }
+    Write-Info "In short: New Application -> Bot -> copy token -> OAuth2 URL Generator"
+    Write-Info "(scope 'bot', permissions 'Connect'+'Speak') -> invite the bot to your server."
+    $k = Read-Host "  Enter DISCORD_BOT_TOKEN (empty = skip)"
+    if ($k) { Set-UserEnv "DISCORD_BOT_TOKEN" $k.Trim(); Write-Ok "Discord token saved." }
 }
-Set-Status "Discord" $(if ($env:DISCORD_BOT_TOKEN) { "ok" } else { "aus" })
+Set-Status "Discord" $(if ($env:DISCORD_BOT_TOKEN) { "ok" } else { "off" })
 
 # ===========================================================================
-#  ABSCHLUSS
+#  DONE
 # ===========================================================================
 Write-Host ""
 Write-Host ("=" * 74) -ForegroundColor DarkGreen
-Write-Host "  FERTIG - Zusammenfassung" -ForegroundColor Green
+Write-Host "  DONE - summary" -ForegroundColor Green
 Write-Host ("=" * 74) -ForegroundColor DarkGreen
 foreach ($k in $script:Summary.Keys) {
     $v = $script:Summary[$k]
-    $col = if ($v -match "FEHLT|Fehler") { "Red" } elseif ($v -match "aus|manuell|pruefen|\?|unvoll") { "Yellow" } else { "Green" }
+    $col = if ($v -match "MISSING|error") { "Red" } elseif ($v -match "off|manual|check|\?|incomplete") { "Yellow" } else { "Green" }
     Write-Host ("  {0,-22} {1}" -f ($k + ":"), $v) -ForegroundColor $col
 }
 Write-Host ""
-Write-Host "  WICHTIG: Schon offene Fenster sehen die neuen Variablen NICHT." -ForegroundColor Yellow
-Write-Host "  Falls du dich noch per Abo anmelden musst: neues Terminal -> 'claude' -> /login" -ForegroundColor Yellow
+Write-Host "  IMPORTANT: already-open windows do NOT see the new variables." -ForegroundColor Yellow
+Write-Host "  If you still need to sign in via plan: new terminal -> 'claude' -> /login" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "  So spielst du:" -ForegroundColor Cyan
-Write-Host "    1. start_game.bat starten (Server + Supervisor + Client, Karte waehlen)" -ForegroundColor Gray
-Write-Host "    2. Im Spiel beitreten (127.0.0.1:2302) und Taste Einfg fuer das Arena-Menue" -ForegroundColor Gray
-Write-Host "    3. Agenten/Modelle/Gesinnung waehlen -> START" -ForegroundColor Gray
+Write-Host "  How to play:" -ForegroundColor Cyan
+Write-Host "    1. Run start_game.bat (server + supervisor + client, pick a map)" -ForegroundColor Gray
+Write-Host "    2. Join in-game (127.0.0.1:2302) and press Insert for the arena menu" -ForegroundColor Gray
+Write-Host "    3. Pick agents/models/alignment -> START" -ForegroundColor Gray
 Write-Host ""
 
 if (-not $NoLaunch) {
-    if (Ask-YesNo "start_game.bat jetzt starten?" $false) {
+    if (Ask-YesNo "Start start_game.bat now?" $false) {
         $bat = Join-Path $RepoDir "start_game.bat"
         if (Test-Path $bat) { Start-Process $bat -WorkingDirectory $RepoDir }
-        else { Write-Warn "start_game.bat nicht gefunden." }
+        else { Write-Warn "start_game.bat not found." }
     }
 }
-Write-Host "Viel Spass. - isualc AI" -ForegroundColor Cyan
+Write-Host "Have fun. - isualc AI" -ForegroundColor Cyan
 exit 0

@@ -46,10 +46,10 @@ foreach ($c in $candidates) {
     if ($c -and (Test-Path $c) -and (Test-BuildHasPbos $c)) { $srcBuild = $c; break }
 }
 if (-not $srcBuild) {
-    Write-Error ("Keine fertigen PBOs gefunden. Erst die Mods packen (tools\pack_mod.ps1 fuer IsuSurvivor UND IsuVoice), oder -BuildSource auf den build-Ordner zeigen lassen. Gesucht in:`n  " + ($candidates -join "`n  "))
+    Write-Error ("No packed PBOs found. Pack the mods first (tools\pack_mod.ps1 for IsuSurvivor AND IsuVoice), or point -BuildSource at the build folder. Searched in:`n  " + ($candidates -join "`n  "))
     exit 1
 }
-Write-Host "PBO-Quelle: $srcBuild" -ForegroundColor Cyan
+Write-Host "PBO source: $srcBuild" -ForegroundColor Cyan
 
 # --- 2) Ensure the PBOs are inside THIS repo's build\ (so the zip carries them) ---
 $repoBuild = Join-Path $RepoDir "build"
@@ -64,7 +64,7 @@ if ($srcBuild -ne $repoBuild) {
             New-Item -ItemType Directory -Force $kd | Out-Null
             Copy-Item (Join-Path $keys "*.bikey") $kd -Force -ErrorAction SilentlyContinue
         }
-        Write-Host "  PBO uebernommen: @$m" -ForegroundColor Green
+        Write-Host "  PBO copied in: @$m" -ForegroundColor Green
     }
 }
 
@@ -81,7 +81,7 @@ Write-Host "Staging: $stage" -ForegroundColor DarkGray
 
 robocopy $RepoDir $stage /MIR /XD $excludeDirs $excludeGlobs /XF "*.log" "*.pyc" /NFL /NDL /NJH /NJS /NP | Out-Null
 # robocopy exit codes 0-7 are success; 8+ are real errors.
-if ($LASTEXITCODE -ge 8) { Write-Error "robocopy meldete Fehler (Code $LASTEXITCODE)."; exit 1 }
+if ($LASTEXITCODE -ge 8) { Write-Error "robocopy reported an error (code $LASTEXITCODE)."; exit 1 }
 
 # --- 4) Zip it -----------------------------------------------------------
 New-Item -ItemType Directory -Force $OutDir | Out-Null
@@ -104,5 +104,5 @@ Remove-Item $stage -Recurse -Force
 
 $size = [Math]::Round((Get-Item $zip).Length / 1MB, 1)
 Write-Host ""
-Write-Host "FERTIG: $zip ($size MB)" -ForegroundColor Green
-Write-Host "Empfaenger: entpacken -> INSTALL.bat doppelklicken." -ForegroundColor Green
+Write-Host "DONE: $zip ($size MB)" -ForegroundColor Green
+Write-Host "Recipients: unzip -> double-click INSTALL.bat." -ForegroundColor Green
