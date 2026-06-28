@@ -1,0 +1,25 @@
+# Python dependencies for dayz-ai-survivor.
+# Installed automatically by INSTALL.bat. Manual install:
+#     python -m pip install -r requirements.txt
+#
+# Python 3.10+ recommended (3.12 is what the installer fetches via winget).
+
+# --- Core: the brain's tool bridge (MCP server) and HTTP ---
+mcp>=1.0
+requests>=2.31
+
+# --- Voice output (Discord bot) ---
+discord.py>=2.3
+PyNaCl>=1.5            # required for Discord voice (opus encoding)
+
+# --- Microphone input (push-to-talk speech-to-text) ---
+sounddevice>=0.4
+numpy>=1.24
+
+# --- Non-Latin on-screen text transliteration (CJK / Arabic / Hindi / Cyrillic) ---
+# The stock DayZ font only draws ASCII, so screen text gets latinised.
+Unidecode>=1.3
+pypinyin>=0.49
+korean-romanizer>=0.25
+indic-transliteration>=2.3
+pykakasi>=2.2

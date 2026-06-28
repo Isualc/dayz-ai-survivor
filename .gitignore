@@ -39,6 +39,10 @@ build/
 *.pbo
 *.bin.bak
 
+# --- Release output + installer runtime scratch ---
+dist/
+tools/installer/_subscribe.html
+
 # --- Runtime state / journals / live caches ---
 agent_home/journal/
 agent_home/voice_outbox.jsonl
