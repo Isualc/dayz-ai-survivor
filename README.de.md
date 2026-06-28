@@ -12,6 +12,29 @@ Ein autonomer DayZ-Survivor, gesteuert von Claude Code. Die Architektur hat drei
 
 **Schnelltest der Motorik (Phase 1):** `python daemon\test_driver.py demo` spawnt einen NPC und schickt ihn 80 m weit. Steht am Ende `ERFOLG`, ist die Bridge in Ordnung.
 
+---
+
+## Schnellinstallation (empfohlen)
+
+> Gehört, die Einrichtung sei fummelig? War sie. **Jetzt gibt es einen Ein-Klick-Installer.**
+
+Lade die **`dayz-ai-survivor-Setup.zip`** vom [neuesten Release](https://github.com/Isualc/dayz-ai-survivor/releases), entpacke sie irgendwohin und **doppelklicke `INSTALL.bat`**. Ein geführter Assistent erledigt dann der Reihe nach alles, was die einzelnen Skripte unten tun — mit Live-Fortschritt und vollständiger Pfad-Erkennung:
+
+1. **Werkzeuge** — erkennt Python, Node.js und die Claude Code CLI; installiert fehlende per `winget`.
+2. **Pfade** — findet deine Steam-Bibliothek, DayZ und DayZ Server automatisch (kein hartcodiertes `D:\...`) und setzt die `DAYZ_*`-Variablen für dich.
+3. **Workshop-Mods** — öffnet eine Hilfsseite mit allen acht Abhängigkeiten und wartet mit einer Live-Checkliste, bis Steam sie heruntergeladen hat.
+4. **Server** — verlinkt die Mods in den Server und **deployt die fertig gepackten `IsuSurvivor`- + `IsuVoice`-PBOs, die im ZIP stecken**, sodass du **kein** DayZ Tools brauchst.
+5. **Python-Pakete** — installiert alles aus [`requirements.txt`](requirements.txt).
+6. **Claude + Extras** — führt dich durch den Claude-Login und (optional) die ElevenLabs-, Discord- und Cloud-Modell-Keys, mit den richtigen Links.
+
+Manuell bleiben nur die **API-Keys** und der **Discord-Bot** — und der Assistent öffnet die richtigen Seiten und fragt jeden Schlüssel ab. Am Ende bietet er an, `start_game.bat` zu starten. Erneutes Ausführen ist gefahrlos: Jeder Schritt überspringt bereits Erledigtes.
+
+*Das ZIP selbst bauen (für Maintainer): `powershell -ExecutionPolicy Bypass -File tools\make_release.ps1` bündelt die frisch gepackten PBOs in `dist\dayz-ai-survivor-Setup.zip`.*
+
+Wer stattdessen **dieses Repo klont** (statt das Setup-ZIP zu nutzen), hat die `build\`-PBOs nicht dabei — dann gilt die manuelle Einrichtung unten, die sie mit DayZ Tools packt.
+
+---
+
 ## Projektlayout
 
 ```
