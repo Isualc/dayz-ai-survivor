@@ -211,10 +211,10 @@ class IsuArenaMenu extends UIScriptedMenu
 	// Konto auf; unbekannte fallen sicher auf die Default-Stimme zurueck). Index
 	// 0-3 = die bisherigen Defaults pro Slot, danach die aktuellen ElevenLabs-
 	// Standardstimmen (in jedem Konto vorhanden), multilingual nutzbar.
-	static ref TStringArray s_VoiceNames = {"Helmut - German Epic", "Sarah", "George", "Liam", "Aria", "Roger", "Laura", "Charlie", "Callum", "River", "Charlotte", "Alice", "Matilda", "Will", "Jessica", "Eric", "Chris", "Brian", "Daniel", "Lily", "Bill"};
+	static ref TStringArray s_VoiceNames = {"Helmut - German Epic", "Sarah", "George", "Liam", "Aria", "Roger", "Laura", "Charlie", "Callum", "River", "Charlotte", "Alice", "Matilda", "Will", "Jessica", "Eric", "Chris", "Brian", "Daniel", "Lily", "Bill", "Adam"};
 	// Kurz-Labels fuer Kopf + Liste (Spalte schmal). Index-gleich zu s_VoiceNames;
 	// gesendet wird s_VoiceNames (volle Aufloesung gegen ElevenLabs), angezeigt s_VoiceLabels.
-	static ref TStringArray s_VoiceLabels = {"Helmut", "Sarah", "George", "Liam", "Aria", "Roger", "Laura", "Charlie", "Callum", "River", "Charlotte", "Alice", "Matilda", "Will", "Jessica", "Eric", "Chris", "Brian", "Daniel", "Lily", "Bill"};
+	static ref TStringArray s_VoiceLabels = {"Helmut", "Sarah", "George", "Liam", "Aria", "Roger", "Laura", "Charlie", "Callum", "River", "Charlotte", "Alice", "Matilda", "Will", "Jessica", "Eric", "Chris", "Brian", "Daniel", "Lily", "Bill", "Adam"};
 	// Default-Stimme je Slot (Index in s_VoiceNames): Viktor=Helmut, Birgit=Sarah,
 	// Igor=George, Konrad=Liam - genau die bisherigen agents.json-Stimmen.
 	static ref array<int> s_VoiceIdx = {0, 1, 2, 3};
