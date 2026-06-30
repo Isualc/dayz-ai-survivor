@@ -11,6 +11,7 @@ class IsuNameplateHud
 	static ref IsuNameplateHud s_Inst;
 	const int POOL = 6;
 	const float MAX_DIST = 120.0;
+	const int SPEECH_FADE_MS = 2000;   // sanftes Ausblenden der Blase nach Ablauf
 
 	protected Widget m_Root;
 	protected ref array<Widget> m_Tags;
@@ -190,12 +191,21 @@ class IsuNameplateHud
 			// im Menue eingeschaltet (s_ComicChat). Feste Box aus dem Layout, der
 			// Text bricht per "wrap 1" um. Position/Groesse kommen aus dem Layout -
 			// KEIN SetPos/SetSize (das machte die Box unsichtbar / in die Ecke).
+			// Nach Ablauf (speechExpiry) blendet die Blase ueber SPEECH_FADE_MS
+			// langsam aus (Alpha Text + Hintergrund), statt hart zu verschwinden.
 			ImageWidget sbg = m_SpeechBgs[poolIdx];
 			TextWidget spt = m_Speeches[poolIdx];
-			bool showSpeech = IsuArenaMenu.s_ComicChat && t.speech != "" && GetGame().GetTime() < t.speechExpiry;
+			int nowMs = GetGame().GetTime();
+			bool showSpeech = IsuArenaMenu.s_ComicChat && t.speech != "" && nowMs < t.speechExpiry + SPEECH_FADE_MS;
 			if (showSpeech && spt && sbg)
 			{
+				float sAlpha = 1.0;
+				if (nowMs > t.speechExpiry)
+					sAlpha = 1.0 - (float)(nowMs - t.speechExpiry) / SPEECH_FADE_MS;
+				sAlpha = Math.Clamp(sAlpha, 0.0, 1.0);
 				spt.SetText(t.speech);
+				spt.SetAlpha(sAlpha);
+				sbg.SetAlpha(sAlpha);
 				sbg.Show(true);
 				spt.Show(true);
 			}
