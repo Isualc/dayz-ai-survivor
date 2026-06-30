@@ -1317,8 +1317,7 @@ class IsuBridge
 				// sonst raeumt ein NPC am gemeinsamen Lager das Squad-Zelt leer (zog
 				// Birgits Bandagen raus). loot_container zielt nur auf Leichen/
 				// Rucksaecke/Kisten.
-				if (ground && !ground.GetHierarchyParent() && CountContents(ground) > 0
-					&& !Tent_Base.Cast(ground))
+				if (ground && !ground.GetHierarchyParent() && CountContents(ground) > 0 && !Tent_Base.Cast(ground))
 					body = ground;
 			}
 
