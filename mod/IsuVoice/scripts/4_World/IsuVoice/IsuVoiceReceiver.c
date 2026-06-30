@@ -226,12 +226,13 @@ class IsuNametagStore
 		t.intent = intent;
 	}
 
-	// Comic-Sprechblase: gesagte Zeile mit Ablaufzeit (~6 s) speichern.
+	// Comic-Sprechblase: gesagte Zeile mit Ablaufzeit (~8 s) speichern.
+	// Danach blendet das HUD sie ueber SPEECH_FADE_MS langsam aus.
 	static void UpdateSpeech(int low, int high, string text)
 	{
 		IsuAgentTag t = GetOrCreate(low, high);
 		t.speech = text;
-		t.speechExpiry = GetGame().GetTime() + 6000;
+		t.speechExpiry = GetGame().GetTime() + 8000;
 	}
 
 	// Namensschild zu einer NetworkID entfernen (Server meldet tote Koerper).

@@ -11,7 +11,7 @@ class IsuNameplateHud
 	static ref IsuNameplateHud s_Inst;
 	const int POOL = 6;
 	const float MAX_DIST = 120.0;
-	const int SPEECH_FADE_MS = 2000;   // sanftes Ausblenden der Blase nach Ablauf
+	const int SPEECH_FADE_MS = 3000;   // sanftes Ausblenden der Blase nach Ablauf
 
 	protected Widget m_Root;
 	protected ref array<Widget> m_Tags;
