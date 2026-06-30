@@ -1581,7 +1581,10 @@ def main() -> int:
             "(oft mehrere Kilometer) - marschiere beharrlich, ruf move_to immer "
             "wieder Richtung Treffpunkt auf, bis du da bist, und brich NICHT "
             "wegen der grossen Distanz ab (die 500m-Stop-Regel gilt hier "
-            "ausnahmsweise NICHT). Sorge unterwegs fuer dich (Waerme, Nahrung, "
+            "ausnahmsweise NICHT). EINE Ausnahme: taucht unterwegs der Spieler "
+            "(ein Mensch, kind player in observe) nah bei dir auf, bleib bei ihm, "
+            "begruesse ihn und warte auf seine Anweisung, statt an ihm "
+            "vorbeizumarschieren. Sorge unterwegs fuer dich (Waerme, Nahrung, "
             "trocken bleiben). Funk kurz, wo du bist und dass du unterwegs zum "
             "Treffpunkt bist; sobald ihr euch gefunden habt, bleibt zusammen."
         )
