@@ -1025,7 +1025,13 @@ modded class MissionGameplay
 		// (dann faellt das Radial serverseitig auf "naechster NPC" zurueck).
 		vector hitPos;
 		Object aimedObj;
-		IsuNpcCommand.AimRaycast(hitPos, aimedObj);
+		bool aimHit = IsuNpcCommand.AimRaycast(hitPos, aimedObj);
+		IsuRadialMenu.s_HasAimPos = aimHit;
+		if (aimHit)
+		{
+			IsuRadialMenu.s_AimX = hitPos[0];
+			IsuRadialMenu.s_AimZ = hitPos[2];
+		}
 		eAIBase ai = eAIBase.Cast(aimedObj);
 		if (ai)
 		{

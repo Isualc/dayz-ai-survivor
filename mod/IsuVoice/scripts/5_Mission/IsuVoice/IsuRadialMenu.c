@@ -16,18 +16,25 @@ class IsuRadialMenu extends UIScriptedMenu
 	static int s_TargetHigh = 0;
 	static string s_TargetName = "next NPC";
 
-	// Button-Reihenfolge muss zum Layout (BtnAct0..BtnAct4) passen.
-	static ref TStringArray s_Actions = {"follow", "halt", "comehere", "loot", "engage"};
+	// Anvisierter Bodenpunkt beim Oeffnen (fuer den "Go to"-Chip): der NPC laeuft
+	// genau dorthin, wohin der Spieler zeigt (z.B. auf gefundenes Loot).
+	static bool s_HasAimPos = false;
+	static float s_AimX = 0.0;
+	static float s_AimZ = 0.0;
+
+	// Button-Reihenfolge muss zum Layout (BtnAct0..BtnAct5) passen.
+	static ref TStringArray s_Actions = {"follow", "halt", "comehere", "loot", "engage", "gotoaim"};
 	// Winkel (Grad, im Uhrzeigersinn ab oben) je Chip - deckt sich mit den
 	// Chip-Positionen im Layout. Der Selector-Slice sitzt oben und wird hierhin
 	// gedreht.
-	static ref array<float> s_Angles = {0, 72, 144, 216, 288};
+	static ref array<float> s_Angles = {0, 60, 120, 180, 240, 300};
 
 	protected ButtonWidget m_Act0;
 	protected ButtonWidget m_Act1;
 	protected ButtonWidget m_Act2;
 	protected ButtonWidget m_Act3;
 	protected ButtonWidget m_Act4;
+	protected ButtonWidget m_Act5;
 	protected TextWidget m_Center;
 	protected Widget m_Selector;
 
@@ -40,6 +47,7 @@ class IsuRadialMenu extends UIScriptedMenu
 		m_Act2 = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnAct2"));
 		m_Act3 = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnAct3"));
 		m_Act4 = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnAct4"));
+		m_Act5 = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnAct5"));
 		m_Center = TextWidget.Cast(layoutRoot.FindAnyWidget("RadialCenter"));
 		m_Selector = layoutRoot.FindAnyWidget("Selector");
 
@@ -82,7 +90,8 @@ class IsuRadialMenu extends UIScriptedMenu
 		if (idx == 1) return m_Act1;
 		if (idx == 2) return m_Act2;
 		if (idx == 3) return m_Act3;
-		return m_Act4;
+		if (idx == 4) return m_Act4;
+		return m_Act5;
 	}
 
 	// Selector-Slice auf den Winkel des anvisierten Chips drehen und einblenden.
@@ -96,7 +105,7 @@ class IsuRadialMenu extends UIScriptedMenu
 
 	override bool OnMouseEnter(Widget w, int x, int y)
 	{
-		for (int idx = 0; idx < 5; idx++)
+		for (int idx = 0; idx < 6; idx++)
 		{
 			if (w == ActButton(idx))
 			{
@@ -137,6 +146,19 @@ class IsuRadialMenu extends UIScriptedMenu
 				extra = pp[0].ToString() + "|" + pp[2].ToString();
 			}
 		}
+		else if (action == "gotoaim")
+		{
+			// "Go to" = goto auf den beim Oeffnen anvisierten Bodenpunkt (z.B.
+			// auf gefundenes Loot zeigen -> der NPC laeuft genau dorthin).
+			action = "goto";
+			if (s_HasAimPos)
+				extra = s_AimX.ToString() + "|" + s_AimZ.ToString();
+			else if (pb)
+			{
+				vector pp2 = pb.GetPosition();
+				extra = pp2[0].ToString() + "|" + pp2[2].ToString();
+			}
+		}
 
 		IsuNpcCommand.SendTargeted(action, s_HasTarget, s_TargetLow, s_TargetHigh, extra);
 		GetGame().GetUIManager().HideScriptedMenu(this);
@@ -144,7 +166,7 @@ class IsuRadialMenu extends UIScriptedMenu
 
 	override bool OnClick(Widget w, int x, int y, int button)
 	{
-		for (int idx = 0; idx < 5; idx++)
+		for (int idx = 0; idx < 6; idx++)
 		{
 			if (w == ActButton(idx))
 			{

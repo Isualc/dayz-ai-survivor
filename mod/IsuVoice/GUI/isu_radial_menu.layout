@@ -64,61 +64,6 @@ PanelWidgetClass IsuRadialRoot {
      "stretch mode" stretch_w_h
      filter 1
     }
-    ImageWidgetClass ChipBg0 {
-     ignorepointer 1
-     color 0.14 0.17 0.23 1
-     position 214 60
-     size 212 60
-     hexactpos 1
-     vexactpos 1
-     hexactsize 1
-     vexactsize 1
-     mode blend
-    }
-    ImageWidgetClass ChipBg1 {
-     ignorepointer 1
-     color 0.14 0.17 0.23 1
-     position 433 219
-     size 212 60
-     hexactpos 1
-     vexactpos 1
-     hexactsize 1
-     vexactsize 1
-     mode blend
-    }
-    ImageWidgetClass ChipBg2 {
-     ignorepointer 1
-     color 0.14 0.17 0.23 1
-     position 349 476
-     size 212 60
-     hexactpos 1
-     vexactpos 1
-     hexactsize 1
-     vexactsize 1
-     mode blend
-    }
-    ImageWidgetClass ChipBg3 {
-     ignorepointer 1
-     color 0.14 0.17 0.23 1
-     position 79 476
-     size 212 60
-     hexactpos 1
-     vexactpos 1
-     hexactsize 1
-     vexactsize 1
-     mode blend
-    }
-    ImageWidgetClass ChipBg4 {
-     ignorepointer 1
-     color 0.14 0.17 0.23 1
-     position 0 219
-     size 212 60
-     hexactpos 1
-     vexactpos 1
-     hexactsize 1
-     vexactsize 1
-     mode blend
-    }
     FrameWidgetClass Selector {
      visible 0
      ignorepointer 1
@@ -164,7 +109,7 @@ PanelWidgetClass IsuRadialRoot {
      "text valign" center
     }
     ButtonWidgetClass BtnAct1 {
-     position 439 224
+     position 402 170
      size 200 50
      hexactpos 1
      vexactpos 1
@@ -176,7 +121,7 @@ PanelWidgetClass IsuRadialRoot {
      "text valign" center
     }
     ButtonWidgetClass BtnAct2 {
-     position 355 481
+     position 402 380
      size 200 50
      hexactpos 1
      vexactpos 1
@@ -188,7 +133,7 @@ PanelWidgetClass IsuRadialRoot {
      "text valign" center
     }
     ButtonWidgetClass BtnAct3 {
-     position 85 481
+     position 220 485
      size 200 50
      hexactpos 1
      vexactpos 1
@@ -200,13 +145,25 @@ PanelWidgetClass IsuRadialRoot {
      "text valign" center
     }
     ButtonWidgetClass BtnAct4 {
-     position 1 224
+     position 38 380
      size 200 50
      hexactpos 1
      vexactpos 1
      hexactsize 1
      vexactsize 1
      text "Attack"
+     font "gui/fonts/sdf_MetronBook24"
+     "text halign" center
+     "text valign" center
+    }
+    ButtonWidgetClass BtnAct5 {
+     position 38 170
+     size 200 50
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text "Go to"
      font "gui/fonts/sdf_MetronBook24"
      "text halign" center
      "text valign" center
