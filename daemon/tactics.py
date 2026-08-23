@@ -41,6 +41,7 @@ RECIPES = {
 # Waffen-Ranking: (Muster im Classname, Punktzahl). Grob, aber wirksam.
 WEAPON_TIERS = [
     ("M4A1", 90), ("AKM", 88), ("AK101", 86), ("AK74", 84), ("FAL", 92),
+    ("SCARH", 91),   # SCR17 aus 1.29 "Road to Badlands" (7.62x51, 20-Schuss)
     ("SVD", 95), ("VSS", 85), ("ASVAL", 85), ("Aug", 82), ("FAMAS", 82),
     ("Mosin", 70), ("Winchester", 68), ("Blaze", 66), ("CZ527", 64),
     ("CZ550", 72), ("SSG82", 65), ("Vaiga", 60), ("Saiga", 60),

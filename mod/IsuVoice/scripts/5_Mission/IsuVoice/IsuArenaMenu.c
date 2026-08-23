@@ -17,6 +17,7 @@ class IsuDropdown
 	protected ButtonWidget m_Head;
 	protected Widget m_Container;             // Options-Panel (opak, visible 0)
 	protected ref array<ButtonWidget> m_ItemBtns;
+	protected ref array<Widget> m_AllCells;   // Items + Fueller, fuer Rebuild-Cleanup
 	protected ref TStringArray m_Items;
 	protected int m_Current;
 	protected int m_Cols;
@@ -40,6 +41,7 @@ class IsuDropdown
 	protected void BuildItems()
 	{
 		m_ItemBtns = new array<ButtonWidget>();
+		m_AllCells = new array<Widget>();
 		if (!m_Container || !m_Items)
 			return;
 		int count = m_Items.Count();
@@ -50,14 +52,17 @@ class IsuDropdown
 		float cw, ch;
 		m_Container.GetSize(cw, ch);
 		float colW = cw / m_Cols;
-		for (int i = 0; i < count; i++)
+		// PanelWidget/ButtonWidget ohne Textur rendern ihre color-Flaeche nicht -
+		// darum war die offene Liste durchsichtig. Jedes Item bringt deshalb ein
+		// eigenes opakes ImageWidget (DdItemBg) mit; Zellen ueber count hinaus
+		// werden als leere Fueller erzeugt, damit die letzte Spalte kein Loch hat.
+		int total = rows * m_Cols;
+		for (int i = 0; i < total; i++)
 		{
 			Widget iw = GetGame().GetWorkspace().CreateWidgets("IsuVoice/GUI/isu_dd_item.layout", m_Container);
 			ButtonWidget b = ButtonWidget.Cast(iw);
 			if (!b)
 				continue;
-			b.SetText(m_Items[i]);
-			b.SetTextColor(ARGB(255, 246, 248, 252));   // hell: auf dunklem Item-Bg gut lesbar
 			// EXACTPOS/EXACTSIZE erzwingen, sonst interpretiert SetPos/SetSize die
 			// Werte RELATIV (0..1) und alle Items landen uebereinander.
 			b.SetFlags(WidgetFlags.EXACTPOS | WidgetFlags.EXACTSIZE);
@@ -65,7 +70,40 @@ class IsuDropdown
 			int r = i % rows;
 			b.SetPos(c * colW, r * rowH);
 			b.SetSize(colW, rowH);
-			m_ItemBtns.Insert(b);
+			ImageWidget bg = ImageWidget.Cast(iw.FindAnyWidget("DdItemBg"));
+			if (bg)
+			{
+				bg.SetFlags(WidgetFlags.EXACTPOS | WidgetFlags.EXACTSIZE);
+				bg.SetPos(0, 0);
+				bg.SetSize(colW, rowH);
+				int shade = ARGB(255, 22, 27, 36);
+				if (r % 2 == 1)
+					shade = ARGB(255, 30, 36, 47);
+				if (i == m_Current)
+					shade = ARGB(255, 30, 58, 38);
+				bg.SetColor(shade);
+			}
+			TextWidget lbl = TextWidget.Cast(iw.FindAnyWidget("DdItemLabel"));
+			string txt = "";
+			if (i < count)
+				txt = m_Items[i];
+			if (lbl)
+			{
+				lbl.SetFlags(WidgetFlags.EXACTPOS | WidgetFlags.EXACTSIZE);
+				lbl.SetPos(12, 0);
+				lbl.SetSize(colW - 12, rowH);
+				lbl.SetText(txt);
+				lbl.SetColor(ARGB(255, 246, 248, 252));
+			}
+			else
+			{
+				b.SetText(txt);
+				b.SetTextColor(ARGB(255, 246, 248, 252));
+			}
+			// Fueller-Zellen sind nicht auswaehlbar (kein Eintrag in m_ItemBtns).
+			if (i < count)
+				m_ItemBtns.Insert(b);
+			m_AllCells.Insert(iw);
 		}
 		m_Container.SetSize(cw, rows * rowH);
 	}
@@ -87,11 +125,39 @@ class IsuDropdown
 		m_Head.SetText(label + arrow);
 	}
 
+	// Zebra-Schattierung neu setzen und den aktuell gewaehlten Eintrag gruen
+	// hinterlegen (nach SelectByItem waere die Markierung sonst veraltet).
+	protected void RefreshHighlight()
+	{
+		if (!m_ItemBtns || !m_Items)
+			return;
+		int count = m_Items.Count();
+		int rows = (count + m_Cols - 1) / m_Cols;
+		if (rows < 1)
+			rows = 1;
+		for (int i = 0; i < m_ItemBtns.Count(); i++)
+		{
+			if (!m_ItemBtns[i])
+				continue;
+			ImageWidget bg = ImageWidget.Cast(m_ItemBtns[i].FindAnyWidget("DdItemBg"));
+			if (!bg)
+				continue;
+			int r = i % rows;
+			int shade = ARGB(255, 22, 27, 36);
+			if (r % 2 == 1)
+				shade = ARGB(255, 30, 36, 47);
+			if (i == m_Current)
+				shade = ARGB(255, 30, 58, 38);
+			bg.SetColor(shade);
+		}
+	}
+
 	void Open()
 	{
 		if (!m_Container)
 			return;
 		m_Open = true;
+		RefreshHighlight();
 		m_Container.Show(true);
 		UpdateHead();
 	}
@@ -149,12 +215,12 @@ class IsuDropdown
 	// die Modelle des neuen Providers). Alte Item-Buttons abraeumen, neu bauen.
 	void Rebuild(TStringArray items, int current)
 	{
-		if (m_ItemBtns)
+		if (m_AllCells)
 		{
-			for (int i = 0; i < m_ItemBtns.Count(); i++)
+			for (int i = 0; i < m_AllCells.Count(); i++)
 			{
-				if (m_ItemBtns[i])
-					m_ItemBtns[i].Unlink();
+				if (m_AllCells[i])
+					m_AllCells[i].Unlink();
 			}
 		}
 		m_Items = items;
@@ -173,18 +239,20 @@ class IsuArenaMenu extends UIScriptedMenu
 	// Modellwahl ZWEISTUFIG: erst Provider, dann Modell. Praefix = Backend
 	// (resolve_backend): ohne = Anthropic Max-Plan, api/ = Anthropic-API,
 	// openai/ google/ xai/ = claude-code-router, local/ = llama-server.
-	// Modelle 2026-06-20 gegen die Provider-APIs verifiziert (echte Calls -> 200).
+	// Modelle 2026-08-23 gegen die Provider-Doku aktualisiert (Anthropic: Opus 5
+	// seit 24.07.; OpenAI: GPT-5.6 Sol/Terra/Luna; Google: Gemini 3.6 Flash GA;
+	// xAI: Grok 4.6, die 4.20-Varianten sind retired und redirecten auf 4.3).
 	static ref TStringArray s_Providers = {"Anthropic", "OpenAI", "Google", "xAI", "Local"};
-	static ref TStringArray s_AnthropicModels = {"sonnet", "haiku", "opus", "claude-sonnet-5", "claude-opus-4-7", "claude-opus-4-8", "api/sonnet", "api/haiku", "api/opus"};
-	static ref TStringArray s_AnthropicLabels = {"Sonnet 4.6", "Haiku 4.5", "Opus (auto)", "Sonnet 5", "Opus 4.7", "Opus 4.8", "Sonnet (API)", "Haiku (API)", "Opus (API)"};
-	static ref TStringArray s_OpenAIModels = {"openai/gpt-5.5", "openai/gpt-5.4", "openai/gpt-5.4-mini", "openai/gpt-5.1", "openai/gpt-5-mini", "openai/gpt-4.1-mini", "openai/gpt-4o-mini"};
-	static ref TStringArray s_OpenAILabels = {"GPT-5.5", "GPT-5.4", "GPT-5.4-mini", "GPT-5.1", "GPT-5-mini", "GPT-4.1-mini", "GPT-4o-mini"};
-	static ref TStringArray s_GoogleModels = {"google/gemini-3.5-flash", "google/gemini-3.1-pro-preview", "google/gemini-3.1-flash-lite", "google/gemini-2.5-pro", "google/gemini-2.5-flash"};
+	static ref TStringArray s_AnthropicModels = {"sonnet", "haiku", "opus", "claude-fable-5", "claude-opus-5", "claude-sonnet-5", "claude-opus-4-8", "api/sonnet", "api/haiku", "api/opus"};
+	static ref TStringArray s_AnthropicLabels = {"Sonnet (auto)", "Haiku 4.5", "Opus (auto)", "Fable 5", "Opus 5", "Sonnet 5", "Opus 4.8", "Sonnet (API)", "Haiku (API)", "Opus (API)"};
+	static ref TStringArray s_OpenAIModels = {"openai/gpt-5.6-sol", "openai/gpt-5.6-terra", "openai/gpt-5.6-luna", "openai/gpt-5.5", "openai/gpt-5.4", "openai/gpt-5.4-mini"};
+	static ref TStringArray s_OpenAILabels = {"GPT-5.6 Sol", "GPT-5.6 Terra", "GPT-5.6 Luna", "GPT-5.5", "GPT-5.4", "GPT-5.4-mini"};
+	static ref TStringArray s_GoogleModels = {"google/gemini-3.6-flash", "google/gemini-3.5-flash", "google/gemini-3.5-flash-lite", "google/gemini-3.1-pro", "google/gemini-3.1-pro-preview"};
 	// Labels OHNE "Gemini"/"Grok"-Praefix: die Provider-Spalte zeigt schon Google/xAI,
 	// das spart Breite in der engen Modell-Spalte.
-	static ref TStringArray s_GoogleLabels = {"3.5 Flash", "3.1 Pro", "3.1 Lite", "2.5 Pro", "2.5 Flash"};
-	static ref TStringArray s_XaiModels = {"xai/grok-4.3", "xai/grok-4.20-0309-reasoning", "xai/grok-4.20-0309-non-reasoning"};
-	static ref TStringArray s_XaiLabels = {"4.3", "4.20 reason", "4.20 fast"};
+	static ref TStringArray s_GoogleLabels = {"3.6 Flash", "3.5 Flash", "3.5 Lite", "3.1 Pro", "3.1 Pro prev"};
+	static ref TStringArray s_XaiModels = {"xai/grok-4.6", "xai/grok-4.5", "xai/grok-4.3"};
+	static ref TStringArray s_XaiLabels = {"4.6", "4.5", "4.3"};
 	static ref TStringArray s_LocalModels = {"local/gemma-4-E4B-it"};
 	static ref TStringArray s_LocalLabels = {"Gemma local"};
 

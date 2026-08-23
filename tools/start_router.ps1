@@ -86,24 +86,24 @@ if (Test-Path $cfgFile) {
       "name": "openai",
       "api_base_url": "https://api.openai.com/v1/chat/completions",
       "api_key": "__OPENAI__",
-      "models": ["gpt-5.4-mini", "gpt-5.5"]
+      "models": ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini"]
     },
     {
       "name": "gemini",
       "api_base_url": "https://generativelanguage.googleapis.com/v1beta/models/",
       "api_key": "__GEMINI__",
-      "models": ["gemini-3.5-flash", "gemini-3.1-flash-lite"],
+      "models": ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-pro", "gemini-3.1-pro-preview"],
       "transformer": { "use": ["gemini"] }
     },
     {
       "name": "xai",
       "api_base_url": "https://api.x.ai/v1/chat/completions",
       "api_key": "__XAI__",
-      "models": ["grok-4.3"]
+      "models": ["grok-4.6", "grok-4.5", "grok-4.3"]
     }
   ],
   "Router": {
-    "default": "openai,gpt-5.4-mini"
+    "default": "openai,gpt-5.6-luna"
   }
 }
 "@

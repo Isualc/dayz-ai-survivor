@@ -10,4 +10,30 @@ ButtonWidgetClass IsuDdItem {
  font "gui/fonts/sdf_MetronBook24"
  "text halign" left
  "text valign" center
+ {
+  ImageWidgetClass DdItemBg {
+   ignorepointer 1
+   position 0 0
+   size 296 40
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   color 0.09 0.11 0.15 1
+   mode blend
+  }
+  TextWidgetClass DdItemLabel {
+   ignorepointer 1
+   position 12 0
+   size 284 40
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text ""
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.96 0.97 0.99 1
+   "text valign" center
+  }
+ }
 }
