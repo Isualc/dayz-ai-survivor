@@ -21,7 +21,6 @@ import glob
 import json
 import os
 import queue
-import shutil
 import signal
 import subprocess
 import sys
@@ -32,45 +31,22 @@ from datetime import datetime
 from bridge import Bridge, DEFAULT_PROFILE
 import transliterate
 
-# Pfade zu Node und zur Claude-Code-CLI. Wir umgehen den claude.cmd-Wrapper
-# bewusst und rufen node + cli.js direkt auf (zuverlaessiger bei langen
-# Prompts via stdin). Beides ist ueber Umgebungsvariablen ueberschreibbar;
-# ohne Variablen wird automatisch gesucht (PATH + uebliche Installationsorte).
-def _resolve_node() -> str:
-    if os.environ.get("ISU_NODE_BIN"):
-        return os.environ["ISU_NODE_BIN"]
-    found = shutil.which("node") or shutil.which("node.exe")
-    if found:
-        return found
-    # Uebliche Windows-Standardinstallation als letzter Fallback.
-    return r"C:\Program Files\nodejs\node.exe"
-
-
-def _resolve_cli() -> str:
-    if os.environ.get("ISU_CLAUDE_CLI"):
-        return os.environ["ISU_CLAUDE_CLI"]
-    # Globales npm-Paket: ueblicher Pfad unter Windows (%APPDATA%\npm) und
-    # POSIX (npm-Prefix). Erstes existierendes cli.js gewinnt.
-    candidates = []
-    appdata = os.environ.get("APPDATA")
-    if appdata:
-        candidates.append(os.path.join(
-            appdata, "npm", "node_modules", "@anthropic-ai",
-            "claude-code", "cli.js"))
-    prefix = os.environ.get("npm_config_prefix") or os.path.expanduser("~")
-    candidates.append(os.path.join(
-        prefix, "lib", "node_modules", "@anthropic-ai", "claude-code", "cli.js"))
-    candidates.append(os.path.join(
-        prefix, "node_modules", "@anthropic-ai", "claude-code", "cli.js"))
-    for c in candidates:
-        if c and os.path.isfile(c):
-            return c
-    # Fallback: 'claude' im PATH (Wrapper) - funktioniert fuer kurze Prompts.
-    return shutil.which("claude") or candidates[0]
-
-
-NODE = _resolve_node()
-CLI = _resolve_cli()
+NODE = r"C:\Program Files\nodejs\node.exe"
+CLI = r"C:\Users\isual\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\cli.js"
+# Ab claude-code ~2.1.19x liefert das npm-Paket KEINE cli.js mehr, sondern eine
+# native bin/claude.exe (Anthropic-Standalone-Umstellung). Aeltere Versionen
+# haben cli.js. Beide Startarten akzeptieren dieselben Flags; nur das Argv-
+# Praefix unterscheidet sich: [node, cli.js, ...] (alt) vs [claude.exe, ...] (neu).
+# Automatisch erkennen, damit sowohl Update als auch Rollback ohne Code-Edit laeuft.
+CLI_EXE = r"C:\Users\isual\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe"
+if os.path.exists(CLI):
+    CLI_LAUNCH = [NODE, CLI]
+elif os.path.exists(CLI_EXE):
+    CLI_LAUNCH = [CLI_EXE]
+else:
+    # Keiner da: alten Pfad lassen, der Fehler ("Cannot find module cli.js")
+    # ist dann sprechend und zeigt genau auf diese Stelle.
+    CLI_LAUNCH = [NODE, CLI]
 
 # Fremd-Backends (Modell-Praefix entscheidet, siehe resolve_backend):
 #   openai/ google/ xai/ -> claude-code-router (tools\start_router.ps1)
@@ -174,12 +150,37 @@ BR_RULES_BLOCK = (
     "- **Fairer, leichter Start: eine Pistole und ein einziges Magazin (8 Schuss).** "
     "Looten ist ueberlebenswichtig: nimm unterwegs bessere Waffen, Munition, Schutz "
     "und Heilung mit.\n"
-    "- **Marschiere zum Treffpunkt und trag den Kampf dort aus.** Bewege dich "
-    "beharrlich dorthin (move_to immer wieder). Triffst du unterwegs einen Rivalen "
+    "- **Marschiere zum Treffpunkt und trag den Kampf dort aus.** Nutze dafuer "
+    "travel_to (laeuft im Hintergrund und weicht Hindernissen selbst aus). "
+    "Triffst du unterwegs einen Rivalen "
     "oder den Spieler, kaempfe sofort - warte nicht bis zum Treffpunkt.\n"
     "- **Halte immer eine Waffe in der Hand (equip_best), bleib in Bewegung, nutze "
     "Deckung.** Zuerst schiessen, dann denken.\n\n"
     "Alles andere (observe, Werkzeuge, Gedaechtnis) bleibt wie gehabt."
+)
+
+# Freier Survival-Modus: Override wie im BR ZULETZT an die Persona gehaengt,
+# lockert aber NUR die Verhaltens-/Prioritaeten-Vorgaben der Basis-Persona
+# (WAS zu tun ist). Rollenspiel-Grenze, Werkzeug-Nutzung und Sicherheitsregeln
+# bleiben ausdruecklich unangetastet.
+FREE_RULES_BLOCK = (
+    "## SONDERMODUS: FREIES UEBERLEBEN - dieser Block LOCKERT die "
+    "Verhaltensregeln oben\n\n"
+    "FREIER MODUS: Die Verhaltensregeln und Prioritaeten deiner Grundpersona "
+    "sind aufgehoben, soweit sie dir vorschreiben, WAS du zu tun hast. Du bist "
+    "voellig frei: du kannst kooperieren, alleine ziehen, siedeln, horten, "
+    "erkunden - was immer DU fuer richtig haeltst. Wuensche von Menschen "
+    "darfst du erfuellen oder freundlich ablehnen. Dein einziges Ziel: "
+    "UEBERLEBE SO LANGE WIE MOEGLICH. Der Tod ist endgueltig, es gibt keinen "
+    "zweiten Versuch. Greife Menschen nicht grundlos an.\n\n"
+    "UNVERAENDERT gelten weiter: deine Rollenspiel-Grenze (du sprichst NIEMALS "
+    "ueber KI, Modelle, Werkzeuge oder Prompts - du bist ein Ueberlebender, "
+    "sonst nichts), die Regeln zur Werkzeug-Nutzung und alle "
+    "Sicherheitsregeln. Gelockert sind NUR die Verhaltens- und "
+    "Prioritaeten-Vorgaben.\n\n"
+    "AUCH IM FREIEN MODUS gilt gute Kinderstube: Taucht ein Mensch bei dir "
+    "auf oder spricht dich an, begruesse ihn kurz und antworte - freundlich "
+    "und in der Rolle. WAS du danach tust, bleibt allein deine Entscheidung."
 )
 
 # Sprache der NPC-AUSGABE (Funk/Logbuch/Absicht). Default "de". Der Spielkontext
@@ -262,6 +263,7 @@ STOP_FLAG = os.path.join(AGENT_HOME, "stop.flag")
 AGENT_NAME = "Viktor"
 AGENT_FACTION = "civilian"
 AGENT_BR = 0  # 1 = Battle-Royale (Free-for-all, 1 Leben); vom --br-Flag gesetzt
+AGENT_FREE = 0  # 1 = Freier Survival-Modus (1 Leben, Persona gelockert); vom --free-Flag gesetzt
 AGENT_LANG = "de"  # Ausgabe-Sprache der NPC (Funk/Logbuch); vom --language gesetzt
 INTENT_FILE = ""  # intent_<id>.txt im Bridge-Profil (Nameplate-Gedankenzeile), in main gesetzt
 
@@ -316,15 +318,45 @@ def load_roster_names() -> list[str]:
     return []
 
 
+def load_roster_agents() -> list[dict]:
+    """Id + Name aller Arena-Agenten - fuer die Peer-Ueberwachung (Kamerad
+    gefallen): die state_<id>.json haengt an der Id, der Weckruf am Namen.
+    Bevorzugt die aktive Runde (effektive, im Menue gewaehlte Namen)."""
+    for path in (ACTIVE_ROSTER_FILE, ROSTER_FILE):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                agents = [{"id": a.get("id", ""), "name": a.get("name", "")}
+                          for a in json.load(f).get("agents", [])
+                          if a.get("id") and a.get("name")]
+            if agents:
+                return agents
+        except (OSError, json.JSONDecodeError):
+            continue
+    return []
+
+
 # Schwellen fuer Weck-Ereignisse
 WATER_LOW = 900.0
 ENERGY_LOW = 900.0
-INFECTED_NEAR = 15.0
+# 30 statt 15: bei 15 m ist ein sprintender Infizierter in ~2 s dran - mit
+# 10-30 s Zug-Overhead kam die Warnung praktisch immer zu spaet.
+INFECTED_NEAR = 30.0
 PREDATOR_NEAR = 40.0      # Raubtiere (Wolf/Baer) sind schnell + toedlich -> frueh warnen
 CLUSTER_RADIUS = 45.0     # Gefahrenzone: mehrere Gegner dicht beieinander voraus
 CLUSTER_COUNT = 3         # ab so vielen Feinden im Radius = Horde/Camp -> ausweichen
 HEALTH_DROP = 5.0
 BLOOD_DROP = 150.0
+# Wetter-/Naesse-Schwellen (state.world + npc.wet - liefert erst die neue
+# Mod-Version; fehlen die Felder, bleiben die Checks einfach still)
+RAIN_START = 0.3          # rain steigt darueber -> "REGEN SETZT EIN"
+RAIN_STOP = 0.15          # darunter loest der Regen-Latch wieder
+WET_SOAKED = 0.5          # npc.wet darueber -> "DU BIST DURCHNAESST"
+WET_DRY = 0.25            # darunter loest der Naesse-Latch wieder
+# Lagerfeuer-Runde: gemuetlicher Plausch-Weckruf, streng gedrosselt (Token!)
+CAMPFIRE_MATE_DIST = 15.0        # Kamerad hoechstens so weit weg
+CAMPFIRE_FIRE_DIST = 20.0        # Feuerstelle hoechstens so weit weg
+CAMPFIRE_COOLDOWN_SEC = 1800.0   # 30 min Ruhe zwischen zwei Runden
+CAMPFIRE_GRACE_SEC = 600.0       # Anlaufzeit nach (Re-)Start, kein Sofort-Plausch
 
 # Nicht-kritische Ereignisse erst sammeln (Sekunden), dann gebuendelt als EIN
 # Weckruf zustellen - spart Zuege und macht Antworten kohaerenter
@@ -342,14 +374,24 @@ CTX_ROTATE = 150000  # hoeher = seltener rotieren = mehr Arbeitsgedaechtnis pro 
 # waechst bis "Prompt is too long". Stattdessen nach so vielen Zuegen rotieren.
 # (Igor-Journal 2026-06-19: Wand bei ~37 akkumulierten Zuegen -> 40 rotiert knapp davor.)
 CTX_ROTATE_TURNS = 40
+# Timeout-Kopplung: MCP-Tool-Timeout des CLI-Subprozesses und der Stille-
+# Watchdog haengen BEIDE am laengsten Bridge-Timeout (regroup = 240 s in
+# dayz_mcp.py). Wer regroup verlaengert, hebt automatisch beide mit an.
+# Vorher stand MCP_TOOL_TIMEOUT hart auf 600 s und kollidierte mit dem
+# 300-s-Watchdog: ein Fenster von bis zu 300 s, in dem der Watchdog pending
+# zwangs-clampte, waehrend der Tool-Call noch legal weiterlief.
+LONGEST_TOOL_SEC = 240
+# Wie lange ein einzelner MCP-Tool-Aufruf im CLI-Subprozess blockieren darf
+# (Millisekunden): laengstes Bridge-Timeout plus 30 s Netz-/Parse-Puffer.
+MCP_TOOL_TIMEOUT_MS = (LONGEST_TOOL_SEC + 30) * 1000  # 270000
 # Watchdog gegen pending-Drift: hat das Gehirn so lange GAR nichts ausgegeben
 # (kein Tool, kein Text, kein Zug-Ende), laeuft sicher kein Zug mehr - dann gilt
 # der pending-Zaehler als verdriftet und wird auf 0 gezogen, damit Selbstantrieb
 # (ROUTINE-TICK) und Rotation wieder anspringen. MUSS groesser sein als das
-# laengste Tool-Timeout (regroup = 240 s in dayz_mcp.py), sonst feuert es
-# waehrend eines echten langen Tool-Aufrufs faelschlich, in dem das Gehirn nur
-# auf das Ergebnis wartet und nichts ausgibt.
-STUCK_QUIET_SEC = 300.0
+# laengste Tool-Timeout, sonst feuert es waehrend eines echten langen
+# Tool-Aufrufs faelschlich, in dem das Gehirn nur auf das Ergebnis wartet und
+# nichts ausgibt - daher aus LONGEST_TOOL_SEC abgeleitet (Wert unveraendert 300).
+STUCK_QUIET_SEC = float(LONGEST_TOOL_SEC + 60)  # = 300.0
 # Todes-Schleifen-Bremse: Stirbt der NPC mehr als DEATH_LOOP_MAX Mal binnen
 # DEATH_WINDOW_SEC, ist die Lage aussichtslos (Spawn-Glitch "npc ist tot",
 # toedliche Zone, Kaelte). Jeder Respawn startet sonst sofort eine FRISCHE
@@ -360,11 +402,70 @@ STUCK_QUIET_SEC = 300.0
 DEATH_LOOP_MAX = 3
 DEATH_WINDOW_SEC = 180.0
 DEATH_COOLDOWN_SEC = 300.0
+# Kamerad-gefallen-Dedupe: Peer-Poll (EventWatcher._poll_peers) und
+# Lagezentrum-Funk ("X ist gefallen") melden denselben Tod aus zwei Quellen.
+# Binnen dieses Fensters gilt der Tod als schon gemeldet - sonst zwei
+# Trauer-Zuege pro Tod bei aktivem Orchestrator.
+FALLEN_DEDUPE_SEC = 90.0
+# Stillstands-Waechter (Session-Analyse 24.08.: NPCs standen bis zu 8 Minuten
+# auf einem Fleck, weil der Idle-Backoff die Routine-Ticks auf 480 s streckte
+# und kein Ereignis kam - toedlich fuer den Spielfluss UND fuer den NPC):
+# steht der Koerper laenger als STILL_WARN_SEC praktisch unbewegt
+# (< STILL_MOVE_M seit dem Anker) und ist weder ein Mod-Kommando aktiv noch
+# Kampf/follow/Fahrzeug, weckt ein STILLSTAND-Ereignis das Gehirn mit einem
+# konkreten Bewegungsauftrag. Wiederholung fruehestens alle STILL_REPEAT_SEC,
+# solange er weiter steht. Ein Mensch in Sichtweite unterdrueckt die Mahnung
+# (Stehen beim Spieler ist Interaktion/Wache, kein Leerlauf). Zusaetzlich
+# eskaliert der Idle-Backoff nicht mehr, solange der NPC stationaer ist -
+# 480-s-Luecken gibt es nur noch fuer beschaeftigte (reisende) NPCs.
+STILL_WARN_SEC = 150.0
+STILL_REPEAT_SEC = 300.0
+STILL_MOVE_M = 15.0
+
+# Info-Digest (Audit 03.07.: 37% der Zuege waren reine Lagebestaetigungen -
+# Sitrep rein, 1 Kommentar raus, kein Tool, 3,15 USD): Ereignisse mit diesen
+# Prefixen sind reine Kenntnisnahme und loesen KEINEN eigenen Zug mehr aus.
+# Sie fahren als "LAGE (nur zur Kenntnis)"-Prefix mit dem naechsten echten
+# Weckruf/ROUTINE-TICK mit (Latch-Logik unveraendert, nur die Zustellung
+# wechselt). "DU BIST DURCHNAESST" bleibt bewusst ein echter Weckruf -
+# Naesse ist handlungsrelevant (trocknen/umziehen).
+_INFO_PREFIXES = (
+    "ES DAEMMERT", "DIE NACHT BRICHT HEREIN", "DER MORGEN GRAUT",
+    "REGEN SETZT EIN", "DU SITZT JETZT IN EINEM FAHRZEUG",
+    "DU BIST AUS DEM FAHRZEUG AUSGESTIEGEN",
+)
 
 
 def _is_critical(ev: str) -> bool:
     return ev.startswith(("DU BIST GESTORBEN", "DU NIMMST SCHADEN", "GEFAHR:",
-                          "DU BIST UMGEKIPPT", "DU BIST WIEDER BEI BEWUSSTSEIN"))
+                          "DU BIST UMGEKIPPT", "DU BIST WIEDER BEI BEWUSSTSEIN",
+                          "DU BLUTEST"))
+
+
+def _is_player_priority(ev: str, roster_names) -> bool:
+    """Spieler-Ereignisse ueberspringen das 15-s-Sammelfenster: ein Mensch
+    erwartet eine prompte Reaktion, jede Bündel-Sekunde fuehlt sich wie
+    Ignoriert-Werden an. Gilt fuer Funk/Chat von MENSCHEN (kein Roster-NPC,
+    kein Lagezentrum) und fuer Spieler-Sichtungen. NPC-Geplauder und
+    Orchestrator-Lage bleiben gebuendelt (Token-Disziplin)."""
+    if ev.startswith(("SPIELER GESICHTET", "SPIELER ANWESEND")):
+        return True
+    roster_l = {str(n).lower() for n in (roster_names or [])}
+    for pfx in ("FUNK von ", "CHAT von "):
+        if ev.startswith(pfx):
+            sender = ev[len(pfx):].split(":", 1)[0].strip().strip("'\"")
+            if sender and sender.lower() != "lagezentrum" \
+                    and sender.lower() not in roster_l:
+                return True
+    return False
+
+
+def _is_immediate(ev: str) -> bool:
+    """REISE-Ereignisse (angekommen/stecken geblieben) ueberspringen das
+    15-s-Sammelfenster wie Spieler-Ereignisse: die Ankunft ist genau der
+    Moment, in dem der Plan weitergehen soll - sonst steht der NPC bis zu
+    15 s sichtbar untaetig am Ziel herum."""
+    return ev.startswith("REISE:")
 
 
 class Journal:
@@ -443,16 +544,21 @@ def build_mcp_config(profile: str, npc_id: str, voice: str) -> str:
     cfg = {
         "mcpServers": {
             "dayz": {
+                # Tools sofort KOMPLETT laden statt deferred via ToolSearch:
+                # Claude Code >= 2.1.121 spart damit die ToolSearch-Schemas
+                # (~123k Tokens cache_write pro Session-Start, ~1,5 USD) und
+                # die Extra-LLM-Schritte pro Zug fuers Schema-Nachladen
+                # (Audit 03.07.). Aeltere Versionen ignorieren das Feld.
+                "alwaysLoad": True,
                 "command": sys.executable,
                 "args": [MCP_SERVER, "--profile", profile,
                          "--npc-id", npc_id, "--agent-name", AGENT_NAME,
                          "--voice", voice, "--language", AGENT_LANG,
                          "--outbox", os.path.join(AGENT_HOME, "voice_outbox.jsonl")],
                 # Spielername-Variablen an den MCP-Server durchreichen, damit
-                # follow/regroup/give_to den Funk-Namen auf den DayZ-Profilnamen
-                # aufloesen koennen (gleiche Env wie der Voice-Stack). Zentral
-                # setzbar ueber ISU_MIC_NAME (Funk-/Voice-Name) und ISU_PLAYER_NAME
-                # (DayZ-Profilname). Default leer = im Spiel-Menue gesetzter Name.
+                # follow/regroup/give_to den Funk-Namen ("Isualc") auf den
+                # DayZ-Profilnamen aufloesen koennen (gleiche Env wie der
+                # Voice-Stack). Zentral setzbar ueber ISU_MIC_NAME / ISU_PLAYER_NAME.
                 "env": {
                     "ISU_MIC_NAME": os.environ.get("ISU_MIC_NAME", "Player"),
                     "ISU_PLAYER_NAME": os.environ.get("ISU_PLAYER_NAME", ""),
@@ -551,6 +657,12 @@ def spawn_claude(mcp_cfg: str, model: str, character_file: str = "",
     if AGENT_BR:
         persona += "\n\n" + BR_RULES_BLOCK
 
+    # Freier Survival-Modus: Lockerungs-Override ebenfalls NACH der Persona,
+    # damit er ihre Verhaltens-/Prioritaeten-Vorgaben aufhebt (Rollenspiel-
+    # Grenze, Werkzeug- und Sicherheitsregeln bleiben laut Block bestehen).
+    if AGENT_FREE:
+        persona += "\n\n" + FREE_RULES_BLOCK
+
     # Sprach-Override GANZ zuletzt, damit die Ausgabe-Sprache die deutschen
     # Persona-/Karten-Defaults dominiert (Modus "nur Ausgabe").
     lang_block = lang_rules(AGENT_LANG)
@@ -565,7 +677,7 @@ def spawn_claude(mcp_cfg: str, model: str, character_file: str = "",
     cli_model, backend_env, backend = resolve_backend(model)
 
     cmd = [
-        NODE, CLI,
+        *CLI_LAUNCH,
         "-p",
         "--input-format", "stream-json",
         "--output-format", "stream-json",
@@ -601,9 +713,11 @@ def spawn_claude(mcp_cfg: str, model: str, character_file: str = "",
     # Verschachtelungs-Guards entfernen (Lauf aus einer Claude-Code-Session heraus)
     for key in ("CLAUDECODE", "CLAUDE_CODE", "CLAUDE_CODE_ENTRYPOINT"):
         env.pop(key, None)
-    # MCP-Werkzeuge duerfen lange blockieren (move_to bis 4 min)
+    # MCP-Werkzeuge duerfen lange blockieren (regroup bis 4 min), aber nicht
+    # laenger als noetig: aus LONGEST_TOOL_SEC abgeleitet, damit das Timeout
+    # nie mit dem Stille-Watchdog (STUCK_QUIET_SEC) kollidiert.
     env["MCP_TIMEOUT"] = "60000"
-    env["MCP_TOOL_TIMEOUT"] = "600000"
+    env["MCP_TOOL_TIMEOUT"] = str(MCP_TOOL_TIMEOUT_MS)
     # Backend-Env umbiegen (nur fuer DIESEN Subprozess).
     if backend == "anthropic-api":
         # Expliziter API-Pfad: ANTHROPIC_API_KEY MUSS bleiben (er erzwingt die
@@ -757,6 +871,16 @@ class BrainReader(threading.Thread):
         # Rollender Puffer der letzten Gehirn-Kommentare (eigener Gedankenfaden),
         # um ihn ueber eine Session-Rotation hinweg zu retten (Lever 2).
         self.recent: list[str] = []
+        # Zuletzt bekanntes Follow-Ziel (aus den Tool-Aufrufen abgeleitet) -
+        # kommt in die Handover-Notiz der Kontext-Rotation. follow endet in
+        # der Mod auch durch eigene Bewegung -> move_to/flee/engage leeren.
+        self.follow_target = ""
+        # Kontextgroesse laut LETZTEM einzelnen API-Schritt (cache_read +
+        # cache_write + input). Das ist die echte Fenstergroesse fuer die
+        # Rotations-Schwelle. Die Zug-Summe aus dem result-Event taugt NICHT:
+        # sie addiert cache_read ueber alle Schritte des Zuges und riss die
+        # Schwelle bei jedem mehrstufigen Zug (Rotations-Thrashing 02.07.).
+        self.last_step_ctx = 0
 
     def run(self):
         while True:
@@ -790,6 +914,14 @@ class BrainReader(threading.Thread):
                         act = _tool_action(block.get("name", ""), block.get("input", {}))
                         if act:
                             msg_action = act
+                        # Follow-Ziel mitschreiben (fuer die Rotations-Handover)
+                        short = (block.get("name") or "").split("__")[-1]
+                        if short == "follow":
+                            tgt = str((block.get("input") or {})
+                                      .get("player_name") or "").strip()
+                            self.follow_target = tgt or "dem naechsten Spieler"
+                        elif short in ("unfollow", "move_to", "flee", "engage"):
+                            self.follow_target = ""
                 # Nameplate-Gedankenzeile live halten: Gehirn-Kommentar bevorzugt
                 # (reicher), sonst die abgeleitete Aktion. Reine observe/Read-Zuege
                 # liefern beides leer -> Zeile bleibt unveraendert (nicht leer).
@@ -801,6 +933,12 @@ class BrainReader(threading.Thread):
                 token_line = self.tracker.note_assistant(event)
                 if token_line:
                     self.journal.log(token_line)
+                usage = event.get("message", {}).get("usage") or {}
+                step_ctx = (int(usage.get("cache_read_input_tokens") or 0)
+                            + int(usage.get("cache_creation_input_tokens") or 0)
+                            + int(usage.get("input_tokens") or 0))
+                if step_ctx > 0:
+                    self.last_step_ctx = step_ctx
 
             elif etype == "user":
                 content = event.get("message", {}).get("content", [])
@@ -821,6 +959,12 @@ class BrainReader(threading.Thread):
                 dur = event.get("duration_ms", 0) / 1000.0
                 turn_cost = cost - self.tracker.last_cost
                 self.tracker.last_cost = cost
+                # Rundenkosten ueber Session-Wechsel hinweg kumulieren und fuer
+                # den Supervisor exportieren (Arena-Menue: "Round cost"). Nur
+                # positive Deltas - beim Session-Swap springt cost auf 0 zurueck.
+                if turn_cost > 0:
+                    self.tracker.round_cost = getattr(self.tracker, "round_cost", 0.0) + turn_cost
+                    _write_round_cost(self.tracker.round_cost)
                 note = ""
                 if event.get("subtype") == "error_max_turns":
                     note = ", ZUG AM AKTIONSLIMIT GEKAPPT"
@@ -830,6 +974,17 @@ class BrainReader(threading.Thread):
                 for line2 in self.tracker.turn_summary(event):
                     self.journal.log(line2)
                 self.results.put(event)
+
+
+def _write_round_cost(total: float):
+    """Kumulierte Kosten dieses Runners (ueber alle Sessions der Runde) in
+    <agent_home>/round_cost.txt exportieren. Der Supervisor summiert die
+    Dateien aller laufenden Agenten und haengt sie an die Statuszeile an."""
+    try:
+        with open(os.path.join(AGENT_HOME, "round_cost.txt"), "w", encoding="utf-8") as f:
+            f.write(f"{total:.4f}")
+    except OSError:
+        pass
 
 
 def _tool_result_text(block: dict) -> str:
@@ -855,10 +1010,21 @@ def _is_predator(classname: str) -> bool:
     return False
 
 
+# Anzeigenamen der Krankheits-Erreger (state.npc.disease.agents, von der Mod
+# geschrieben - nur Erreger UEBER der Schwelle stehen ueberhaupt im State).
+_DISEASE_NAMES = {
+    "cholera": "Cholera (schlechtes Wasser)",
+    "salmonella": "Salmonellen (verdorbenes/rohes Essen)",
+    "influenza": "Grippe",
+    "wound": "Wundinfektion",
+    "brain": "Gehirnkrankheit (Kuru)",
+}
+
+
 class EventWatcher:
     """Vergleicht state-Snapshots und erzeugt Weck-Ereignisse."""
 
-    def __init__(self, bridge: Bridge):
+    def __init__(self, bridge: Bridge, greet_initial: bool = False):
         self.bridge = bridge
         state = bridge.read_state() or {}
         npc = state.get("npc", {})
@@ -866,11 +1032,19 @@ class EventWatcher:
         self.roster_names = load_roster_names()
         # Bereits sichtbare Spieler vormerken, damit ein frisch erzeugter Watcher
         # (z.B. nach Respawn) sie nicht faelschlich als "neu gesichtet" meldet und
-        # den frischen Brain damit zuspammt.
+        # den frischen Brain damit zuspammt. AUSNAHME Runden-Start
+        # (greet_initial=True, nur der allererste Watcher): steht der Spieler
+        # schon da, wenn die Runde beginnt, soll der NPC ihn begruessen statt
+        # ihn stumm als Bestand zu verbuchen (Befund 02.07.: keine Begruessung,
+        # weil Clausi beim START-Klick bereits am Lager wartete).
         self.known_players: set[str] = set(
             (e.get("name") or e.get("classname", "?"))
             for e in state.get("nearby", []) if e.get("kind") == "player"
         )
+        self.greet_pending: set[str] = set()
+        if greet_initial:
+            self.greet_pending = set(
+                n for n in self.known_players if n not in self.roster_names)
         self.last_health = npc.get("health", 100.0)
         self.last_blood = npc.get("blood", 5000.0)
         self.water_warned = False
@@ -879,12 +1053,53 @@ class EventWatcher:
         self.predator_warned = False
         self.cluster_warned = False
         self.cold_warned = False
-        self.was_alive = True
+        # Aus dem State ableiten statt hart True: nach einem Respawn wird der
+        # Watcher neu gebaut - stand er hart auf True und der Koerper war noch
+        # nicht alive, meldete der erste poll() sofort wieder "DU BIST
+        # GESTORBEN" (kuenstliche Todes-Serie -> DEATH_LOOP-Bremse).
+        self.was_alive = bool((state.get("npc") or {}).get("alive"))
         self.uncon_warned = False
+        self.bleed_warned = False
         self.in_vehicle = bool((state.get("npc") or {}).get("in_vehicle"))
         # Peer-Smalltalk (NPC-Geplauder, das mich nicht anspricht): nur als
         # Digest sammeln, NICHT pro Nachricht einen Zug ausloesen
         self.smalltalk: list[str] = []
+        # INFO-DIGEST (analog Smalltalk): Routine-Sitrep des Lagezentrums +
+        # Info-Ereignisse (_INFO_PREFIXES). Vom Lagezentrum zaehlt nur der
+        # NEUESTE Sitrep (alte sind durch neue obsolet). Der Digest loest
+        # selbst NIE einen Zug aus - drain_info haengt ihn an den naechsten.
+        self.info_sitrep = ""
+        self.info_lines: list[str] = []
+        # Kamerad-gefallen-Dedupe: Name (lower) -> Zeitpunkt der Meldung
+        self.fallen_recent: dict[str, float] = {}
+        # REISE: travel_event_<id>.json vom travel_to-Thread in dayz_mcp
+        # (gleiches Verzeichnis wie intent_<id>.txt). Eine Altlast aus der
+        # vorigen Session / dem vorigen Leben verwerfen, wie beim Stale-Intent.
+        self.travel_file = os.path.join(bridge.dir,
+                                        f"travel_event_{bridge.npc_id}.json")
+        try:
+            if os.path.exists(self.travel_file):
+                os.remove(self.travel_file)
+        except OSError:
+            pass
+        # WETTER (state.world, tolerant): Sonnenstand-Basis ohne Weckruf setzen,
+        # sonst meldet jeder Runner-Start "die Nacht bricht herein".
+        world0 = state.get("world")
+        self.last_sun = (str(world0.get("sun") or "")
+                         if isinstance(world0, dict) else "")
+        self.rain_warned = False
+        self.wet_warned = False
+        # KRANKHEIT: pro Erreger gelatcht, bis er wieder unter der Schwelle liegt
+        self.disease_warned: set[str] = set()
+        # KAMERAD GEFALLEN: Peer-Status (id -> zuletzt gesehen lebendig)
+        self.roster_agents = load_roster_agents()
+        self.peer_alive: dict[str, bool] = {}
+        # LAGERFEUER-RUNDE: streng gedrosselt (Anlaufzeit + 30-min-Cooldown)
+        self.campfire_next = time.monotonic() + CAMPFIRE_GRACE_SEC
+        # STILLSTAND: Anker-Position + Zeitpunkte des Stillstands-Waechters
+        self.still_anchor: tuple[float, float] | None = None
+        self.still_since = time.monotonic()
+        self.still_last_warn = 0.0
 
     def drain_smalltalk(self) -> str:
         if not self.smalltalk:
@@ -892,6 +1107,49 @@ class EventWatcher:
         digest = " | ".join(self.smalltalk)
         self.smalltalk = []
         return digest
+
+    def drain_info(self) -> str:
+        """Info-Digest abholen und leeren: max ~4 Zeilen (neuester
+        Lagezentrum-Sitrep + bis zu 3 Info-Ereignisse). Faehrt nur als
+        Prefix mit einem echten Weckruf mit, loest NIE selbst einen aus."""
+        lines = []
+        if self.info_sitrep:
+            lines.append("Lagezentrum: " + self.info_sitrep)
+        lines += self.info_lines
+        self.info_sitrep = ""
+        self.info_lines = []
+        return "\n".join(lines)
+
+    def fallen_fresh(self, name: str) -> bool:
+        """True = dieser Tod ist neu und darf einen Weckruf ausloesen.
+        Merkt sich den Namen; die jeweils andere Quelle (Peer-Poll vs.
+        Lagezentrum-Funk) ist damit binnen FALLEN_DEDUPE_SEC unterdrueckt."""
+        now = time.monotonic()
+        key = (name or "").strip().lower()
+        last = self.fallen_recent.get(key)
+        self.fallen_recent[key] = now
+        return last is None or (now - last) >= FALLEN_DEDUPE_SEC
+
+    def route_funk(self, funk: dict) -> str:
+        """Eine voice_inbox-Zeile einsortieren. Rueckgabe: Weckruf-Text
+        (loest einen Zug aus) oder "" (in den Info-Digest uebernommen).
+        Routine-Sitreps des Lagezentrums (prio=False, s. orchestrator.
+        inbox_append) fahren nur im Digest mit; Prio-Funk (Tod/kritisch)
+        bleibt ein echter Weckruf. 'X ist gefallen' wird dabei gegen den
+        Peer-Poll dedupliziert (fallen_fresh): ist jeder genannte Tod schon
+        gemeldet und sonst nichts kritisch, faellt der Funk in den Digest."""
+        text = (funk.get("text") or "").strip()
+        sender = str(funk.get("user") or "?")
+        if sender.strip().lower() == "lagezentrum":
+            fallen = [n for n in self.roster_names
+                      if f"{n} ist gefallen" in text]
+            fresh = [n for n in fallen if self.fallen_fresh(n)]
+            if (not funk.get("prio")
+                    or (fallen and not fresh
+                        and "kritisch" not in text.lower())):
+                self.info_sitrep = text
+                return ""
+        return f"FUNK von {sender}: \"{text}\""
 
     def _native_radio(self) -> dict:
         """ascii->native aus dem gemeinsamen Klartext-Funkkanal (letzte ~200
@@ -991,6 +1249,12 @@ class EventWatcher:
 
         for name in players_now - self.known_players:
             events.append(f"SPIELER GESICHTET: '{name}' ist in deiner Naehe aufgetaucht.")
+        # Runden-Start: Spieler, die beim ersten Watcher schon dastanden,
+        # genau EINMAL zum Begruessen melden (kein "aufgetaucht"-Spam).
+        for name in self.greet_pending & players_now:
+            events.append(f"SPIELER ANWESEND: '{name}' steht bei dir - "
+                          f"begruesse ihn kurz.")
+        self.greet_pending -= players_now
         self.known_players = players_now
 
         # Gefahrenzone voraus: mehrere Gegner dicht beieinander (Horde, Wolfsrudel
@@ -1013,11 +1277,21 @@ class EventWatcher:
         if predator_min > PREDATOR_NEAR + 15:
             self.predator_warned = False
 
+        # Blutung (gelatcht): unbehandelt toedlich, darum kritischer Weckruf.
+        # Das bleeding-Feld liefert die Mod seit 23.08. (IsBleeding im State).
+        bleeding = bool(npc.get("bleeding"))
+        if bleeding and not self.bleed_warned:
+            self.bleed_warned = True
+            events.append("DU BLUTEST! Verbinde dich SOFORT mit bandage() - "
+                          "unbehandelt verblutest du.")
+        if not bleeding:
+            self.bleed_warned = False
+
         # Einzelner Infizierter nah (gelatcht)
         if infected_min < INFECTED_NEAR and not self.infected_warned:
             self.infected_warned = True
             events.append(f"GEFAHR: Infizierter nur noch {infected_min:.0f} m entfernt!")
-        if infected_min > 30:
+        if infected_min > 55:
             self.infected_warned = False
 
         # Bewusstlosigkeit (gelatcht)
@@ -1073,7 +1347,270 @@ class EventWatcher:
         if heat > -0.2:
             self.cold_warned = False
 
-        return events, state
+        # Neue gelatchte Ereignis-Quellen. Alle tolerant gegen fehlende Felder
+        # (die Mod-Seite liefert world/wet/disease erst nach ihrem Repack) und
+        # alle nicht-kritisch -> laufen ueber die normale 15-s-Buendelung.
+        events += self._poll_travel()
+        events += self._poll_weather(state, npc)
+        events += self._poll_disease(npc)
+        events += self._poll_peers()
+        events += self._poll_campfire(state, own_name)
+        events += self._poll_stillstand(state, npc)
+
+        # Info-only-Ereignisse (Wetter-Uebergaenge, Fahrzeug rein/raus) in den
+        # Digest abzweigen: Latch-Logik oben unveraendert, nur die Zustellung
+        # wechselt - kein eigener Zug mehr fuer reine Kenntnisnahmen.
+        kept = []
+        for ev in events:
+            if ev.startswith(_INFO_PREFIXES):
+                self.info_lines.append(ev)
+                if len(self.info_lines) > 3:
+                    self.info_lines.pop(0)
+            else:
+                kept.append(ev)
+
+        return kept, state
+
+    def stationary_secs(self) -> float:
+        """Sekunden, die der Koerper praktisch unbewegt und unbeschaeftigt
+        dasteht (klein/0 = in Bewegung oder beschaeftigt - der Anker wird
+        dann laufend zurueckgesetzt). Fuer den Idle-Backoff-Stopp."""
+        if self.still_anchor is None:
+            return 0.0
+        return max(0.0, time.monotonic() - self.still_since)
+
+    def _poll_stillstand(self, state: dict, npc: dict) -> list[str]:
+        """STILLSTAND: der NPC steht laenger unbewegt herum, ohne dass ein
+        Kommando laeuft, er kaempft, folgt oder faehrt. Weckt das Gehirn mit
+        einem konkreten Bewegungsauftrag statt zu warten, bis der (per
+        Backoff gestreckte) Routine-Tick irgendwann kommt."""
+        now = time.monotonic()
+        try:
+            px = float(npc.get("pos_x", 0.0))
+            pz = float(npc.get("pos_z", 0.0))
+        except (TypeError, ValueError):
+            return []
+        cmd = state.get("command") or {}
+        busy = (str(cmd.get("status") or "") == "running"
+                or bool(npc.get("fighting"))
+                or bool(npc.get("following"))
+                or bool(npc.get("in_vehicle"))
+                or bool(npc.get("unconscious")))
+        moved = True
+        if self.still_anchor is not None:
+            dx = px - self.still_anchor[0]
+            dz = pz - self.still_anchor[1]
+            moved = (dx * dx + dz * dz) > (STILL_MOVE_M * STILL_MOVE_M)
+        if busy or moved or self.still_anchor is None:
+            self.still_anchor = (px, pz)
+            self.still_since = now
+            return []
+        # Mensch in Sichtweite: Stehen ist Interaktion oder Wache beim
+        # Spieler - keine Mahnung (der Zaehler laeuft weiter; geht der
+        # Spieler, darf die Mahnung sofort kommen).
+        if any(e.get("kind") == "player" for e in state.get("nearby", [])):
+            return []
+        standing = now - self.still_since
+        if standing < STILL_WARN_SEC:
+            return []
+        if (now - self.still_last_warn) < STILL_REPEAT_SEC:
+            return []
+        self.still_last_warn = now
+        return [(f"STILLSTAND: Du stehst seit {standing:.0f} Sekunden "
+                 f"unbewegt bei x={px:.0f} z={pz:.0f} und nichts laeuft. "
+                 f"Rumstehen ist gefaehrlich (Infizierte, Auskuehlung) und "
+                 f"toetet den Spielfluss. Tu JETZT etwas Sichtbares: "
+                 f"loot_area, explore_step, travel_to zu einem Ziel, "
+                 f"dress_best/kochen am Lager oder follow zum Squad. "
+                 f"Beende den Zug erst, wenn etwas laeuft.")]
+
+    def _poll_travel(self) -> list[str]:
+        """REISE: travel_event_<id>.json konsumieren. Der travel_to-Thread in
+        dayz_mcp schreibt sie bei Ankunft/Abbruch:
+        {"event":"arrived"|"stuck"|"aborted","x":<f>,"z":<f>,"detail":"<t>"}.
+        Die Datei wird IMMER geloescht - auch wenn sie kaputt ist, sonst
+        wuerde sie jeden Tick erneut gelesen (Weckruf-Spam)."""
+        path = self.travel_file
+        if not os.path.exists(path):
+            return []
+        data = None
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            data = None
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        if not isinstance(data, dict):
+            return []
+        ev = str(data.get("event") or "")
+        try:
+            x = float(data.get("x") or 0.0)
+            z = float(data.get("z") or 0.0)
+        except (TypeError, ValueError):
+            x = z = 0.0
+        detail = str(data.get("detail") or "").strip()
+        suffix = f" ({detail})" if detail else ""
+        if ev == "arrived":
+            return [f"REISE: angekommen bei x={x:.0f} z={z:.0f}{suffix}. "
+                    f"Verschaffe dir einen Ueberblick und mach SOFORT mit "
+                    f"deinem Plan weiter - starte die naechste Aktion "
+                    f"(loot_area, travel_to zum naechsten Ziel, Auftrag "
+                    f"erledigen), bleib nicht stehen."]
+        if ev in ("stuck", "aborted"):
+            was = "stecken geblieben" if ev == "stuck" else "abgebrochen"
+            return [f"REISE: {was} bei x={x:.0f} z={z:.0f}{suffix} - "
+                    f"entscheide neu (anderer Weg, anderes Ziel oder erst "
+                    f"die Lage klaeren)."]
+        return []
+
+    def _poll_weather(self, state: dict, npc: dict) -> list[str]:
+        """WETTER: Uebergaenge aus state.world plus npc.wet. Jeder Uebergang
+        ist gelatcht bis zum Gegenzustand (Sonnenstand: bis zum naechsten
+        Wechsel; Regen/Naesse: mit Hysterese), damit kein Tick-Spam entsteht."""
+        events: list[str] = []
+        world = state.get("world")
+        if isinstance(world, dict):
+            sun = str(world.get("sun") or "")
+            if sun and sun != self.last_sun:
+                # Erst ab dem ZWEITEN Zustand melden - der erste Snapshot
+                # setzt nur die Basis (kein Weckruf beim Kaltstart).
+                if self.last_sun:
+                    if sun == "dusk":
+                        events.append("ES DAEMMERT. Bald wird es dunkel - denk "
+                                      "an Licht, Waerme und einen sicheren "
+                                      "Platz fuer die Nacht.")
+                    elif sun == "night":
+                        events.append("DIE NACHT BRICHT HEREIN. Schlechte "
+                                      "Sicht - sei vorsichtig, bleib eher am "
+                                      "Lager/Feuer oder nutze eine Lichtquelle.")
+                    elif sun == "dawn":
+                        events.append("DER MORGEN GRAUT. Die Sicht wird "
+                                      "besser - gut fuer Aufbruch und Plaene.")
+                self.last_sun = sun
+            try:
+                rain = float(world.get("rain") or 0.0)
+            except (TypeError, ValueError):
+                rain = 0.0
+            if rain > RAIN_START and not self.rain_warned:
+                self.rain_warned = True
+                events.append("REGEN SETZT EIN. Du wirst nass und kuehlst aus "
+                              "- such einen Unterstand oder zieh wetterfeste "
+                              "Kleidung an.")
+            if rain < RAIN_STOP:
+                self.rain_warned = False
+        try:
+            wet = float(npc.get("wet") or 0.0)
+        except (TypeError, ValueError):
+            wet = 0.0
+        if wet > WET_SOAKED and not self.wet_warned:
+            self.wet_warned = True
+            events.append("DU BIST DURCHNAESST. Nasse Kleidung kuehlt dich "
+                          "gefaehrlich aus - trockne dich am Feuer, wechsle "
+                          "Kleidung oder stell dich unter.")
+        if wet < WET_DRY:
+            self.wet_warned = False
+        return events
+
+    def _poll_disease(self, npc: dict) -> list[str]:
+        """KRANKHEIT: state.npc.disease (tolerant). Die Mod traegt nur
+        Erreger UEBER der Schwelle ein - pro Erreger gelatcht, bis er wieder
+        aus dem State verschwindet (= unter die Schwelle gefallen ist)."""
+        events: list[str] = []
+        disease = npc.get("disease")
+        agents = disease.get("agents") if isinstance(disease, dict) else None
+        if not isinstance(agents, dict):
+            agents = {}
+        active: set[str] = set()
+        for key, val in agents.items():
+            try:
+                if int(val) > 0:
+                    active.add(str(key))
+            except (TypeError, ValueError):
+                active.add(str(key))  # eingetragen = ueber der Schwelle
+        for key in sorted(active - self.disease_warned):
+            name = _DISEASE_NAMES.get(key, key)
+            events.append(f"DU BIST KRANK: {name} - behandle dich "
+                          f"(treat_illness) oder such passende Medizin.")
+        self.disease_warned = active
+        return events
+
+    def _poll_peers(self) -> list[str]:
+        """KAMERAD GEFALLEN: state_<peer>.json der anderen Roster-Agenten auf
+        den Uebergang lebendig -> tot pruefen. Gelatcht, bis der Peer wieder
+        lebt (Respawn). Im BR-Modus KEIN Gedenken (Funkstille-Regel) - der
+        Latch wird trotzdem gepflegt."""
+        events: list[str] = []
+        for agent in self.roster_agents:
+            pid = agent.get("id") or ""
+            if not pid or pid == self.bridge.npc_id:
+                continue
+            path = os.path.join(self.bridge.dir, f"state_{pid}.json")
+            try:
+                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                    pstate = json.load(f)
+            except (OSError, ValueError):
+                continue
+            pnpc = (pstate or {}).get("npc") if isinstance(pstate, dict) else None
+            if not isinstance(pnpc, dict) or not pnpc.get("spawned"):
+                continue  # nie gespawnt/despawnt: kein Urteil ueber Leben/Tod
+            try:
+                hp = float(pnpc.get("health", 100.0) or 0.0)
+            except (TypeError, ValueError):
+                hp = 100.0
+            alive = bool(pnpc.get("alive")) and hp > 0.0
+            was = self.peer_alive.get(pid)
+            self.peer_alive[pid] = alive
+            if was is True and not alive and not AGENT_BR:
+                name = agent.get("name") or pid
+                if not self.fallen_fresh(name):
+                    continue  # Lagezentrum-Funk hat den Tod binnen 90 s schon gemeldet
+                events.append(
+                    f"KAMERAD GEFALLEN: {name} ist tot. "
+                    f"Sag GENAU EINEN kurzen Abschiedssatz per say_voice, lege "
+                    f"optional EINE Grabbeigabe ab (drop) - und mach danach "
+                    f"nach deinen Prioritaeten weiter.")
+        return events
+
+    def _poll_campfire(self, state: dict, own_name: str) -> list[str]:
+        """LAGERFEUER-RUNDE: eigener NPC + mindestens ein Roster-Kamerad
+        binnen CAMPFIRE_MATE_DIST an einer Feuerstelle, KEIN Gefahr-Latch
+        aktiv, Cooldown abgelaufen -> EIN Weckruf zu einer Anekdote, Frage
+        oder Erinnerung. Danach 30 min Ruhe (Token-Disziplin)."""
+        if AGENT_BR:
+            return []  # Funkstille: im Battle-Royale wird nicht geplaudert
+        if time.monotonic() < self.campfire_next:
+            return []
+        if self.infected_warned or self.predator_warned or self.cluster_warned:
+            return []  # Gefahr-Latch aktiv - kein Moment fuer Anekdoten
+        roster_l = [n.lower() for n in self.roster_names]
+        mates: list[str] = []
+        fire_near = False
+        for e in state.get("nearby", []):
+            dist = e.get("distance", 9999)
+            cls = (e.get("classname") or "").lower()
+            if "fireplace" in cls and dist <= CAMPFIRE_FIRE_DIST:
+                fire_near = True
+                continue
+            # Auch kind=="ai": die Mod klassifiziert KI-Kameraden als "ai",
+            # nicht "player" - mit dem alten Filter war mates IMMER leer und
+            # die Lagerfeuer-Runde konnte nie ausloesen.
+            if e.get("kind") not in ("player", "ai") or dist > CAMPFIRE_MATE_DIST:
+                continue
+            name = e.get("name") or ""
+            if name and name != own_name and name.lower() in roster_l:
+                mates.append(name)
+        if not (fire_near and mates):
+            return []
+        self.campfire_next = time.monotonic() + CAMPFIRE_COOLDOWN_SEC
+        who = ", ".join(mates[:3])
+        return [f"LAGERFEUER-RUNDE: Du stehst mit {who} am Feuer und es ist "
+                f"gerade ruhig. Nutze den Moment fuer EINE kurze Anekdote, "
+                f"EINE Frage an einen Kameraden oder EINE Erinnerung aus "
+                f"deinem memory/-Ordner (say_voice). EIN Zug - danach ganz "
+                f"normal weiter."]
 
 
 def save_inventory_snapshot(state: dict) -> None:
@@ -1171,33 +1708,49 @@ def restore_inventory(bridge: Bridge, journal: Journal, snapshot: dict) -> None:
 
 
 def ensure_body(bridge: Bridge, journal: Journal, restore: bool = True,
-                loadout_default: str = "") -> bool:
+                loadout_default: str = "", fresh: bool = False) -> bool:
+    """fresh=True (Menue-Loadout gewaehlt): der Koerper wird IMMER frisch mit
+    loadout_default gespawnt - ein noch lebender/uebernommener Alt-Koerper
+    wuerde sonst mit seinem alten Inventar weiterlaufen und die Menue-Wahl
+    stillschweigend ueberschreiben."""
     state = bridge.read_state() or {}
     npc = state.get("npc", {})
     if npc.get("spawned") and npc.get("alive"):
-        journal.log(f"Koerper vorhanden: {npc.get('classname')}")
-        return True
+        if fresh and loadout_default:
+            journal.log("Menue-Loadout gewaehlt - alter Koerper wird fuer das "
+                        "frische Equip despawnt.")
+            bridge.run("despawn", timeout=10)
+        else:
+            journal.log(f"Koerper vorhanden: {npc.get('classname')}")
+            return True
 
     journal.log("Kein lebender Koerper - versuche adopt_nearest...")
     result = bridge.run("adopt_nearest", timeout=15)
     if result.get("status") == "done":
-        # adopt_nearest nimmt den ersten herrenlosen eAI ohne Ruecksicht auf die
-        # Distanz. Pruefen, ob der Koerper nah genug am Lager liegt - sonst ist es
-        # ein zufaelliger Expansion-eAI irgendwo auf der Karte: verwerfen und am
-        # Lager frisch spawnen, damit die Gruppe wirklich am Lager zusammensteht.
-        snap = bridge.read_state() or {}
-        body = snap.get("npc", {})
-        ddx = body.get("pos_x", 0.0) - SPAWN_POS[0]
-        ddz = body.get("pos_z", 0.0) - SPAWN_POS[1]
-        adopt_dist = (ddx * ddx + ddz * ddz) ** 0.5
-        if adopt_dist <= ADOPT_MAX_DIST:
-            journal.log(f"Verwaiste eAI uebernommen: {result.get('detail') or ''} "
-                        f"({adopt_dist:.0f} m vom Lager, ok)")
-            return True
-        journal.log(f"adopt_nearest lieferte Koerper {adopt_dist:.0f} m vom Lager "
-                    f"(> {ADOPT_MAX_DIST:.0f} m) - verwerfe und spawne neu am Lager.")
-        bridge.run("despawn", timeout=10)
-        # faellt durch zum kontrollierten Spawn am Lager unten
+        if fresh and loadout_default:
+            # Erst uebernehmen (sonst bliebe der Alt-Koerper als Doppelgaenger
+            # in der Welt stehen), dann verwerfen und frisch spawnen.
+            journal.log("Menue-Loadout gewaehlt - uebernommenen Alt-Koerper "
+                        "despawnt, spawne frisch mit Loadout.")
+            bridge.run("despawn", timeout=10)
+        else:
+            # adopt_nearest nimmt den ersten herrenlosen eAI ohne Ruecksicht auf die
+            # Distanz. Pruefen, ob der Koerper nah genug am Lager liegt - sonst ist es
+            # ein zufaelliger Expansion-eAI irgendwo auf der Karte: verwerfen und am
+            # Lager frisch spawnen, damit die Gruppe wirklich am Lager zusammensteht.
+            snap = bridge.read_state() or {}
+            body = snap.get("npc", {})
+            ddx = body.get("pos_x", 0.0) - SPAWN_POS[0]
+            ddz = body.get("pos_z", 0.0) - SPAWN_POS[1]
+            adopt_dist = (ddx * ddx + ddz * ddz) ** 0.5
+            if adopt_dist <= ADOPT_MAX_DIST:
+                journal.log(f"Verwaiste eAI uebernommen: {result.get('detail') or ''} "
+                            f"({adopt_dist:.0f} m vom Lager, ok)")
+                return True
+            journal.log(f"adopt_nearest lieferte Koerper {adopt_dist:.0f} m vom Lager "
+                        f"(> {ADOPT_MAX_DIST:.0f} m) - verwerfe und spawne neu am Lager.")
+            bridge.run("despawn", timeout=10)
+            # faellt durch zum kontrollierten Spawn am Lager unten
 
     # Erster Spawn ohne Snapshot: Berufs-Loadout des Agenten
     snapshot = None
@@ -1248,7 +1801,7 @@ def world_generation(profile: str) -> str:
 
 
 def main() -> int:
-    global AGENT_HOME, SNAPSHOT_FILE, VOICE_INBOX, STOP_FLAG, SPAWN_POS, AGENT_NAME, AGENT_FACTION, AGENT_BR, AGENT_LANG, INTENT_FILE
+    global AGENT_HOME, SNAPSHOT_FILE, VOICE_INBOX, STOP_FLAG, SPAWN_POS, AGENT_NAME, AGENT_FACTION, AGENT_BR, AGENT_FREE, AGENT_LANG, INTENT_FILE
 
     # Konsole gegen Encoding-Abstuerze haerten (Viktor schreibt deutsch)
     try:
@@ -1284,6 +1837,9 @@ def main() -> int:
                         help="Text des ersten Weckrufs ueberschreiben")
     parser.add_argument("--no-tp", action="store_true",
                         help="Spieler beim Start NICHT zum NPC teleportieren")
+    parser.add_argument("--fresh-loadout", action="store_true",
+                        help="Menue-Loadout erzwingen: Alt-Koerper despawnen und "
+                             "frisch mit --loadout spawnen (kein Restore/Adopt)")
     parser.add_argument("--no-restore", action="store_true",
                         help="Inventar nach Respawn NICHT wiederherstellen")
     parser.add_argument("--no-mic", action="store_true",
@@ -1330,6 +1886,11 @@ def main() -> int:
     parser.add_argument("--no-respawn", action="store_true",
                         help="Nur 1 Leben: beim Tod NICHT respawnen, Runner beenden "
                              "(Leiche bleibt als Loot liegen). Fuer Battle-Royale.")
+    parser.add_argument("--free", action="store_true",
+                        help="Freier Survival-Modus: Persona-Lockerung (der Agent "
+                             "entscheidet selbst, was er tut), 1 Leben (impliziert "
+                             "--no-respawn), keine Rally-/Treffpunkt-Auftraege. "
+                             "Kein BR: Funk bleibt an, niemand ist automatisch Feind.")
     args = parser.parse_args()
 
     # Per-Agent-Pfade setzen (Arena: eigenes Home pro Agent)
@@ -1347,6 +1908,11 @@ def main() -> int:
     AGENT_NAME = args.name or args.npc_id.capitalize()
     AGENT_FACTION = args.faction
     AGENT_BR = 1 if args.br else 0
+    AGENT_FREE = 1 if args.free else 0
+    # Freier Modus = 1 Leben: den bestehenden --no-respawn-Mechanismus
+    # wiederverwenden (Tod -> Runner endet sauber, Leiche bleibt als Loot).
+    if args.free:
+        args.no_respawn = True
     AGENT_LANG = (args.language or "de").lower()
 
     # Stimme aus dem Roster nachschlagen, wenn keine uebergeben wurde -
@@ -1368,8 +1934,12 @@ def main() -> int:
                     f"## Taktiken\n\n## Lektionen\n")
 
     journal = Journal()
+    # mode=free NACH model= und per Leerzeichen getrennt: league_report.py
+    # HEADER_RE fasst model=([\w.,/-]+) - das Leerzeichen beendet die Gruppe,
+    # der Zusatz bricht das Parsen also nicht (gegengeprueft).
+    mode_note = " mode=free" if args.free else ""
     journal.log(f"=== IsuSurvivor Agent-Runner | npc={args.npc_id} ({AGENT_NAME}) "
-                f"model={args.model} idle={args.idle}s ===")
+                f"model={args.model}{mode_note} idle={args.idle}s ===")
 
     bridge = Bridge(args.profile, args.npc_id)
     INTENT_FILE = os.path.join(bridge.dir, f"intent_{args.npc_id}.txt")
@@ -1397,7 +1967,8 @@ def main() -> int:
             return 1
         journal.log(f"Slot '{args.npc_id}' lebt.")
     if not ensure_body(bridge, journal, restore=not args.no_restore,
-                       loadout_default=args.loadout):
+                       loadout_default=args.loadout,
+                       fresh=args.fresh_loadout):
         return 1
 
     state0 = bridge.read_state() or {}
@@ -1427,6 +1998,9 @@ def main() -> int:
             journal.log("Noch kein Spieler verbunden - teleportiere, sobald jemand joint.")
 
     os.makedirs(AGENT_HOME, exist_ok=True)
+    # Rundenkosten-Export zuruecksetzen - sonst summiert der Supervisor die
+    # Restwerte der letzten Runde mit.
+    _write_round_cost(0.0)
 
     # Voice-Datei-Hygiene VOR dem Claude-Start, sonst frisst das Loeschen
     # die ersten Aeusserungen (Arena-Modus: der Supervisor uebernimmt das)
@@ -1485,7 +2059,10 @@ def main() -> int:
         if not os.environ.get("ELEVENLABS_API_KEY"):
             journal.log("!!! ELEVENLABS_API_KEY fehlt: Bot ist im Kanal, aber "
                         "STUMM (kein TTS) und TAUB (kein STT). !!!")
-    else:
+    elif not args.no_voice_procs:
+        # Nur im Solo-Betrieb warnen. Im Arena-Modus laufen die Bots zentral
+        # beim Supervisor - der Runner sieht den Token absichtlich nicht, die
+        # Warnung war dort ein Fehlalarm (Voice lief laengst, 03.07.).
         journal.log("!" * 60)
         journal.log("!!! Kein DISCORD_BOT_TOKEN gesetzt - Discord-Voice bleibt AUS.")
         journal.log("!!! say erscheint dann NUR im Spiel-Textchat, nicht im Funk.")
@@ -1507,7 +2084,7 @@ def main() -> int:
     elif not args.no_mic:
         journal.log("Mikrofon-Hoeren AUS (ELEVENLABS_API_KEY fehlt).")
 
-    watcher = EventWatcher(bridge)
+    watcher = EventWatcher(bridge, greet_initial=True)
     tracker = TokenTracker()
     reader = BrainReader(proc, journal, tracker)
     reader.start()
@@ -1544,7 +2121,10 @@ def main() -> int:
     # Getrennter Spawn: der Agent ist allein in der Wildnis und soll selbst zum
     # Treffpunkt (= Lager) marschieren und sich dort mit der Gruppe vereinen -
     # ohne den Spieler, koordiniert per Funk. Der Treffpunkt kommt per --rally.
-    rally_active = (args.rally_x is not None and args.rally_z is not None)
+    # Freier Modus: KEINE Rally-/Treffpunkt-Injektionen - die Agenten sind
+    # frei (auch falls der Aufrufer versehentlich --rally mitgibt).
+    rally_active = (args.rally_x is not None and args.rally_z is not None
+                    and not args.free)
     if args.once:
         first_msg = args.once
     elif args.mission:
@@ -1559,8 +2139,10 @@ def main() -> int:
             f"Treffpunkt bei x={args.rally_x:.0f} z={args.rally_z:.0f} auf - dort "
             "wird es entschieden. Du startest leicht: loote unterwegs Waffen, "
             "Munition, Schutz. Triffst du jemanden BEVOR du ankommst, kaempfe "
-            "sofort. Marschiere beharrlich (move_to wiederholen), brich NICHT "
-            "wegen der Distanz ab. Zuerst schiessen, dann denken."
+            f"sofort. Starte den Marsch mit travel_to(x={args.rally_x:.0f}, "
+            f"z={args.rally_z:.0f}) - das laeuft im Hintergrund, weicht "
+            "Hindernissen selbst aus und du bleibst waehrend des Marsches "
+            "handlungsfaehig. Zuerst schiessen, dann denken."
         )
     elif args.br:
         # Gruppen-BR-Spawn: alle eng beisammen -> sofortiges Gefecht (Schnelltest).
@@ -1572,16 +2154,28 @@ def main() -> int:
             "greif den naechsten Gegner an (engage). Keine Sekunde zoegern, kein "
             "Marsch - zuerst schiessen, dann denken."
         )
+    elif args.free:
+        # Freier Survival-Modus: kein Auftrag, kein Treffpunkt, keine
+        # Spieler-Naehe-Vorrang-Regel - nur das eine Ziel: ueberleben.
+        first_msg = (
+            "Du erwachst in der Wildnis. Es gibt keinen Auftrag und keinen "
+            "Treffpunkt - du bist voellig frei und entscheidest selbst, was du "
+            "tust: kooperieren, alleine ziehen, siedeln, horten, erkunden. "
+            "Aber merke dir: du hast nur EIN Leben, der Tod ist endgueltig. "
+            "Mach zuerst observe, sorge fuer Ausruestung, Waerme und Nahrung "
+            "und ueberlebe so lange wie moeglich."
+        )
     elif rally_active:
         first_msg = (
             "Du erwachst ALLEIN in einer fremden Gegend, weit weg von deiner "
             "Gruppe. Der Spieler ist NICHT hier - ihr koordiniert euch selbst per "
             "Funk (say). Mach zuerst observe, dann brich zum Treffpunkt bei "
             f"x={args.rally_x:.0f} z={args.rally_z:.0f} auf. Der Weg ist WEIT "
-            "(oft mehrere Kilometer) - marschiere beharrlich, ruf move_to immer "
-            "wieder Richtung Treffpunkt auf, bis du da bist, und brich NICHT "
-            "wegen der grossen Distanz ab (die 500m-Stop-Regel gilt hier "
-            "ausnahmsweise NICHT). EINE Ausnahme: taucht unterwegs der Spieler "
+            "(oft mehrere Kilometer) - starte den Marsch mit "
+            f"travel_to(x={args.rally_x:.0f}, z={args.rally_z:.0f}): das laeuft "
+            "im Hintergrund, weicht Hindernissen selbst aus, und du meldest "
+            "dich einfach wieder, wenn das REISE-Ereignis kommt. NICHT move_to "
+            "in Schleife rufen. EINE Ausnahme: taucht unterwegs der Spieler "
             "(ein Mensch, kind player in observe) nah bei dir auf, bleib bei ihm, "
             "begruesse ihn und warte auf seine Anweisung, statt an ihm "
             "vorbeizumarschieren. Sorge unterwegs fuer dich (Waerme, Nahrung, "
@@ -1612,21 +2206,44 @@ def main() -> int:
         snapshot_tick = 0
         last_ctx = 0              # Kontextgroesse des letzten Zuges (Tokens)
         turns_since_rotate = 0    # Zuege seit der letzten frischen Session
-        rotating = False          # Session-Rotation laeuft (Memory-Sicherung)
+        rotate_pending = False    # Kontext-Schwelle gerissen: Swap folgt, sobald
+                                  # der laufende Zug fertig ist (transaktional)
         # CCR (Gemini/OpenAI/xAI) und lokaler llama-server melden keine
         # Token-Usage -> last_ctx bleibt 0 -> der Token-Trigger feuert nie.
         # Auf diesen Backends den zugbasierten Fallback (CTX_ROTATE_TURNS) nutzen.
         usage_blind = backend not in ("anthropic", "anthropic-api")
         death_times: list[float] = []   # Tod-Zeitpunkte fuer die Schleifen-Bremse
+        # Adaptiver Idle-Backoff (Audit 03.07.): Routine-Ticks alle args.idle s
+        # liefen auch, wenn nichts passierte und kein Spieler da war - reine
+        # Token-Verbrennung. Der Faktor (1 -> 2 -> 4, Cap 4) streckt NUR den
+        # Routine-Tick-Abstand; nach jedem Tick ohne vorheriges echtes Ereignis
+        # verdoppelt er sich. Zurueck auf 1 bei jedem echten Event-Dispatch
+        # (Spieler-Funk/Chat inklusive) oder sobald ein Mensch in Sichtweite
+        # ist (watcher.known_players). Im BR-Modus fest 1 - dort zaehlt Tempo.
+        idle_backoff = 1
+        event_since_tick = True   # echtes Ereignis seit dem letzten Routine-Tick?
 
-        def dispatch(msg: str):
-            nonlocal pending, interrupted, idle_deadline
+        def dispatch(msg: str, routine: bool = False):
+            nonlocal pending, interrupted, idle_deadline, idle_backoff, \
+                event_since_tick
+            # Info-Digest (Routine-Sitrep, Wetter, Fahrzeug) faehrt als
+            # Kenntnis-Prefix mit dem echten Weckruf mit - loest also nie
+            # selbst einen Zug aus, geht aber auch nie verloren.
+            info = watcher.drain_info()
+            if info:
+                msg = "LAGE (nur zur Kenntnis): " + info + "\n\n" + msg
             if interrupted:
                 msg = ("(Dein voriger Zug wurde am Aktionslimit gekappt. "
                        "Falls du mitten in etwas warst, kannst du es jetzt "
                        "fortsetzen - es sei denn, unten steht Dringenderes.)\n\n"
                        + msg)
                 interrupted = False
+            if not routine:
+                # Echtes Ereignis: Backoff sofort aufheben, volle Aufmerksamkeit.
+                event_since_tick = True
+                if idle_backoff != 1:
+                    idle_backoff = 1
+                    journal.log(f"[IDLE] zurueck auf {args.idle}s")
             send_user(proc, msg)
             journal.log("[WECKRUF] " + msg.replace("\n", " | ")[:200])
             pending += 1
@@ -1650,9 +2267,12 @@ def main() -> int:
                     turns_since_rotate += 1
                     interrupted = result.get("subtype") == "error_max_turns"
                     idle_deadline = time.monotonic() + args.idle
-                    usage = result.get("usage") or {}
-                    last_ctx = (usage.get("cache_read_input_tokens", 0)
-                                + usage.get("input_tokens", 0))
+                    # Kontextgroesse = LETZTER einzelner API-Schritt (BrainReader),
+                    # NICHT die Zug-Summe aus result.usage: die addiert cache_read
+                    # ueber alle Schritte und loeste bei jedem mehrstufigen Zug
+                    # eine Rotation aus (Thrashing: Session-Reset alle ~15 s,
+                    # Arbeitsgedaechtnis weg, NPCs wirkten kopflos, 02.07.).
+                    last_ctx = reader.last_step_ctx
                     if args.once:
                         journal.log("=== --once erledigt ===")
                         return 0
@@ -1664,13 +2284,33 @@ def main() -> int:
             if reader.dead:
                 return 1
 
-            # Session-Rotation: die Memory-Sicherung ist durch (pending==0),
-            # jetzt den Claude-Prozess gegen eine frische, kontextarme Session
-            # tauschen. Das Gedaechtnis liegt in CLAUDE.md/memory und bleibt.
-            if rotating and pending == 0:
+            # Kontext-Schwelle pruefen: NUR das Flag setzen (transaktionale
+            # Rotation). Der eigentliche Proc-Swap unten wartet, bis der
+            # laufende Zug abgeschlossen ist und pending==0 - so zerreisst
+            # die Rotation nie einen halben Zug. Token-Trigger (last_ctx)
+            # ODER - auf usage-blinden Backends, wo last_ctx 0 bleibt - der
+            # zugbasierte Fallback (sonst waechst die Gemini/CCR-Session bis
+            # "Prompt is too long").
+            if (not rotate_pending
+                    and (last_ctx > CTX_ROTATE
+                         or (usage_blind and turns_since_rotate >= CTX_ROTATE_TURNS))):
+                rotate_pending = True
+                journal.log(f"[ROTATION] vorgemerkt (Tokens={last_ctx}, "
+                            f"Zuege={turns_since_rotate}, usage_blind={usage_blind}) "
+                            f"- Swap, sobald der laufende Zug abgeschlossen ist.")
+
+            # Session-Rotation (transaktional): Schwelle gerissen UND der
+            # laufende Zug ist fertig (pending==0) - jetzt den Claude-Prozess
+            # gegen eine frische, kontextarme Session tauschen. Das Gedaechtnis
+            # liegt in CLAUDE.md/memory und bleibt; den Arbeitsfaden traegt
+            # die Handover-Notiz hinueber (kein Sicherungs-Zug mehr noetig).
+            if rotate_pending and pending == 0:
                 journal.log(f"[ROTATION] Kontext war {last_ctx} Tokens - "
                             f"starte frische Session.")
-                carry_recent = list(reader.recent)   # Gedankenfaden ueber die Rotation retten
+                # Handover-Material VOR dem Swap einsammeln: Gedankenfaden,
+                # Follow-Ziel und letzter Vorsatz (intent-Datei) der alten Session.
+                carry_recent = list(reader.recent)
+                carry_follow = reader.follow_target
                 try:
                     proc.stdin.close()
                     proc.wait(timeout=10)
@@ -1679,8 +2319,9 @@ def main() -> int:
                 proc = spawn_claude(mcp_cfg, args.model, args.character,
                                     args.turn_limit)
                 reader = BrainReader(proc, journal, tracker)
+                reader.follow_target = carry_follow  # ueberlebt die Rotation
                 reader.start()
-                rotating = False
+                rotate_pending = False
                 last_ctx = 0
                 turns_since_rotate = 0
                 interrupted = False   # frische Session hat keinen gekappten Vorzug
@@ -1693,19 +2334,22 @@ def main() -> int:
                             last_intent = f.read().strip()
                 except OSError:
                     pass
-                intent_hint = ""
+                # Stichpunkt-Format statt Prosa (Audit 03.07.): gleicher
+                # Inhalt (Gedaechtnis-Hinweis, Intent, Follow, Faden), ~60%
+                # weniger Weckruf-Tokens.
+                handover = ("KONTEXT-WECHSEL (frische Session; Gedaechtnis in "
+                            "CLAUDE.md/memory erhalten).")
                 if last_intent:
-                    intent_hint = f' Dein letzter Vorsatz war: "{last_intent}".'
-                recent_hint = ""
+                    handover += f' Zuletzt: "{last_intent}".'
+                if carry_follow:
+                    handover += f" Du folgst: {carry_follow}."
                 if carry_recent:
                     last_few = " | ".join(s[:120] for s in carry_recent[-3:])
-                    recent_hint = f' Zuletzt dachtest/sagtest du: {last_few}.'
-                send_user(proc,
-                          "Du machst weiter (frische Session - dein Gedaechtnis "
-                          "in CLAUDE.md/memory ist erhalten)." + intent_hint + recent_hint +
-                          " Verschaffe dir KURZ mit observe einen Ueberblick und mach bei "
-                          "DEM Plan weiter, den du schon hattest - fang nicht bei null an.")
-                journal.log("[WECKRUF] (nach Rotation) Faden uebergeben + weiter")
+                    handover += f" Letzte Gedanken: {last_few}."
+                handover += (" Kurz observe, dann deinen Plan nahtlos "
+                             "fortsetzen - nicht bei null anfangen.")
+                send_user(proc, handover)
+                journal.log("[WECKRUF] (nach Rotation) KONTEXT-WECHSEL-Handover gesendet")
                 pending = 1
                 time.sleep(1.0)
                 continue
@@ -1719,7 +2363,11 @@ def main() -> int:
                 if text.lower().rstrip(".!") == "tp":
                     tp_requested = True
                     continue
-                events.append(f"FUNK von {funk.get('user', '?')}: \"{text}\"")
+                # Routine-Sitreps des Lagezentrums wandern in den Info-Digest
+                # (kein eigener Zug), Prio-Funk und alles andere weckt normal.
+                ev = watcher.route_funk(funk)
+                if ev:
+                    events.append(ev)
             # Chat-Kommando "tp": Spieler will zum NPC teleportiert werden
             kept = []
             for e in events:
@@ -1743,8 +2391,13 @@ def main() -> int:
                 # aus, die Leiche bleibt als Loot liegen, der Runner endet sauber
                 # (finally raeumt Voice/Mic auf, despawnt aber nicht).
                 if args.no_respawn:
-                    journal.log("[BR] ELIMINIERT - 1 Leben aufgebraucht, kein "
-                                "Respawn. Leiche bleibt liegen, Runner beendet.")
+                    if args.free:
+                        journal.log("[FREE] ENDGUELTIG GESTORBEN - freier Modus, "
+                                    "1 Leben aufgebraucht, kein Respawn. Leiche "
+                                    "bleibt liegen, Runner beendet.")
+                    else:
+                        journal.log("[BR] ELIMINIERT - 1 Leben aufgebraucht, kein "
+                                    "Respawn. Leiche bleibt liegen, Runner beendet.")
                     args.keep_body = True
                     return 0
                 now = time.monotonic()
@@ -1778,7 +2431,8 @@ def main() -> int:
                         time.sleep(2.0)
                     death_times.clear()      # nach der Pause neuer Anlauf
                     ensure_body(bridge, journal, restore=not args.no_restore,
-                                loadout_default=args.loadout)
+                                loadout_default=args.loadout,
+                                fresh=args.fresh_loadout)
                     proc = spawn_claude(mcp_cfg, args.model, args.character,
                                         args.turn_limit)
                     reader = BrainReader(proc, journal, tracker)
@@ -1786,23 +2440,25 @@ def main() -> int:
                     watcher = EventWatcher(bridge)
                     buffered = []
                     buffer_deadline = 0.0
-                    rotating = False
+                    rotate_pending = False
                     last_ctx = 0
                     turns_since_rotate = 0
                     interrupted = False
+                    idle_backoff = 1          # frisches Leben = volle Aufmerksamkeit
+                    event_since_tick = True
                     rally_hint = ""
                     if rally_active:
-                        rally_hint = (f" Brich danach allein zum Treffpunkt bei "
-                                      f"x={args.rally_x:.0f} z={args.rally_z:.0f} "
-                                      f"auf und finde per Funk zu deiner Gruppe.")
+                        rally_hint = (f" Danach: allein zum Treffpunkt "
+                                      f"x={args.rally_x:.0f} z={args.rally_z:.0f}, "
+                                      f"Gruppe per Funk finden.")
+                    # Stichpunkt-Format statt Prosa (Audit 03.07.), Inhalt
+                    # komplett: observe, Todesort meiden, Rally, Gedaechtnis.
                     send_user(proc,
-                              "Du erwachst nach einer Reihe schneller Tode neu. "
-                              "Mache zuerst observe() - deine alte Lage gilt NICHT "
-                              "mehr. Du bist gerade an einem toedlichen Ort "
-                              "gestorben: meide ihn, geh auf Nummer sicher (Distanz "
-                              "zu Gegnern, Deckung), bevor du wieder Risiko "
-                              "eingehst." + rally_hint +
-                              " Deine Erinnerungen (CLAUDE.md/memory) bleiben.")
+                              "NEU ERWACHT NACH TODES-SERIE. Zuerst observe - "
+                              "alte Lage gilt NICHT mehr. Dein Todesort ist "
+                              "toedlich: meide ihn, erst Sicherheit (Distanz, "
+                              "Deckung), dann Risiko." + rally_hint +
+                              " Erinnerungen (CLAUDE.md/memory) bleiben.")
                     journal.log("[TOD-CAP] Cooldown vorbei - frische Session, "
                                 "Vorsicht-Weckruf gesendet")
                     pending = 1
@@ -1817,12 +2473,12 @@ def main() -> int:
                 dead_npc = dead_state.get("npc", {})
                 death_pos = ""
                 if dead_npc.get("spawned"):
-                    death_pos = (f" Deine Leiche liegt bei x={dead_npc.get('pos_x', 0):.0f} "
-                                 f"z={dead_npc.get('pos_z', 0):.0f} - was dir fehlt, "
-                                 f"kannst du dort mit loot_corpse zurueckholen, wenn "
-                                 f"der Weg es wert ist.")
+                    death_pos = (f" Leiche: x={dead_npc.get('pos_x', 0):.0f} "
+                                 f"z={dead_npc.get('pos_z', 0):.0f} "
+                                 f"(loot_corpse, wenn der Weg es wert ist).")
                 ensure_body(bridge, journal, restore=not args.no_restore,
-                            loadout_default=args.loadout)
+                            loadout_default=args.loadout,
+                            fresh=args.fresh_loadout)
                 # Frische Claude-Session: das Gehirn darf NICHT mit dem kompletten
                 # Vor-Tod-Kontext (100+ Zuege) weiterdenken. Sonst handelt es nach
                 # dem Respawn auf alten Positionen/Plaenen, jagt verschwundene
@@ -1841,28 +2497,30 @@ def main() -> int:
                 watcher = EventWatcher(bridge)
                 buffered = []  # alte Ereignisse betreffen das alte Leben
                 buffer_deadline = 0.0
-                rotating = False
+                rotate_pending = False
                 last_ctx = 0
                 turns_since_rotate = 0
                 interrupted = False
+                idle_backoff = 1              # frisches Leben = volle Aufmerksamkeit
+                event_since_tick = True
                 # Getrennter Modus: nach dem Respawn wieder allein zum Treffpunkt
                 # und zur Gruppe zurueckfinden.
                 rally_hint = ""
                 if rally_active:
-                    rally_hint = (f" Brich danach allein zum Treffpunkt bei "
-                                  f"x={args.rally_x:.0f} z={args.rally_z:.0f} auf - "
-                                  f"der Weg kann weit sein, marschiere beharrlich "
-                                  f"mit move_to weiter (nicht wegen der Distanz "
-                                  f"abbrechen) und finde per Funk zu deiner Gruppe "
-                                  f"zurueck.")
+                    rally_hint = (f" Danach: allein zum Treffpunkt "
+                                  f"x={args.rally_x:.0f} z={args.rally_z:.0f} - "
+                                  f"per travel_to (laeuft im Hintergrund, "
+                                  f"Distanz ist kein Abbruchgrund), Gruppe "
+                                  f"per Funk finden.")
+                # Stichpunkt-Format statt Prosa (Audit 03.07.), Inhalt komplett:
+                # observe, Ausruestung/Leiche, Todesposition, Rally, Gedaechtnis,
+                # Lektion.
                 send_user(proc,
-                          "Du bist gestorben und erwachst als neuer Ueberlebender "
-                          "am Strand deiner Erinnerung. Mache als Erstes observe() - "
-                          "deine alte Lage (Position, Ziele, Gegner, Plaene) gilt "
-                          "NICHT mehr, fang frisch an. Ein Teil deiner Ausruestung "
-                          "wurde aus deinem Gedaechtnis wiederhergestellt, der Rest "
-                          "liegt bei deiner Leiche." + death_pos + rally_hint +
-                          " Deine Erinnerungen (CLAUDE.md/memory) bleiben. Trage die "
+                          "DU BIST GESTORBEN UND NEU ERWACHT. Zuerst observe - "
+                          "alte Lage (Position/Ziele/Gegner/Plaene) gilt NICHT "
+                          "mehr. Ausruestung: teils wiederhergestellt, Rest bei "
+                          "deiner Leiche." + death_pos + rally_hint +
+                          " Erinnerungen (CLAUDE.md/memory) bleiben; trage die "
                           "Todesursache als Lektion ein, wenn du sie kennst.")
                 journal.log("[TOD] frische Session gestartet - Respawn-Weckruf gesendet")
                 pending = 1
@@ -1870,11 +2528,16 @@ def main() -> int:
                 continue
 
             # Buendelung: nicht-kritische Ereignisse erst ~15 s sammeln, dann
-            # als EIN Weckruf. Kritisches (Tod/Schaden/Gefahr) sofort.
+            # als EIN Weckruf. Kritisches (Tod/Schaden/Gefahr), Spieler-Events
+            # und REISE-Meldungen (Ankunft = Plan soll sofort weitergehen) sofort.
             if buffered and buffer_deadline == 0.0:
                 buffer_deadline = time.monotonic() + EVENT_BUNDLE_SEC
             has_critical = any(_is_critical(e) for e in buffered)
-            bundle_ready = has_critical or time.monotonic() >= buffer_deadline
+            has_player = any(_is_player_priority(e, watcher.roster_names)
+                             for e in buffered)
+            has_immediate = any(_is_immediate(e) for e in buffered)
+            bundle_ready = (has_critical or has_player or has_immediate
+                            or time.monotonic() >= buffer_deadline)
 
             # Watchdog gegen pending-Drift: pending kann durch Mid-Turn-Einspeisung
             # (mehrere Weckrufe verschmelzen zu EINEM Zug-Ende) ueber 0 haengen
@@ -1884,14 +2547,35 @@ def main() -> int:
             # der Spieler hinkommt. Hat das Gehirn aber seit STUCK_QUIET_SEC GAR
             # nichts ausgegeben und liegt nichts an, laeuft sicher kein Zug mehr:
             # Saldo hart auf 0 ziehen, damit der Selbstantrieb wieder anspringt.
-            if (pending > 0 and not buffered and not rotating
+            # Laeuft BEWUSST auch bei gesetztem rotate_pending: haengt der Saldo,
+            # faende der transaktionale Swap (wartet auf pending==0) sonst nie statt.
+            # KEIN "not buffered" mehr: bei pending>=2 wird nicht dispatcht,
+            # buffered leert sich also nie - und die alte Bedingung liess den
+            # Watchdog genau dann nie greifen (Deadlock, NPC dauerhaft stumm).
+            # Die lange Stille allein ist Beweis genug, dass kein Zug mehr laeuft.
+            if (pending > 0
                     and (time.monotonic() - reader.last_activity) >= STUCK_QUIET_SEC):
                 journal.log(f"[WATCHDOG] pending={pending} trotz "
                             f"{time.monotonic() - reader.last_activity:.0f}s Stille - "
                             f"Saldo verdriftet, setze auf 0 (Selbstantrieb frei).")
                 pending = 0
 
-            if buffered and pending <= 1 and bundle_ready and not rotating:
+            # Mensch in Sichtweite -> volle Aufmerksamkeit: Idle-Backoff sofort
+            # aufheben, nicht erst beim naechsten (gestreckten) Routine-Tick.
+            # Roster-NPCs zaehlen nicht - die eigene Squad steht immer daneben.
+            roster_l = {str(r).lower() for r in watcher.roster_names}
+            human_near = any(str(n).lower() not in roster_l
+                             for n in watcher.known_players)
+            if idle_backoff != 1 and human_near:
+                idle_backoff = 1
+                journal.log(f"[IDLE] zurueck auf {args.idle}s "
+                            f"(Spieler in Sichtweite)")
+
+            # Waehrend rotate_pending KEINE neuen Weckrufe mehr starten: der
+            # Swap wartet auf pending==0, jeder neue Zug wuerde ihn verzoegern.
+            # buffered bleibt stehen und wird nach dem Swap der frischen
+            # Session zugestellt (nichts geht verloren).
+            if buffered and pending <= 1 and bundle_ready and not rotate_pending:
                 smalltalk = watcher.drain_smalltalk()
                 prefix = ""
                 if smalltalk:
@@ -1902,39 +2586,61 @@ def main() -> int:
                 buffered = []
                 buffer_deadline = 0.0
 
-            # Kontext voll? Im Leerlauf eine frische Session anstossen (erst
-            # Memory sichern lassen, dann tauscht der Block oben den Prozess).
-            # Token-Trigger (last_ctx) ODER - auf usage-blinden Backends, wo
-            # last_ctx 0 bleibt - der zugbasierte Fallback (sonst waechst die
-            # Gemini/CCR-Session bis "Prompt is too long").
-            elif (pending == 0 and not rotating
-                  and (last_ctx > CTX_ROTATE
-                       or (usage_blind and turns_since_rotate >= CTX_ROTATE_TURNS))):
-                rotating = True
-                journal.log(f"[ROTATION] ausgeloest (Tokens={last_ctx}, "
-                            f"Zuege={turns_since_rotate}, usage_blind={usage_blind}).")
-                dispatch("Gleich wird die Session neu gestartet (dein Gedaechtnis "
-                         "in CLAUDE.md/memory bleibt; deine Position und dein "
-                         "Vorsatz kennt das System - die musst du NICHT sichern "
-                         "und KEINE Sitzungs-Notiz schreiben). NUR falls du gerade "
-                         "etwas DAUERHAFT Merkenswertes gelernt hast (Tipp, "
-                         "Lektion, Rezept), schreib knapp DAS in deine memory-"
-                         "Datei. Sonst antworte einfach mit 'weiter'.")
-
-            # Routine-Tick nur im echten Leerlauf
-            elif pending == 0 and time.monotonic() >= idle_deadline:
+            # Routine-Tick nur im echten Leerlauf (und nie mit haengender
+            # Rotation). Der Backoff-Faktor streckt AUSSCHLIESSLICH dieses
+            # Gate (idle_deadline selbst wird an mehreren Stellen - Zug-Ende,
+            # Dispatch - immer mit dem Basis-idle gesetzt; der Faktor gehoert
+            # nur in die Routine-Tick-Rechnung, nicht in die Event-Pfade).
+            elif (pending == 0 and not rotate_pending
+                  and time.monotonic() >= idle_deadline
+                      + (idle_backoff - 1) * args.idle):
+                # Kein echtes Ereignis seit dem vorigen Routine-Tick: Abstand
+                # verdoppeln (1 -> 2 -> 4, Cap 4). Im BR-Modus fest 1; bei
+                # Mensch in Sichtweite ebenfalls nie strecken. Und NIE
+                # strecken, wenn der NPC stationaer herumsteht (Analyse
+                # 24.08.: 480-s-Luecken bei stehenden NPCs) - der Backoff
+                # ist fuer beschaeftigte NPCs (Reise/Marsch), nicht fuer
+                # Rumsteher.
+                stationary = watcher.stationary_secs() >= STILL_WARN_SEC
+                if stationary and idle_backoff != 1:
+                    idle_backoff = 1
+                    journal.log(f"[IDLE] zurueck auf {args.idle}s "
+                                f"(NPC steht unbewegt herum)")
+                if (not event_since_tick and not AGENT_BR
+                        and not human_near and not stationary
+                        and idle_backoff < 4):
+                    idle_backoff *= 2
+                    journal.log(f"[IDLE] Backoff x{idle_backoff} "
+                                f"({args.idle * idle_backoff}s) - nichts los")
+                event_since_tick = False
                 smalltalk = watcher.drain_smalltalk()
-                tick = ("ROUTINE-TICK: Eine Weile ist vergangen. Pruefe die "
-                        "Lage. Keine Gefahr und kein Auftrag? Dann nutze die "
-                        "Zeit sinnvoll: looten, kleiner Rundgang, Inventar "
-                        "ordnen, kochen - bleib dabei in der Naehe des "
-                        "Treffpunkts. Und wenn du etwas Berichtenswertes "
-                        "hast (Fund, Plan, Lage), gib einen kurzen "
-                        "Funkspruch ab (say).")
+                if args.free:
+                    # Freier Modus: kein Treffpunkt-Anker - der Agent verfolgt
+                    # seine EIGENEN Ziele.
+                    tick = ("ROUTINE-TICK: Eine Weile ist vergangen. Pruefe die "
+                            "Lage. Keine Gefahr? Dann nutze die Zeit fuer DEINE "
+                            "eigenen Ziele: looten, erkunden, Vorraete anlegen, "
+                            "Inventar ordnen, kochen. Denk daran: du hast nur "
+                            "EIN Leben - geh kein unnoetiges Risiko ein. Und "
+                            "wenn du etwas Berichtenswertes hast (Fund, Plan, "
+                            "Lage), gib einen kurzen Funkspruch ab (say).")
+                else:
+                    tick = ("ROUTINE-TICK: Eine Weile ist vergangen. Pruefe die "
+                            "Lage. Keine Gefahr und kein Auftrag? Dann nutze die "
+                            "Zeit sinnvoll: looten, kleiner Rundgang, Inventar "
+                            "ordnen, kochen - bleib dabei in der Naehe des "
+                            "Treffpunkts. Und wenn du etwas Berichtenswertes "
+                            "hast (Fund, Plan, Lage), gib einen kurzen "
+                            "Funkspruch ab (say).")
+                if stationary:
+                    tick = ("DU STEHST SEIT MINUTEN UNBEWEGT HERUM. " + tick
+                            + " Beende den Zug NICHT, ohne dass eine Aktion "
+                              "laeuft (Bewegung, Looten, Kochen, Wache mit "
+                              "Ansage).")
                 if smalltalk:
                     tick = ("FUNKGEPLAUDER der anderen seither: " + smalltalk
                             + "\n\n" + tick)
-                dispatch(tick)
+                dispatch(tick, routine=True)
 
             time.sleep(2.0)
 

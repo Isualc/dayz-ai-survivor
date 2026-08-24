@@ -22,6 +22,11 @@ class IsuRadialMenu extends UIScriptedMenu
 	static float s_AimX = 0.0;
 	static float s_AimZ = 0.0;
 
+	// Anvisiertes loses Item beim Oeffnen. Ist eins da, wird der "Go to"-Chip zum
+	// "Hol das": der NPC laeuft hin, hebt es auf und zieht es an / schultert es.
+	static bool s_HasAimItem = false;
+	static string s_AimItemClass = "";
+
 	// Button-Reihenfolge muss zum Layout (BtnAct0..BtnAct5) passen.
 	static ref TStringArray s_Actions = {"follow", "halt", "comehere", "loot", "engage", "gotoaim"};
 	// Winkel (Grad, im Uhrzeigersinn ab oben) je Chip - deckt sich mit den
@@ -70,6 +75,23 @@ class IsuRadialMenu extends UIScriptedMenu
 	override void OnShow()
 	{
 		super.OnShow();
+		// Chip + Zentrum an das anvisierte Ziel anpassen (der Oeffner hat es
+		// gerade gesetzt). Zeigt der Spieler auf ein Item, wird "Go to" zu
+		// "Get item"; sonst bleibt es der Lauf-Befehl.
+		if (m_Act5)
+		{
+			if (s_HasAimItem)
+				m_Act5.SetText("Get item");
+			else
+				m_Act5.SetText("Go to");
+		}
+		if (m_Center)
+		{
+			if (s_HasAimItem)
+				m_Center.SetText("Item: " + s_AimItemClass);
+			else
+				m_Center.SetText("Target: " + s_TargetName);
+		}
 		SetFocus(layoutRoot);
 		GetGame().GetInput().ChangeGameFocus(1);
 		GetGame().GetUIManager().ShowUICursor(true);
@@ -148,15 +170,23 @@ class IsuRadialMenu extends UIScriptedMenu
 		}
 		else if (action == "gotoaim")
 		{
-			// "Go to" = goto auf den beim Oeffnen anvisierten Bodenpunkt (z.B.
-			// auf gefundenes Loot zeigen -> der NPC laeuft genau dorthin).
-			action = "goto";
-			if (s_HasAimPos)
-				extra = s_AimX.ToString() + "|" + s_AimZ.ToString();
-			else if (pb)
+			if (s_HasAimItem)
 			{
-				vector pp2 = pb.GetPosition();
-				extra = pp2[0].ToString() + "|" + pp2[2].ToString();
+				// Auf ein Item gezeigt -> "Hol das": hingehen, aufheben, anziehen.
+				action = "fetch";
+				extra = s_AimItemClass;
+			}
+			else
+			{
+				// Auf den Boden gezeigt -> "Go to": zum anvisierten Punkt laufen.
+				action = "goto";
+				if (s_HasAimPos)
+					extra = s_AimX.ToString() + "|" + s_AimZ.ToString();
+				else if (pb)
+				{
+					vector pp2 = pb.GetPosition();
+					extra = pp2[0].ToString() + "|" + pp2[2].ToString();
+				}
 			}
 		}
 

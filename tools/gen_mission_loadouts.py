@@ -14,8 +14,7 @@ import os
 TOOLS = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(TOOLS)
 SRC = os.path.join(REPO, "mod", "loadouts")
-_SERVER_DIR = os.environ.get("DAYZ_SERVER_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\DayZServer")
-DST = os.path.join(_SERVER_DIR, "profiles", "ExpansionMod", "Loadouts")
+DST = r"D:\SteamLibrary\steamapps\common\DayZServer\profiles\ExpansionMod\Loadouts"
 
 
 def itm(cn, health=(0.85, 1.0), q=None):

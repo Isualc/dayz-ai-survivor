@@ -2,7 +2,7 @@
 
 # dayz-ai-survivor
 
-Ein autonomer DayZ-Survivor, gesteuert von Claude Code. Die Architektur hat drei Schichten: Reflexe macht die Expansion-AI auf dem Server (EnforceScript), Taktik macht ein lokaler Daemon, Strategie und Chat macht Claude über MCP. Aus Phase 1 (reine Motorik) ist inzwischen ein vollständiges **Mehr-Agenten-System** geworden: bis zu vier von Claude gesteuerte NPCs gleichzeitig, je mit eigenem Gedächtnis, Modell und Stimme, dazu hörbare Sprache (Discord + 3D im Spiel), schwebende Namensschilder, ein In-Game-Setup-Menü und Direktbefehle per Tastatur/Befehlsrad. Die Phasen-Historie unten dokumentiert den Weg dahin; die jüngsten Features stehen unter „v0.8" am Ende.
+Ein autonomer DayZ-Survivor, gesteuert von Claude Code. Die Architektur hat drei Schichten: Reflexe macht die Expansion-AI auf dem Server (EnforceScript), Taktik macht ein lokaler Daemon, Strategie und Chat macht Claude über MCP. Aus Phase 1 (reine Motorik) ist inzwischen ein vollständiges **Mehr-Agenten-System** geworden: bis zu **zehn** LLM-gesteuerte NPCs gleichzeitig (Claude, GPT, Gemini, Grok oder lokales Gemma pro Slot), je mit eigenem Gedächtnis, Rolle, Loadout und Stimme, dazu hörbare Sprache (Discord + 3D im Spiel), schwebende Namensschilder, drei Spielmodi (Koop / Battle Royale / Freies Überleben), Missionen, ein Spectator-Webserver mit Liga-Wertung, komplette Survival-Folgeketten (Jagen, Fischen, Kochen, Kleidungs-Logik, Nachladen), ein In-Game-Setup-Menü und Direktbefehle per Tastatur/Befehlsrad. Die Phasen-Historie unten dokumentiert den Weg dahin; die jüngsten Features stehen unter „v0.8" am Ende.
 
 ![ISU-Survivor-Keyart — ein Trupp Claude-gesteuerter Survivor im Feld, mit der Tagline „DayZ NPCs with a real AI brain"](docs/images/cover.jpg)
 

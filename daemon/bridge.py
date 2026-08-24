@@ -7,6 +7,7 @@ Spricht mit der IsuSurvivor-Servermod ueber zwei JSON-Dateien im Profilordner
 import json
 import math
 import os
+import threading
 import time
 import uuid
 
@@ -64,6 +65,11 @@ class Bridge:
         # sobald hier eine neue Zeile auftaucht, damit der Agent sofort auf den
         # Spieler reagiert statt minutenlang weiterzumarschieren/-kaempfen.
         self.voice_inbox = None
+        # Reise-Thread (_travel_worker) und Tool-Thread teilen sich DIESELBE
+        # Bridge: ohne Lock koennen beide gleichzeitig "Mailbox frei" sehen und
+        # sich das commands.json ueberschreiben - der Verlierer wartet dann auf
+        # eine cmd_id, die nie ankommt (volles Timeout, leere Fehlermeldung).
+        self._send_lock = threading.Lock()
 
     # ------------------------------------------------------------- state I/O
 
@@ -93,42 +99,51 @@ class Bridge:
 
     def send(self, action: str, x: float = 0.0, y: float = 0.0, z: float = 0.0,
              loadout: str = "", text: str = "", faction: str = "", br: int = 0,
-             timeout: float = 10.0) -> str:
+             timeout: float = 10.0, **extra) -> str:
         cmd_id = uuid.uuid4().hex[:12]
-        payload = {
-            "commands": [
-                {
-                    "id": cmd_id,
-                    "action": action,
-                    "x": float(x),
-                    "y": float(y),
-                    "z": float(z),
-                    "loadout": loadout,
-                    "text": text,
-                    "faction": faction,
-                    "br": str(br),
-                }
-            ]
+        cmd = {
+            "id": cmd_id,
+            "action": action,
+            "x": float(x),
+            "y": float(y),
+            "z": float(z),
+            "loadout": loadout,
+            "text": text,
+            "faction": faction,
+            "br": str(br),
         }
+        # Zusatzfelder fuer neuere Kommandos (z.B. find_water max_dist,
+        # spawn_infected count, treat_other target/item) unveraendert
+        # durchreichen. Bestehende Aufrufe uebergeben kein **extra -> der
+        # ausgehende Befehl bleibt fuer sie exakt gleich. Aeltere Mod-Builds,
+        # die ein Feld nicht kennen, ignorieren es beim Deserialisieren still.
+        for k, v in extra.items():
+            if k not in cmd:
+                cmd[k] = v
+        payload = {"commands": [cmd]}
 
-        deadline = time.monotonic() + timeout
-        while os.path.exists(self.cmd_file):
-            if time.monotonic() > deadline:
-                raise TimeoutError(
-                    "commands.json wird nicht konsumiert - laeuft der Server mit "
-                    "-servermod=@IsuSurvivor?"
-                )
-            time.sleep(0.3)
+        # Lock ueber Warten+Schreiben: das "Mailbox ist frei"-Fenster darf nur
+        # EIN Thread gleichzeitig beanspruchen (Reise- vs. Tool-Thread).
+        with self._send_lock:
+            deadline = time.monotonic() + timeout
+            while os.path.exists(self.cmd_file):
+                if time.monotonic() > deadline:
+                    raise TimeoutError(
+                        "commands.json wird nicht konsumiert - laeuft der Server mit "
+                        "-servermod=@IsuSurvivor?"
+                    )
+                time.sleep(0.3)
 
-        os.makedirs(self.dir, exist_ok=True)
-        tmp = self.cmd_file + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
-        os.replace(tmp, self.cmd_file)
-        return cmd_id
+            os.makedirs(self.dir, exist_ok=True)
+            tmp = self.cmd_file + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2)
+            os.replace(tmp, self.cmd_file)
+            return cmd_id
 
     def wait_status(self, cmd_id: str, timeout: float = 700.0,
-                    on_progress=None, interrupt_inbox=None) -> dict:
+                    on_progress=None, interrupt_inbox=None,
+                    stop_event=None) -> dict:
         """Pollen bis state.command.id == cmd_id und status done/failed.
 
         Bei Timeout wird der LETZTE bekannte command-Block zurueckgegeben
@@ -137,6 +152,10 @@ class Bridge:
         interrupt_inbox: Pfad zur Funk-Inbox. Waechst die Datei waehrend des
         Wartens (neuer Funk vom Spieler), wird mit status "interrupted"
         abgebrochen, damit der Agent sofort zuhoeren statt weitermarschieren kann.
+
+        stop_event: threading.Event - gesetzt = sofort mit "interrupted"
+        aussteigen (der Reise-Thread haengt sonst bis zu 75 s in einem
+        laufenden Segment, waehrend das naechste Tool schon die Beine will).
         """
         deadline = time.monotonic() + timeout
         base_size = -1
@@ -147,6 +166,9 @@ class Bridge:
                 base_size = -1
         last_cmd: dict = {}
         while time.monotonic() < deadline:
+            if stop_event is not None and stop_event.is_set():
+                return {"id": cmd_id, "status": "interrupted",
+                        "detail": "abgebrochen (stop_event)"}
             state = self.read_state()
             cmd = (state or {}).get("command", {})
             if cmd.get("id") == cmd_id:
@@ -163,15 +185,18 @@ class Bridge:
         return last_cmd
 
     def run(self, action: str, timeout: float = 700.0,
-            interruptible: bool = False, **kwargs) -> dict:
+            interruptible: bool = False, stop_event=None, **kwargs) -> dict:
         """Befehl senden und auf Endstatus warten (oder Timeout -> running).
 
         interruptible=True: lange Aktion (move_to, engage, loot, ...) bricht ab,
         sobald neuer Funk in der Inbox liegt - der Agent reagiert dann sofort.
+        stop_event: bricht das Warten ab, sobald das Event gesetzt ist
+        (Reise-Thread-Abbruch via _abort_travel).
         """
         cmd_id = self.send(action, **kwargs)
         inbox = self.voice_inbox if interruptible else None
-        return self.wait_status(cmd_id, timeout=timeout, interrupt_inbox=inbox)
+        return self.wait_status(cmd_id, timeout=timeout, interrupt_inbox=inbox,
+                                stop_event=stop_event)
 
 
 # --------------------------------------------------------- Beobachtungstext
@@ -220,6 +245,52 @@ def inventory_signature(state: dict | None) -> str:
     return "|".join(sorted(parts))
 
 
+_SUN_LABEL = {"day": "Tag", "dawn": "Morgendaemmerung",
+              "dusk": "Abenddaemmerung", "night": "Nacht"}
+
+
+def _weather_line(world, wet) -> str:
+    """Eine Wetterzeile aus state.world (+ npc.wet), oder "" wenn keine Felder
+    da sind. Tolerant: fehlende Einzelwerte werden einfach weggelassen."""
+    if not isinstance(world, dict):
+        return ""
+    parts: list[str] = []
+    t = world.get("time")
+    if t:
+        parts.append(str(t))
+    sun = world.get("sun")
+    if sun:
+        parts.append(_SUN_LABEL.get(str(sun), str(sun)))
+    rain = world.get("rain")
+    if isinstance(rain, (int, float)) and rain > 0.05:
+        parts.append(f"Regen {rain * 100:.0f}%")
+    fog = world.get("fog")
+    if isinstance(fog, (int, float)) and fog > 0.15:
+        parts.append(f"Nebel {fog * 100:.0f}%")
+    if isinstance(wet, (int, float)) and wet > 0.3:
+        parts.append("du bist durchnaesst")
+    if not parts:
+        return ""
+    return "Wetter: " + ", ".join(parts)
+
+
+def _symptom_line(disease) -> str:
+    """Eine Symptomzeile aus npc.disease (Schnittstelle 3), oder "" wenn nichts
+    vorliegt. Zeigt die Erreger, die die Mod ueber Schwelle eingetragen hat."""
+    if not isinstance(disease, dict):
+        return ""
+    agents = disease.get("agents")
+    present = []
+    if isinstance(agents, dict):
+        present = [k for k, v in agents.items()
+                   if isinstance(v, (int, float)) and v > 0]
+    if not present:
+        if disease.get("sick"):
+            return "Du fuehlst dich krank."
+        return ""
+    return "Du fuehlst dich krank: " + ", ".join(sorted(present))
+
+
 def format_observation(state: dict | None, last_chat_id: int = 0,
                        inv_unchanged: bool = False,
                        compact: bool = False) -> tuple[str, int]:
@@ -266,6 +337,15 @@ def format_observation(state: dict | None, last_chat_id: int = 0,
         f" | Waerme: {_heat_label(npc.get('heat_comfort', 0.0))}"
     )
 
+    # Wetter- und Symptomzeile NUR, wenn die Mod die Felder liefert (tolerant:
+    # aeltere Builds schreiben sie nicht -> nichts anzeigen, kein Rauschen).
+    weather_line = _weather_line(state.get("world"), npc.get("wet"))
+    if weather_line:
+        lines.append(weather_line)
+    symptom_line = _symptom_line(npc.get("disease"))
+    if symptom_line:
+        lines.append(symptom_line)
+
     if npc.get("fighting"):
         lines.append("!!! IM KAMPF !!!")
 
@@ -280,6 +360,15 @@ def format_observation(state: dict | None, last_chat_id: int = 0,
                      f"{clothing_count} Kleidung - observe(full=true) fuer Details)")
     else:
         lines.append(f"INVENTAR ({len(inventory)} Items, davon {clothing_count} Kleidung):")
+        # Wichtiges darf beim 15er-Cap nicht hinter Nahrung/Kram wegfallen:
+        # Waffen/Munition/Medizin zuerst (stabile Sortierung, Rest wie geliefert).
+        _kind_rank = {"firearm": 0, "magazine": 1, "ammo": 1, "medical": 2}
+        interesting = sorted(
+            interesting,
+            key=lambda i: _kind_rank.get(str(i.get("kind", "")).lower(), 5))
+        if len(interesting) > 15:
+            lines.append(f"  (gekuerzt: {len(interesting) - 15} weitere Items, "
+                         f"observe(full=true) zeigt alles)")
         for it in interesting[:15]:
             hand_marker = " [IN HAND]" if it.get("in_hands") else ""
             # Steckt das Item in einer Waffe? Dann kann man es nicht droppen
@@ -299,6 +388,18 @@ def format_observation(state: dict | None, last_chat_id: int = 0,
                              f" x{qty:.0f}{hand_marker}{stuck}")
         if not interesting:
             lines.append("  - (nur Kleidung)")
+        # Kleidung als Einzeiler: getragen vs. lose im Gepaeck. Details holt
+        # dress_best selbst aus dem State (warmth/cargo_size/slot der Mod).
+        worn = [i for i in inventory
+                if i.get("kind") == "clothing" and i.get("worn")]
+        if worn:
+            loose_cloth = clothing_count - len(worn)
+            cloth_line = "  Getragen: " + ", ".join(
+                i.get("classname", "?") for i in worn[:8])
+            if loose_cloth > 0:
+                cloth_line += (f" | {loose_cloth} Kleidungsstueck(e) lose im "
+                               f"Gepaeck (dress_best optimiert)")
+            lines.append(cloth_line)
 
     # Nach Distanz sortieren, BEVOR auf limit gekuerzt wird: der Mod fuellt
     # nearby in Engine-Abfragereihenfolge (unsortiert) und cappt bei 40. Ohne
@@ -308,6 +409,14 @@ def format_observation(state: dict | None, last_chat_id: int = 0,
     nearby = sorted(state.get("nearby", []),
                     key=lambda e: e.get("distance", 9999.0))
     limit = 8 if compact else 15
+    # GEFAHREN duerfen nie hinter den Schnitt fallen: am vollen Lager belegen
+    # Zelt/Feuer/Squad/Items die 8 compact-Plaetze, und der Infizierte auf
+    # 50 m war unsichtbar. Bedrohungen zuerst, dann der Rest nach Distanz.
+    threats = [e for e in nearby
+               if e.get("kind") in ("infected", "animal", "player")]
+    rest = [e for e in nearby
+            if e.get("kind") not in ("infected", "animal", "player")]
+    nearby = threats + rest
     if nearby:
         lines.append("UMGEBUNG (100 m):")
         for e in nearby[:limit]:

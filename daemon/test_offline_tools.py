@@ -64,7 +64,7 @@ try:
           bridge._inbox_should_interrupt(_inbox, base2) is True)
     # Spieler-Funk -> unterbrechen
     base3 = os.path.getsize(_inbox)
-    _append({"user": "Player", "text": "kommt her", "prio": False})
+    _append({"user": "Clausi", "text": "kommt her", "prio": False})
     check("Spieler-Funk (user != Lagezentrum) -> unterbrechen",
           bridge._inbox_should_interrupt(_inbox, base3) is True)
     # Unparsbare Zeile -> sicherheitshalber unterbrechen

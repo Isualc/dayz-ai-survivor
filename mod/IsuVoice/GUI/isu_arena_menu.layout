@@ -1,7 +1,7 @@
 FrameWidgetClass IsuArenaRoot {
  clipchildren 0
  position 0 0
- size 1480 792
+ size 1600 792
  halign center_ref
  valign center_ref
  hexactpos 1
@@ -10,10 +10,10 @@ FrameWidgetClass IsuArenaRoot {
  vexactsize 1
  {
   ImageWidgetClass Background {
-   ignorepointer 1
+   ignorepointer 0
    color 0.04 0.05 0.07 0.97
    position 0 0
-   size 1480 792
+   size 1600 792
    hexactpos 1
    vexactpos 1
    hexactsize 1
@@ -35,7 +35,7 @@ FrameWidgetClass IsuArenaRoot {
   ImageWidgetClass StatusPill {
    ignorepointer 1
    color 0.09 0.11 0.14 0.95
-   position 980 12
+   position 1100 12
    size 480 36
    hexactpos 1
    vexactpos 1
@@ -46,7 +46,7 @@ FrameWidgetClass IsuArenaRoot {
   ImageWidgetClass StatusDot {
    ignorepointer 1
    color 0.45 0.45 0.48 1
-   position 994 24
+   position 1114 24
    size 12 12
    hexactpos 1
    vexactpos 1
@@ -56,7 +56,7 @@ FrameWidgetClass IsuArenaRoot {
   }
   TextWidgetClass StatusText {
    ignorepointer 1
-   position 1016 12
+   position 1136 12
    size 444 36
    hexactpos 1
    vexactpos 1
@@ -94,7 +94,7 @@ FrameWidgetClass IsuArenaRoot {
   TextWidgetClass HdrModel {
    ignorepointer 1
    position 434 64
-   size 244 20
+   size 228 20
    hexactpos 1
    vexactpos 1
    hexactsize 1
@@ -105,8 +105,8 @@ FrameWidgetClass IsuArenaRoot {
   }
   TextWidgetClass HdrRole {
    ignorepointer 1
-   position 686 64
-   size 234 20
+   position 670 64
+   size 158 20
    hexactpos 1
    vexactpos 1
    hexactsize 1
@@ -115,10 +115,22 @@ FrameWidgetClass IsuArenaRoot {
    font "gui/fonts/sdf_MetronBook24"
    color 0.5 0.52 0.56 1
   }
+  TextWidgetClass HdrLoadout {
+   ignorepointer 1
+   position 836 64
+   size 158 20
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "LOADOUT"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.5 0.52 0.56 1
+  }
   TextWidgetClass HdrVoice {
    ignorepointer 1
-   position 928 64
-   size 182 20
+   position 1002 64
+   size 158 20
    hexactpos 1
    vexactpos 1
    hexactsize 1
@@ -129,8 +141,8 @@ FrameWidgetClass IsuArenaRoot {
   }
   TextWidgetClass HdrLang {
    ignorepointer 1
-   position 1118 64
-   size 172 20
+   position 1168 64
+   size 148 20
    hexactpos 1
    vexactpos 1
    hexactsize 1
@@ -141,8 +153,8 @@ FrameWidgetClass IsuArenaRoot {
   }
   TextWidgetClass HdrStatus {
    ignorepointer 1
-   position 1298 64
-   size 165 20
+   position 1324 64
+   size 200 20
    hexactpos 1
    vexactpos 1
    hexactsize 1
@@ -152,468 +164,48 @@ FrameWidgetClass IsuArenaRoot {
    color 0.5 0.52 0.56 1
   }
 
-  ImageWidgetClass Card0 {
+  ButtonWidgetClass BtnAddNpc {
+   position 600 12
+   size 110 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "+ NPC"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass RowCountText {
    ignorepointer 1
-   color 0.075 0.090 0.120 0.95
+   position 724 18
+   size 160 26
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "1 / 10"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.91 0.639 0.2 1
+  }
+
+  ScrollWidgetClass ArenaScroll {
    position 8 90
-   size 1464 40
+   size 1584 208
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   mode blend
-  }
-  ImageWidgetClass Accent0 {
-   ignorepointer 1
-   color 0.94 0.62 0.15 1
-   position 8 90
-   size 6 40
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-  }
-  ButtonWidgetClass BtnAgent0 {
-   position 20 91
-   size 56 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "ON"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ImageWidgetClass NameBg0 {
-   ignorepointer 1
-   color 0.10 0.12 0.16 0.95
-   position 80 91
-   size 150 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-  }
-  EditBoxWidgetClass EditName0 {
-   position 84 91
-   size 142 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Viktor"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass ProviderHead0 {
-   position 236 91
-   size 190 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Anthropic"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass ModelHead0 {
-   position 432 91
-   size 246 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Sonnet 4.6"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass RoleHead0 {
-   position 684 91
-   size 238 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Hunter"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass VoiceHead0 {
-   position 926 91
-   size 184 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Helmut"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass LangHead0 {
-   position 1116 91
-   size 172 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Deutsch"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  TextWidgetClass Live0 {
-   ignorepointer 1
-   position 1296 91
-   size 165 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "idle"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.5 0.5 0.52 1
-  }
-
-  ImageWidgetClass Card1 {
-   ignorepointer 1
-   color 0.075 0.090 0.120 0.95
-   position 8 142
-   size 1464 40
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-  }
-  ImageWidgetClass Accent1 {
-   ignorepointer 1
-   color 0.36 0.79 0.65 1
-   position 8 142
-   size 6 40
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-  }
-  ButtonWidgetClass BtnAgent1 {
-   position 20 143
-   size 56 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "ON"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ImageWidgetClass NameBg1 {
-   ignorepointer 1
-   color 0.10 0.12 0.16 0.95
-   position 80 143
-   size 150 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-  }
-  EditBoxWidgetClass EditName1 {
-   position 84 143
-   size 142 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Birgit"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass ProviderHead1 {
-   position 236 143
-   size 190 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Anthropic"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass ModelHead1 {
-   position 432 143
-   size 246 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Haiku 4.5"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass RoleHead1 {
-   position 684 143
-   size 238 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Medic"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass VoiceHead1 {
-   position 926 143
-   size 184 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Sarah"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass LangHead1 {
-   position 1116 143
-   size 172 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Deutsch"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  TextWidgetClass Live1 {
-   ignorepointer 1
-   position 1296 143
-   size 165 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "idle"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.5 0.5 0.52 1
-  }
-
-  ImageWidgetClass Card2 {
-   ignorepointer 1
-   color 0.075 0.090 0.120 0.95
-   position 8 194
-   size 1464 40
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-  }
-  ImageWidgetClass Accent2 {
-   ignorepointer 1
-   color 0.59 0.77 0.35 1
-   position 8 194
-   size 6 40
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-  }
-  ButtonWidgetClass BtnAgent2 {
-   position 20 195
-   size 56 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "ON"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ImageWidgetClass NameBg2 {
-   ignorepointer 1
-   color 0.10 0.12 0.16 0.95
-   position 80 195
-   size 150 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-  }
-  EditBoxWidgetClass EditName2 {
-   position 84 195
-   size 142 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Igor"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass ProviderHead2 {
-   position 236 195
-   size 190 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Anthropic"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass ModelHead2 {
-   position 432 195
-   size 246 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Haiku 4.5"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass RoleHead2 {
-   position 684 195
-   size 238 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Farmer"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass VoiceHead2 {
-   position 926 195
-   size 184 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "George"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass LangHead2 {
-   position 1116 195
-   size 172 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Deutsch"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  TextWidgetClass Live2 {
-   ignorepointer 1
-   position 1296 195
-   size 165 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "idle"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.5 0.5 0.52 1
-  }
-
-  ImageWidgetClass Card3 {
-   ignorepointer 1
-   color 0.075 0.090 0.120 0.95
-   position 8 246
-   size 1464 40
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-  }
-  ImageWidgetClass Accent3 {
-   ignorepointer 1
-   color 0.22 0.54 0.87 1
-   position 8 246
-   size 6 40
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-  }
-  ButtonWidgetClass BtnAgent3 {
-   position 20 247
-   size 56 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "ON"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ImageWidgetClass NameBg3 {
-   ignorepointer 1
-   color 0.10 0.12 0.16 0.95
-   position 80 247
-   size 150 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-  }
-  EditBoxWidgetClass EditName3 {
-   position 84 247
-   size 142 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Konrad"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass ProviderHead3 {
-   position 236 247
-   size 190 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Anthropic"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass ModelHead3 {
-   position 432 247
-   size 246 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Sonnet 4.6"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass RoleHead3 {
-   position 684 247
-   size 238 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Ex-military"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass VoiceHead3 {
-   position 926 247
-   size 184 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Liam"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ButtonWidgetClass LangHead3 {
-   position 1116 247
-   size 172 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Deutsch"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  TextWidgetClass Live3 {
-   ignorepointer 1
-   position 1296 247
-   size 165 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "idle"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.5 0.5 0.52 1
+   clipchildren 1
+   {
+    PanelWidgetClass RowsHost {
+     position 0 0
+     size 1584 208
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     clipchildren 0
+    }
+   }
   }
 
   TextWidgetClass GrpRound {
@@ -626,7 +218,7 @@ FrameWidgetClass IsuArenaRoot {
    vexactsize 1
    text "ROUND"
    font "gui/fonts/sdf_MetronBook24"
-   color 0.55 0.86 0.47 1
+   color 0.91 0.639 0.2 1
   }
   TextWidgetClass GrpControls {
    ignorepointer 1
@@ -638,7 +230,7 @@ FrameWidgetClass IsuArenaRoot {
    vexactsize 1
    text "CONTROLS"
    font "gui/fonts/sdf_MetronBook24"
-   color 0.55 0.86 0.47 1
+   color 0.91 0.639 0.2 1
   }
 
   TextWidgetClass LblMode {
@@ -908,6 +500,29 @@ FrameWidgetClass IsuArenaRoot {
    text "ON"
    font "gui/fonts/sdf_MetronBook24"
   }
+  TextWidgetClass LblHud {
+   ignorepointer 1
+   position 958 578
+   size 124 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "HUD"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.78 0.80 0.84 1
+   "text valign" center
+  }
+  ButtonWidgetClass BtnHud {
+   position 1090 578
+   size 132 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "ON"
+   font "gui/fonts/sdf_MetronBook24"
+  }
 
   TextWidgetClass LblOrch {
    ignorepointer 1
@@ -1001,14 +616,14 @@ FrameWidgetClass IsuArenaRoot {
    text "START (neutral)"
    font "gui/fonts/sdf_MetronBook24"
   }
-  ButtonWidgetClass BtnMission {
+  ButtonWidgetClass MissionHead {
    position 406 670
    size 368 46
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "Mission: Birgit"
+   text "No mission"
    font "gui/fonts/sdf_MetronBook24"
   }
   ImageWidgetClass StopAccent {
@@ -1050,335 +665,21 @@ FrameWidgetClass IsuArenaRoot {
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "Click a field (Provider/Model/Role/Voice/Lang) to open its list. Stop/Go/Radial act on the targeted NPC."
+   text "Click a field (Provider/Model/Role/Loadout/Voice/Lang) to open its list. Right-click Camp resets it. Stop/Go/Radial act on the targeted NPC."
    font "gui/fonts/sdf_MetronBook24"
    color 0.5 0.5 0.52 1
   }
 
-  PanelWidgetClass ProviderList0 {
+  PanelWidgetClass DdPopup {
    visible 0
    clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 236 129
-   size 190 220
+   position 0 0
+   size 200 200
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass ProviderList1 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 236 181
-   size 190 220
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass ProviderList2 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 236 233
-   size 190 220
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass ProviderList3 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 236 285
-   size 190 220
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass ModelList0 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 432 129
-   size 246 320
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 105
-  }
-  PanelWidgetClass ModelList1 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 432 181
-   size 246 320
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 105
-  }
-  PanelWidgetClass ModelList2 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 432 233
-   size 246 320
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 105
-  }
-  PanelWidgetClass ModelList3 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 432 285
-   size 246 320
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 105
-  }
-  PanelWidgetClass RoleList0 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 684 129
-   size 238 220
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass RoleList1 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 684 181
-   size 238 220
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass RoleList2 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 684 233
-   size 238 220
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass RoleList3 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 684 285
-   size 238 220
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass IdleList {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 188 418
-   size 360 132
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass TurnsList {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 188 468
-   size 360 132
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass KeyStopList {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 768 368
-   size 360 290
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass KeyGotoList {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 768 418
-   size 360 290
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass KeyRadialList {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 768 468
-   size 360 290
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass VoiceList0 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 440 168
-   size 700 320
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 110
-  }
-  PanelWidgetClass VoiceList1 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 440 168
-   size 700 320
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 110
-  }
-  PanelWidgetClass VoiceList2 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 440 168
-   size 700 320
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 110
-  }
-  PanelWidgetClass VoiceList3 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 440 168
-   size 700 320
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 110
-  }
-  PanelWidgetClass LangList0 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 1098 129
-   size 300 420
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass LangList1 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 1098 181
-   size 300 420
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass LangList2 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 1098 233
-   size 300 420
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
-  }
-  PanelWidgetClass LangList3 {
-   visible 0
-   clipchildren 0
-   color 0.06 0.08 0.11 1
-   position 1098 285
-   size 300 420
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   mode blend
-   priority 100
+   priority 200
   }
  }
 }

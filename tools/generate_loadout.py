@@ -16,8 +16,8 @@ import json
 import os
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_SERVER_DIR = os.environ.get("DAYZ_SERVER_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\DayZServer")
-SERVER_LOADOUTS = os.path.join(_SERVER_DIR, "profiles", "ExpansionMod", "Loadouts")
+SERVER_LOADOUTS = (r"D:\SteamLibrary\steamapps\common\DayZServer"
+                   r"\profiles\ExpansionMod\Loadouts")
 
 
 def item(classname, health=(0.7, 0.9), cargo=None, attachments=None):
@@ -178,10 +178,114 @@ WINTER_LOADOUTS = {
                           attachments=[slot("magazine", ["Mag_IJ70_8Rnd"])])]),
 }
 
+# --- Rollenfreie Menue-Presets (Loadout-Dropdown im Arena-Menue, Phase 4) ---
+# Fuer JEDEN Slot waehlbar, unabhaengig von der Persona. Das Menue schickt den
+# Dateinamen als "ld:<aid>:<datei>"-Segment; der Supervisor spiegelt die
+# Dateien beim Start nach ExpansionMod/Loadouts (ensure_loadouts) und waehlt
+# bei map=sakhal selbst die _Winter-Variante.
+PRESETS = {
+    # Aufklaerer: leicht + schnell, Fernglas/Kompass, bewusst keine Schusswaffe.
+    "IsuPresetScout": loadout(
+        [slot("Body", ["TrackSuitJacket_Black", "TrackSuitJacket_Green"]),
+         slot("Legs", ["TrackSuitPants_Black", "TrackSuitPants_Blue"]),
+         slot("Feet", ["JoggingShoes_Black", "JoggingShoes_Blue"]),
+         slot("Headgear", ["BaseballCap_Olive"]),
+         slot("Gloves", ["WorkingGloves_Black"]),
+         slot("Back", ["CourierBag"])],
+        RATION + ["Binoculars", "Compass", "HuntingKnife", "Matchbox"]),
+
+    # Sturm: Gorka + GELADENE MP5K und ein Reserve-Magazin.
+    "IsuPresetAssault": loadout(
+        [slot("Body", ["GorkaEJacket_Summer", "GorkaEJacket_Flat"]),
+         slot("Legs", ["GorkaPants_Summer", "GorkaPants_Flat"]),
+         slot("Feet", ["CombatBoots_Black", "CombatBoots_Brown"]),
+         slot("Headgear", ["Ssh68Helmet"]),
+         slot("Gloves", ["TacticalGloves_Black"]),
+         slot("Back", ["AssaultBag_Ttsko"]),
+         {"SlotName": "Shoulder",
+          "Items": [item("MP5K", health=(0.85, 1.0),
+                         attachments=[slot("magazine", ["Mag_MP5_15Rnd"])])]}],
+        RATION + ["Mag_MP5_15Rnd", "CombatKnife"]),
+
+    # Sani: Paramedic-Kleidung + volle Erste-Hilfe-Ausstattung (keine
+    # schluckbare Medizin - eat nimmt sonst Tabletten statt Apfel).
+    "IsuPresetMedic": loadout(
+        [slot("Body", ["ParamedicJacket_Blue", "ParamedicJacket_Green"]),
+         slot("Legs", ["ParamedicPants_Blue", "ParamedicPants_Green"]),
+         slot("Feet", ["AthleticShoes_Blue", "AthleticShoes_Grey"]),
+         slot("Headgear", ["MedicalScrubsHat_Blue"]),
+         slot("Gloves", ["SurgicalGloves_Blue"]),
+         slot("Back", ["TaloonBag_Orange"])],
+        RATION + ["BandageDressing", "BandageDressing", "Epinephrine",
+                  "Morphine", "SalineBagIV", "DisinfectantSpray", "Splint"]),
+
+    # Sniper: Jagd-Tarnung + Mosin auf dem Ruecken, PU-Scope und Munition im
+    # Gepaeck (Anbau macht der NPC selbst - equip_best kennt Optiken).
+    "IsuPresetSniper": loadout(
+        [slot("Body", ["HuntingJacket_Spring", "HuntingJacket_Summer"]),
+         slot("Legs", ["HunterPants_Spring", "HunterPants_Summer"]),
+         slot("Feet", ["HikingBoots_Brown"]),
+         slot("Headgear", ["BoonieHat_Flecktarn", "BoonieHat_Olive"]),
+         slot("Gloves", ["WorkingGloves_Brown"]),
+         slot("Back", ["HuntingBag"]),
+         slot("Shoulder", ["Mosin9130"])],
+        RATION + ["PUScopeOptic", "Ammo_762x54", "Ammo_762x54", "HuntingKnife"]),
+}
+
+# Winter-Varianten der Presets (Sakhal): Ausruestung identisch, Kleidung warm.
+WINTER_PRESETS = {
+    "IsuPresetScout_Winter": loadout(
+        [slot("Body", ["DownJacket_Blue", "DownJacket_Orange"]),
+         slot("Legs", ["HunterPants_Winter"]),
+         slot("Feet", ["ColdOperationBoots_Green"]),
+         slot("Headgear", ["Ushanka_Blue"]),
+         slot("Gloves", ["SkiGloves_Blue"]),
+         slot("Mask", ["BalaclavaMask_Blue"]),
+         slot("Back", ["CourierBag"])],
+        RATION + ["Binoculars", "Compass", "HuntingKnife", "Matchbox"]),
+
+    "IsuPresetAssault_Winter": loadout(
+        [slot("Body", ["WinterMilitaryCoat_Grey", "WinterMilitaryCoat_DarkGrey"]),
+         slot("Legs", ["HunterPants_Winter"]),
+         slot("Feet", ["ColdOperationBoots_Camo"]),
+         slot("Headgear", ["SnowstormUshanka_Olive"]),
+         slot("Gloves", ["PaddedGloves_Threat"]),
+         slot("Mask", ["BalaclavaMask_Black"]),
+         slot("Back", ["AssaultBag_Ttsko"]),
+         {"SlotName": "Shoulder",
+          "Items": [item("MP5K", health=(0.85, 1.0),
+                         attachments=[slot("magazine", ["Mag_MP5_15Rnd"])])]}],
+        RATION + ["Mag_MP5_15Rnd", "CombatKnife"]),
+
+    "IsuPresetMedic_Winter": loadout(
+        [slot("Body", ["QuiltedJacket_Red", "QuiltedJacket_Violet"]),
+         slot("Legs", ["HunterPants_Winter"]),
+         slot("Feet", ["ColdOperationBoots_Grey"]),
+         slot("Headgear", ["Ushanka_Black"]),
+         slot("Gloves", ["SkiGloves_Red"]),
+         slot("Mask", ["BalaclavaMask_White"]),
+         slot("Back", ["TaloonBag_Orange"])],
+        RATION + ["BandageDressing", "BandageDressing", "Epinephrine",
+                  "Morphine", "SalineBagIV", "DisinfectantSpray", "Splint"]),
+
+    "IsuPresetSniper_Winter": loadout(
+        [slot("Body", ["DownJacket_Green", "DownJacket_Red"]),
+         slot("Legs", ["HunterPants_Winter"]),
+         slot("Feet", ["ColdOperationBoots_Green"]),
+         slot("Headgear", ["SnowstormUshanka_Brown"]),
+         slot("Gloves", ["PaddedGloves_Brown"]),
+         slot("Mask", ["BalaclavaMask_Green"]),
+         slot("Back", ["HuntingBag"]),
+         slot("Shoulder", ["Mosin9130"])],
+        RATION + ["PUScopeOptic", "Ammo_762x54", "Ammo_762x54", "HuntingKnife"]),
+}
+
 repo_dir = os.path.join(REPO, "mod", "loadouts")
 os.makedirs(repo_dir, exist_ok=True)
 all_loadouts = dict(LOADOUTS)
 all_loadouts.update(WINTER_LOADOUTS)
+all_loadouts.update(PRESETS)
+all_loadouts.update(WINTER_PRESETS)
 for name, data in all_loadouts.items():
     for base in (repo_dir, SERVER_LOADOUTS):
         path = os.path.join(base, name + ".json")

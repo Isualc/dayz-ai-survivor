@@ -13,8 +13,11 @@ BEOBACHTER ueber den Squad:
     Log) - das ist der Benchmark-Mitschnitt, voellig nicht-invasiv.
   * Bei einer WESENTLICHEN Aenderung (jemand faellt, verliert viel HP, eine
     Bedrohung taucht auf ODER kommt naeher, ein Kampf beginnt, jemand
-    erreicht den Treffpunkt) funkt er EINEN kompakten Lagebericht an alle
-    Agenten ("FUNK von Lagezentrum: ...").
+    erreicht den Treffpunkt) funkt er EINEN kompakten Lagebericht
+    ("FUNK von Lagezentrum: ..."). Prio-Funk (Tod/kritisch) geht an ALLE;
+    Routine-Sitreps laufen durch einen Relevanz-/Empfaengerfilter
+    (Selbstbetroffenheit + ~800 m Distanz, Audit 03.07.), damit nicht jeder
+    Weckruf einen Lagebestaetigungs-Zug bei allen vier Modellen kostet.
 
 WICHTIG - Schiedsrichter, NICHT Kommandeur: der Orchestrator BEFIEHLT den
 NPCs nichts. Er teilt nur das gemeinsame Lagebild; jedes Modell entscheidet
@@ -58,9 +61,21 @@ FOOD_LOOT_HINTS = ("meat", "steak", "pelt", "fat", "bone", "lard", "guts",
                    "skin", "sinew", "leather")
 HOSTILE_KINDS = ("player", "survivor", "ai", "bandit")
 # Eine bestehende Bedrohung loest erneut Funk aus, wenn sie um so viele Meter
-# naeher kommt (sonst bliebe ein langsam heranpirschender Baer fuer immer stumm,
-# nachdem er einmal in der Grundlinie auftauchte).
-THREAT_STEP_CLOSER = 15.0
+# naeher kommt als beim LETZTEN gemeldeten Stand (threat_latch, nicht der
+# letzte 3s-Tick - sonst feuerte ein sprintender Zombie mit 18 m/Tick jeden
+# Tick neu). 15 -> 35 m angehoben (Audit 03.07.: 37% der Zuege waren reine
+# Lagebestaetigungen; "Bedrohung 5 m naeher" ist kein Zustandswechsel). Ein
+# langsam heranpirschender Baer bleibt trotzdem nicht stumm: der Latch
+# akkumuliert, bis 35 m zusammenkommen oder er in die Gefahrenzone rutscht.
+THREAT_STEP_CLOSER = 35.0
+
+# Distanz-Relevanzfilter fuer ROUTINE-Sitreps: nur Agenten, die naeher als so
+# viele Meter am Ausloeser-Agenten stehen (oder selbst verletzt/bedroht/im
+# Kampf sind), bekommen den Funk. Wer 2 km entfernt lootet, braucht die
+# Zombie-Distanz eines Kameraden nicht - jeder Weckruf ist ein LLM-Zug
+# (Audit 03.07.: 3,15 USD reine Lagebestaetigungen). ~800 m = plausible
+# Hoer-/Eingreifreichweite; Prio-Funk (Tod/kritisch) geht weiter an ALLE.
+ROUTINE_RELEVANCE_DIST = 800.0
 
 
 def log(msg: str) -> None:
@@ -75,10 +90,9 @@ def log(msg: str) -> None:
 
 
 def agent_home(aid: str) -> str:
-    """Arbeitsverzeichnis eines Agenten (deckt sich mit arena_supervisor)."""
-    if aid == "viktor":
-        return os.path.join(REPO_DIR, "agent_home")
-    return os.path.join(REPO_DIR, "agent_homes", aid)
+    """Arbeitsverzeichnis eines Agenten (zentral in agent_paths)."""
+    import agent_paths
+    return agent_paths.agent_home_dir(aid)
 
 
 def read_intent(bridge_dir: str, aid: str) -> str:
@@ -237,14 +251,22 @@ def short_line(s: dict) -> str:
 
 def detect_changes(prev: dict, cur: dict, hp_drop: float,
                    camp, rally_dist: float, prev_rally: set,
-                   danger_dist: float) -> list:
-    """Wesentliche Aenderungen seit dem letzten Tick -> Ausloeser-Texte."""
+                   danger_dist: float, threat_latch: dict) -> list:
+    """Wesentliche Aenderungen seit dem letzten Tick -> Liste von
+    (ausloeser_aid, text)-Tupeln. Die aid des Betroffenen traegt jeder Grund
+    explizit mit, damit der Empfaengerfilter im Broadcast NICHT ueber
+    Namens-Substrings raten muss (Selbstbetroffenheit + Distanz-Relevanz,
+    Audit 03.07.). threat_latch (aid -> Distanz der zuletzt GEMELDETEN
+    Bedrohung) persistiert ueber Ticks: der Naeher-kommt-Vergleich laeuft
+    gegen den letzten Meldestand, nicht gegen den letzten 3s-Tick - sonst
+    ist der 35-m-Schritt nie erreichbar (langsamer Baer) oder feuert jeden
+    Tick (sprintender Zombie)."""
     reasons = []
     for aid, s in cur.items():
         p = prev.get(aid)
         if not s.get("online"):
             if p and p.get("online"):
-                reasons.append(f"Kontakt zu {aid} verloren")
+                reasons.append((aid, f"Kontakt zu {aid} verloren"))
             continue
         name = s.get("name", aid)
         if not s.get("spawned"):
@@ -256,38 +278,68 @@ def detect_changes(prev: dict, cur: dict, hp_drop: float,
             continue
         if not s.get("alive"):
             if p and p.get("alive"):
-                reasons.append(f"{name} ist gefallen")
+                reasons.append((aid, f"{name} ist gefallen"))
             continue
         if p and p.get("online") and not p.get("alive") and s.get("alive"):
-            reasons.append(f"{name} ist zurueck im Spiel")
+            reasons.append((aid, f"{name} ist zurueck im Spiel"))
         if p and p.get("alive"):
             drop = p.get("health", 100) - s.get("health", 100)
             if drop >= hp_drop:
-                reasons.append(f"{name} verliert HP (jetzt {s['health']})")
+                reasons.append((aid, f"{name} verliert HP (jetzt {s['health']})"))
             elif s.get("health", 100) < 35 <= p.get("health", 100):
-                reasons.append(f"{name} kritisch ({s['health']} HP)")
+                reasons.append((aid, f"{name} kritisch ({s['health']} HP)"))
         # Kampfbeginn (nicht->kaempfend) ist ein Ausloeser
         if s.get("fighting") and not (p and p.get("fighting")):
-            reasons.append(f"{name} ist im Kampf")
-        # Bedrohung: neu aufgetaucht ODER eskaliert (in die Gefahrenzone
-        # gerutscht oder deutlich naeher gekommen). So bleibt ein bereits in der
-        # Grundlinie vorhandener Gegner nicht fuer immer stumm.
+            reasons.append((aid, f"{name} ist im Kampf"))
+        # Bedrohung: nur bei ZUSTANDSWECHSEL (neu aufgetaucht, in die
+        # Gefahrenzone gerutscht, seit der letzten Meldung >= 35 m naeher) -
+        # nicht pro Bewegungsschritt. So bleibt ein bereits in der Grundlinie
+        # vorhandener Gegner nicht fuer immer stumm, spammt aber auch nicht.
         cur_threat = s.get("threat")
         prev_threat = p.get("threat") if p else None
         if cur_threat:
             cd = cur_threat["dist"]
             if not prev_threat:
-                reasons.append(f"Bedrohung nahe {name}: "
-                               f"{cur_threat['what']} {cd}m")
+                reasons.append((aid, f"Bedrohung nahe {name}: "
+                                     f"{cur_threat['what']} {cd}m"))
+                threat_latch[aid] = cd
             else:
-                pd = prev_threat.get("dist", 9999)
+                # Latch = Distanz beim letzten gemeldeten Stand; Fallback auf
+                # den Vor-Tick, falls der Latch fehlt (z.B. Orchestrator-Neustart
+                # mit bereits bestehender Bedrohung in der Grundlinie).
+                pd = threat_latch.get(aid, prev_threat.get("dist", 9999))
                 if (cd <= danger_dist < pd) or (pd - cd) >= THREAT_STEP_CLOSER:
-                    reasons.append(f"Bedrohung naeher an {name}: "
-                                   f"{cur_threat['what']} {cd}m")
+                    reasons.append((aid, f"Bedrohung naeher an {name}: "
+                                         f"{cur_threat['what']} {cd}m"))
+                    threat_latch[aid] = cd
+        else:
+            # Bedrohung weg -> Latch loesen, damit eine NEUE als "neu
+            # aufgetaucht" sauber wieder meldet.
+            threat_latch.pop(aid, None)
         in_rally = dist2d(s["x"], s["z"], camp[0], camp[1]) <= rally_dist
         if in_rally and aid not in prev_rally:
-            reasons.append(f"{name} hat den Treffpunkt erreicht")
+            reasons.append((aid, f"{name} hat den Treffpunkt erreicht"))
     return reasons
+
+
+def routine_relevant(recipient: dict, subject_ids: list, cur: dict) -> bool:
+    """Distanz-Relevanzfilter fuer Routine-Sitreps: True, wenn der Empfaenger
+    den Funk braucht. Immer relevant, wenn er selbst verletzt/bedroht/im Kampf
+    ist (dann zaehlt jede Squad-Info); sonst nur, wenn mindestens ein
+    Ausloeser-Agent naeher als ROUTINE_RELEVANCE_DIST steht. Ausloeser ohne
+    brauchbare Position (offline/despawnt, z.B. 'Kontakt verloren') gelten
+    konservativ als relevant - lieber ein Funk zu viel als Info verlieren."""
+    if (recipient.get("fighting") or recipient.get("threat")
+            or recipient.get("health", 100) < 60):
+        return True
+    rx, rz = recipient.get("x", 0), recipient.get("z", 0)
+    for sub in subject_ids:
+        s = cur.get(sub)
+        if not s or not s.get("online") or not s.get("spawned"):
+            return True
+        if dist2d(rx, rz, s["x"], s["z"]) <= ROUTINE_RELEVANCE_DIST:
+            return True
+    return False
 
 
 def build_sitrep(snaps: list, reasons: list) -> str:
@@ -359,6 +411,9 @@ def main() -> int:
 
     prev_snaps: dict = {}
     prev_rally: set = set()
+    # aid -> Distanz der zuletzt GEMELDETEN Bedrohung (Latch fuer den
+    # 35-m-Naeher-Schritt, siehe detect_changes)
+    threat_latch: dict = {}
     last_broadcast = 0.0
     ticks = 0
     try:
@@ -404,28 +459,66 @@ def main() -> int:
                 log("Grundlinie gesetzt (erster Tick, kein Funk).")
                 continue
 
-            # Wesentliche Aenderung (oder optionaler Heartbeat) -> Funk an alle
+            # Wesentliche Aenderung (oder optionaler Heartbeat) -> Funk
             now = time.monotonic()
             reasons = detect_changes(prev_snaps, cur, args.hp_drop, camp,
-                                     args.rally_dist, prev_rally, args.danger_dist)
+                                     args.rally_dist, prev_rally,
+                                     args.danger_dist, threat_latch)
+            why = [txt for _aid, txt in reasons]
             heartbeat_due = (args.heartbeat > 0
                              and (now - last_broadcast) >= args.heartbeat)
             ready = (now - last_broadcast) >= args.min_broadcast
             if (reasons or heartbeat_due) and not args.no_broadcast and ready:
-                why = reasons if reasons else ["Routine-Lagebericht"]
                 # Kritischer Funk (Tod/kritische HP) darf einen laufenden Marsch
                 # unterbrechen; Routine (Bedrohung, Kampf, Position) nicht - die
                 # NPCs lesen ihn beim naechsten Aufwachen.
-                prio = any(("gefallen" in r) or ("kritisch" in r) for r in why)
-                sitrep = build_sitrep(snaps, why)
-                sent = [aid for aid in ids
-                        if cur[aid].get("alive") and inbox_append(aid, sitrep, prio)]
-                last_broadcast = now
-                log(f"FUNK an {sent}: {why[:4]}" + (" [PRIO]" if prio else ""))
+                prio = any(("gefallen" in t) or ("kritisch" in t) for t in why)
+                if prio or not reasons:
+                    # Prio-Broadcast und Heartbeat gehen UNGEFILTERT an alle
+                    # Lebenden - Tod/kritisch muss jeder wissen, der Heartbeat
+                    # ist das bewusste Lebenszeichen beim Testen.
+                    hb_why = why if why else ["Routine-Lagebericht"]
+                    sitrep = build_sitrep(snaps, hb_why)
+                    sent = [aid for aid in ids
+                            if cur[aid].get("alive")
+                            and inbox_append(aid, sitrep, prio)]
+                    log(f"FUNK an {sent}: {hb_why[:4]}"
+                        + (" [PRIO]" if prio else ""))
+                else:
+                    # ROUTINE-Sitrep: Relevanz- und Empfaengerfilter (Audit
+                    # 03.07.: 37% der Zuege reine Lagebestaetigungen).
+                    # a) Selbstbetroffenheit: Gruende, die NUR den Empfaenger
+                    #    selbst betreffen, hat er laengst als eigenen GEFAHR-/
+                    #    REISE-Weckruf - Doppelzustellung vermeiden; bei
+                    #    gemischten Gruenden nur die fuer ihn FREMDEN funken.
+                    # b) Distanz: nur Empfaenger nahe am Ausloeser (oder selbst
+                    #    verletzt/bedroht/im Kampf), siehe routine_relevant.
+                    sent = []
+                    skipped = []
+                    for aid in ids:
+                        if not cur[aid].get("alive"):
+                            continue
+                        foreign = [(sub, t) for sub, t in reasons
+                                   if sub != aid]
+                        if not foreign:
+                            skipped.append(aid)
+                            continue
+                        subs = [sub for sub, _t in foreign]
+                        if not routine_relevant(cur[aid], subs, cur):
+                            skipped.append(aid)
+                            continue
+                        sitrep = build_sitrep(
+                            snaps, [t for _sub, t in foreign])
+                        if inbox_append(aid, sitrep, False):
+                            sent.append(aid)
+                    log(f"FUNK an {sent}: {why[:4]}"
+                        + (f" (gefiltert: {skipped})" if skipped else ""))
+                if sent:
+                    last_broadcast = now
             elif reasons and not args.no_broadcast:
                 # Aenderung erkannt, aber Funk noch in der Sperrzeit - das ist
                 # gewollt (Token-Disziplin), nur fuers Log vermerken.
-                log(f"Aenderung gesehen (Funk gedrosselt): {reasons[:3]}")
+                log(f"Aenderung gesehen (Funk gedrosselt): {why[:3]}")
 
             prev_snaps = cur
             prev_rally = set(summary["at_rally"])

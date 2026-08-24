@@ -2,6 +2,31 @@
 // Serialisiert/deserialisiert mit dem Vanilla-JsonFileLoader.
 // Schema-Doku: docs/protocol.md im Projekt-Repo.
 
+// Krankheits-Zustand des NPC. agents traegt NUR Erreger ueber der
+// Melde-Schwelle (Name -> Agent-Count), sick = mindestens einer drueber.
+// Der Python-Leser ist tolerant: fehlende/leere Felder werden ignoriert.
+class IsuDiseaseInfo
+{
+	ref map<string, int> agents;   // "cholera" | "salmonella" | "influenza" | "wound" | "brain"
+	bool sick;
+
+	void IsuDiseaseInfo()
+	{
+		agents = new map<string, int>();
+	}
+}
+
+// Welt-Zustand (Zeit/Wetter), einmal pro Tick aus Engine-Werten gefuellt.
+class IsuWorldState
+{
+	string time;    // In-Game-Uhrzeit "HH:MM"
+	string sun;     // "dawn" | "day" | "dusk" | "night" (Heuristik nach Jahreszeit)
+	float rain;     // 0..1 (WeatherPhenomenon.GetActual)
+	float fog;      // 0..1
+	float wind;     // Windgeschwindigkeit in m/s
+	float temp_c;   // Umgebungstemperatur am NPC in Grad C (Environment)
+}
+
 class IsuNpcState
 {
 	bool spawned;
@@ -17,12 +42,20 @@ class IsuNpcState
 	float energy;          // PlayerStat Energy, ca. 0..20000
 	float stomach_volume;  // Mageninhalt gesamt (PlayerStomach.GetStomachVolume)
 	float heat_comfort;    // Waerme -1..+1 (unter ca. -0.5 friert er ernsthaft)
+	float wet;             // Naesse 0..1 (PlayerStat WET, Vanilla kennt nur 0/1)
 	string in_hands;       // Classname des Items in der Hand, leer = nichts
 	bool fighting;         // eAI-Kampf-FSM aktiv
 	string name;           // Anzeigename des Survivors (Chat-Absender)
 	bool following;        // folgt gerade einem Spieler (Gruppenbeitritt)
 	bool unconscious;      // bewusstlos (Schock) - liegt und kann nicht handeln
 	bool in_vehicle;       // sitzt in einem Fahrzeug (Bewegungsbefehle gesperrt)
+	bool bleeding;         // aktive Blutungsquelle(n) - unbehandelt toedlich
+	ref IsuDiseaseInfo disease;
+
+	void IsuNpcState()
+	{
+		disease = new IsuDiseaseInfo();
+	}
 }
 
 class IsuItemInfo
@@ -34,6 +67,12 @@ class IsuItemInfo
 	bool in_hands;
 	string parent;     // Classname des Tragers, wenn das Item an etwas steckt
 	                   // (z.B. Magazin IN der Waffe) - sonst leer
+	bool worn;         // am Koerper getragen (Kleidungs-/Schulter-Slot),
+	                   // nicht Hand, nicht Cargo
+	float warmth;      // nur kind=="clothing": heatIsolation aus der Config (0..1)
+	int cargo_size;    // nur kind=="clothing": Stauraum in Slots (Breite*Hoehe), 0 = keiner
+	string slot;       // nur kind=="clothing": Koerper-Slot (Body/Legs/Feet/
+	                   // Headgear/Gloves/Vest/Back/Shoulder ...)
 }
 
 class IsuCommandStatus
@@ -60,6 +99,9 @@ class IsuEntityInfo
 	                    // clothing | food | other - hilft beim Priorisieren
 	string near;        // bei kind=="item": Name eines KI-Survivors <2 m -
 	                    // wahrscheinlich dessen frische Ablage, nicht freies Loot
+	float warmth;       // nur item_kind=="clothing": heatIsolation (0..1)
+	int cargo_size;     // nur item_kind=="clothing": Stauraum in Slots
+	string slot;        // nur item_kind=="clothing": Koerper-Slot
 }
 
 class IsuChatMsg
@@ -77,6 +119,7 @@ class IsuState
 	float uptime;           // Serverlaufzeit in Sekunden
 	string bridge_version;
 	ref IsuNpcState npc;
+	ref IsuWorldState world;
 	ref IsuCommandStatus command;
 	ref array<ref IsuItemInfo> inventory;
 	ref array<ref IsuEntityInfo> nearby;
@@ -86,6 +129,7 @@ class IsuState
 	void IsuState()
 	{
 		npc = new IsuNpcState();
+		world = new IsuWorldState();
 		command = new IsuCommandStatus();
 		inventory = new array<ref IsuItemInfo>();
 		nearby = new array<ref IsuEntityInfo>();
@@ -113,6 +157,11 @@ class IsuCommand
 	                    // jeder gegen jeden inkl. Spieler), sonst normal/coop.
 	                    // String statt int: JsonFileLoader deserialisiert Strings
 	                    // zuverlaessig (wie faction/text); int kam als 0 an.
+	string target;      // nur fuer "treat_other": Name des Patienten (Spieler oder Agent)
+	string item;        // nur fuer "treat_other": Classname des Medizin-Items
+	float max_dist;     // nur fuer "find_water": Suchradius in m, <= 0 = Default 300
+	float count;        // nur fuer "spawn_infected": Anzahl 1..10 (hart gekappt).
+	                    // float statt int aus demselben Grund wie br (JsonFileLoader).
 }
 
 class IsuCommandFile

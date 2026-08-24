@@ -57,6 +57,17 @@ if ($null -eq $ccr) {
 # 2) Config anlegen, falls keine existiert
 $cfgDir = Join-Path $env:USERPROFILE ".claude-code-router"
 $cfgFile = Join-Path $cfgDir "config.json"
+
+# gpt5fix-Transformer immer aktuell halten (Repo-Kopie ist kanonisch).
+# Ohne ihn lehnen GPT-5-Modelle Requests mit 400 ab (max_tokens bzw.
+# reasoning_effort-Default bei gpt-5.6* mit Function-Tools).
+$fixSrc = Join-Path $PSScriptRoot "gpt5fix.js"
+$fixDst = Join-Path $cfgDir "gpt5fix.js"
+if (Test-Path $fixSrc) {
+    New-Item -ItemType Directory -Force $cfgDir | Out-Null
+    Copy-Item $fixSrc $fixDst -Force
+}
+
 if (Test-Path $cfgFile) {
     Write-Host "[2/3] Config existiert schon: $cfgFile (wird nicht angefasst)."
 } else {
@@ -81,12 +92,18 @@ if (Test-Path $cfgFile) {
   "LOG": false,
   "PORT": $Port,
   "API_TIMEOUT_MS": 600000,
+  "transformers": [
+    { "name": "gpt5fix", "path": "__GPT5FIX__" }
+  ],
   "Providers": [
     {
       "name": "openai",
       "api_base_url": "https://api.openai.com/v1/chat/completions",
       "api_key": "__OPENAI__",
-      "models": ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini"]
+      "models": ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini"],
+      "transformer": {
+        "use": [["maxtoken", { "max_tokens": 16000 }], "gpt5fix"]
+      }
     },
     {
       "name": "gemini",
@@ -108,6 +125,7 @@ if (Test-Path $cfgFile) {
 }
 "@
     $cfg = $cfg.Replace("__OPENAI__", $openaiKey).Replace("__GEMINI__", $geminiKey).Replace("__XAI__", $xaiKey)
+    $cfg = $cfg.Replace("__GPT5FIX__", $fixDst.Replace("\", "\\"))
     New-Item -ItemType Directory -Force $cfgDir | Out-Null
     # BOM-frei schreiben - Node JSON.parse stolpert ueber UTF-8-BOM
     [System.IO.File]::WriteAllText($cfgFile, $cfg, (New-Object System.Text.UTF8Encoding($false)))

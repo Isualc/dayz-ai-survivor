@@ -1,65 +1,181 @@
 // IsuVoice — In-Game-Arena-Setup (Taste Einfg).
 //
-// Modell, Rolle, Idle-Takt, Zug-Limit und die drei Direkttasten sind echte
-// Aufklapp-Dropdowns: ein head-Button zeigt den Wert, ein Klick blendet ein
-// Panel mit den Optionen als gestapelte Buttons ein (zuverlaessiges Rendern,
-// kein Listbox-Style noetig). Auswahl per Klick uebernimmt und schliesst. Die
-// Zwei-Wert-Schalter (Gesinnung, Spawn, Ziel) plus Agent an/aus, Mikrofon und
-// Comic-Chat sind Toggle-Buttons. Name wird frei eingetippt. "Starten"/
-// "Stoppen" schickt den Befehl als RPC an den Server (IsuSurvivor schreibt ihn
-// fuer den arena_supervisor.py in eine Datei). Statuszeile = Supervisor-Antwort.
+// NPC-Zeilen sind DYNAMISCH: Start mit einer Zeile, [+ NPC] haengt bis zu 10
+// an (Slots 0-3 = viktor/birgit/igor/konrad, 4-9 = npc5..npc10), X entfernt
+// eine Zeile; die Zeilen kommen aus isu_arena_row.layout und stapeln sich in
+// einem ScrollWidget (ArenaScroll/RowsHost). Modell, Rolle, Stimme, Sprache,
+// Idle-Takt, Zug-Limit und die drei Direkttasten sind Aufklapp-Dropdowns, die
+// sich alle EIN geteiltes DdPopup-Panel teilen (klappt nach oben, wenn unten
+// kein Platz ist). Gesinnung (Neutral/Hostile/Free) und Squad-HUD sind
+// zyklische Dreifach-Schalter; Spawn, Ziel, Agent an/aus, Mikrofon und
+// Comic-Chat bleiben Zwei-Wert-Toggles. Name wird frei eingetippt.
+// Mission/Event ist ein Dropdown (none/birgit/horde); bei Auswahl != none
+// haengt "Starten" das Segment "mission:<id>" an. "Starten"/"Stoppen" schickt
+// den Befehl als RPC an den Server (IsuSurvivor schreibt ihn fuer den
+// arena_supervisor.py in eine Datei). Statuszeile = Supervisor-Antwort.
+// Protokoll v2 (seit 23.08.): "start|v:2|count:<n>|..." - Stamm-Slots 0-3 im
+// Alt-Format, Zusatz-Slots als "npc:<id>:..."-Segmente; der Supervisor
+// validiert IDs per Regex und verteilt Zusatz-Spawns auf einem Ring.
 
-// Ein Aufklapp-Dropdown: head-Button + Options-Panel mit dynamisch erzeugten
-// Item-Buttons (gestapelt via SetPos, Muster wie vanilla actionmenu/chat). Nur
-// ein Dropdown ist gleichzeitig offen (das Menue schliesst die anderen).
+// Ein Aufklapp-Dropdown: head-Button + EIN geteiltes Popup-Panel (DdPopup im
+// Layout-Root), das beim Oeffnen an den Kopf gesetzt und mit Item-Buttons
+// befuellt wird. Es existiert immer nur die Liste des gerade offenen Dropdowns
+// (statt frueher 26 vorgebauter Panels mit ~1060 Widgets); klappt nach oben,
+// wenn unten kein Platz ist. Nur ein Dropdown ist gleichzeitig offen.
 class IsuDropdown
 {
+	// Zeilenhoehe der Listen-Items. 32 statt 40, damit die langen Listen
+	// (Sprachen, Tasten) innerhalb der Menuegrenzen bleiben. Position/Groesse
+	// im isu_dd_item.layout werden zur Laufzeit ohnehin ueberschrieben.
+	static const float ITEM_ROW_H = 32.0;
+
 	protected ButtonWidget m_Head;
-	protected Widget m_Container;             // Options-Panel (opak, visible 0)
-	protected ref array<ButtonWidget> m_ItemBtns;
-	protected ref array<Widget> m_AllCells;   // Items + Fueller, fuer Rebuild-Cleanup
+	protected Widget m_Popup;                 // geteiltes DdPopup, nur gesetzt solange DIESES Dropdown offen ist
+	protected ref array<ButtonWidget> m_ItemBtns;   // nur befuellt, solange offen
+	protected ref array<Widget> m_AllCells;   // Items + Fueller, fuer Cleanup beim Schliessen
 	protected ref TStringArray m_Items;
 	protected int m_Current;
 	protected int m_Cols;
+	protected float m_ColW;   // Spaltenbreite der Liste; 0 = Kopfbreite uebernehmen
 	protected bool m_Open;
 	protected bool m_ShowArrow = true;   // Pfeil "v"/"^" am Kopf; in engen Spalten aus
+	// Rueckadresse fuer ApplyIfItem: welches Feld (IsuArenaMenu.DD_*) und
+	// welcher NPC-Slot (-1 bei globalen Dropdowns wie Idle/Turns).
+	protected int m_KindTag = -1;
+	protected int m_SlotTag = -1;
 
-	void Setup(Widget root, string headName, string containerName, TStringArray items, int current, int cols)
+	void SetTags(int kind, int slot)
+	{
+		m_KindTag = kind;
+		m_SlotTag = slot;
+	}
+
+	int GetKindTag()
+	{
+		return m_KindTag;
+	}
+
+	int GetSlotTag()
+	{
+		return m_SlotTag;
+	}
+
+	void Setup(Widget root, string headName, TStringArray items, int current, int cols, float colW)
 	{
 		m_Head = ButtonWidget.Cast(root.FindAnyWidget(headName));
-		m_Container = root.FindAnyWidget(containerName);
+		// Layout-Tippfehler frueh sichtbar machen statt lautlos totes Dropdown
+		if (!m_Head)
+			Print("[IsuArena] Dropdown-Kopf fehlt: " + headName);
 		m_Items = items;
 		m_Current = current;
 		m_Cols = cols;
 		if (m_Cols < 1)
 			m_Cols = 1;
-		BuildItems();
-		Close();
-	}
-
-	// Item-Buttons ins Panel erzeugen und im Raster (Spalten m_Cols) anordnen.
-	protected void BuildItems()
-	{
+		m_ColW = colW;
 		m_ItemBtns = new array<ButtonWidget>();
 		m_AllCells = new array<Widget>();
-		if (!m_Container || !m_Items)
-			return;
-		int count = m_Items.Count();
+		m_Open = false;
+		UpdateHead();
+	}
+
+	// Zebra-Schattierung: gerade/ungerade Zeile, aktueller Eintrag gruen.
+	protected int ShadeFor(int i, int rows)
+	{
+		if (i == m_Current)
+			return ARGB(255, 30, 58, 38);
+		int r = i % rows;
+		if (r % 2 == 1)
+			return ARGB(255, 30, 36, 47);
+		return ARGB(255, 22, 27, 36);
+	}
+
+	protected int RowCount()
+	{
+		int count = 0;
+		if (m_Items)
+			count = m_Items.Count();
 		int rows = (count + m_Cols - 1) / m_Cols;
 		if (rows < 1)
 			rows = 1;
-		float rowH = 40.0;
-		float cw, ch;
-		m_Container.GetSize(cw, ch);
-		float colW = cw / m_Cols;
+		return rows;
+	}
+
+	// Alle Zellen des Popups abraeumen (beim Schliessen; das Popup wird beim
+	// naechsten Oeffnen ohnehin frisch befuellt).
+	protected void ClearCells()
+	{
+		if (m_AllCells)
+		{
+			for (int i = 0; i < m_AllCells.Count(); i++)
+			{
+				if (m_AllCells[i])
+					m_AllCells[i].Unlink();
+			}
+		}
+		m_ItemBtns = new array<ButtonWidget>();
+		m_AllCells = new array<Widget>();
+	}
+
+	// Popup an den Kopf setzen, dimensionieren und mit Item-Buttons befuellen.
+	// menuRoot = Menue-Root (liefert Referenzgroesse und Screen-Rahmen).
+	protected void BuildItemsInto(Widget popup, Widget menuRoot)
+	{
+		ClearCells();
+		if (!popup || !m_Items || !m_Head || !menuRoot)
+			return;
+		int count = m_Items.Count();
+		int rows = RowCount();
+
+		// Geometrie: unter dem Kopf aufklappen; wenn unten kein Platz ist, nach
+		// oben; seitlich an die Menuekante clampen. Die Koepfe leben seit dem
+		// Zeilen-Umbau in gescrollten Sub-Baeumen - darum ueber SCREEN-Position
+		// in den Root-Raum zurueckrechnen (beruecksichtigt Scroll-Offset und
+		// UI-Skalierung), statt GetPos relativ zum unbekannten Parent zu nehmen.
+		float menuW, menuH;
+		menuRoot.GetSize(menuW, menuH);
+		float rootSX, rootSY, rootSW, rootSH;
+		menuRoot.GetScreenPos(rootSX, rootSY);
+		menuRoot.GetScreenSize(rootSW, rootSH);
+		float scale = 1.0;
+		if (menuW > 0 && rootSW > 0)
+			scale = rootSW / menuW;
+		float headSX, headSY, headSW, headSH;
+		m_Head.GetScreenPos(headSX, headSY);
+		m_Head.GetScreenSize(headSW, headSH);
+		float headX = (headSX - rootSX) / scale;
+		float headY = (headSY - rootSY) / scale;
+		float headW = headSW / scale;
+		float headH = headSH / scale;
+		float colW = m_ColW;
+		if (colW <= 0)
+			colW = headW;
+		float listW = colW * m_Cols;
+		float listH = rows * ITEM_ROW_H;
+		float x = headX;
+		float y = headY + headH;
+		if (y + listH > menuH)
+			y = headY - listH;
+		if (y < 0)
+			y = 0;
+		if (x + listW > menuW)
+			x = menuW - listW;
+		if (x < 0)
+			x = 0;
+		popup.SetFlags(WidgetFlags.EXACTPOS | WidgetFlags.EXACTSIZE);
+		popup.SetPos(x, y);
+		popup.SetSize(listW, listH);
+
 		// PanelWidget/ButtonWidget ohne Textur rendern ihre color-Flaeche nicht -
-		// darum war die offene Liste durchsichtig. Jedes Item bringt deshalb ein
-		// eigenes opakes ImageWidget (DdItemBg) mit; Zellen ueber count hinaus
-		// werden als leere Fueller erzeugt, damit die letzte Spalte kein Loch hat.
+		// jedes Item bringt deshalb ein eigenes opakes ImageWidget (DdItemBg)
+		// mit; Zellen ueber count hinaus werden als leere Fueller erzeugt, damit
+		// die letzte Spalte kein transparentes Loch hat.
 		int total = rows * m_Cols;
 		for (int i = 0; i < total; i++)
 		{
-			Widget iw = GetGame().GetWorkspace().CreateWidgets("IsuVoice/GUI/isu_dd_item.layout", m_Container);
+			Widget iw = GetGame().GetWorkspace().CreateWidgets("IsuVoice/GUI/isu_dd_item.layout", popup);
+			// Sofort registrieren, damit ClearCells die Zelle auch dann abraeumt,
+			// wenn der Cast darunter fehlschlaegt.
+			m_AllCells.Insert(iw);
 			ButtonWidget b = ButtonWidget.Cast(iw);
 			if (!b)
 				continue;
@@ -68,20 +184,15 @@ class IsuDropdown
 			b.SetFlags(WidgetFlags.EXACTPOS | WidgetFlags.EXACTSIZE);
 			int c = i / rows;
 			int r = i % rows;
-			b.SetPos(c * colW, r * rowH);
-			b.SetSize(colW, rowH);
+			b.SetPos(c * colW, r * ITEM_ROW_H);
+			b.SetSize(colW, ITEM_ROW_H);
 			ImageWidget bg = ImageWidget.Cast(iw.FindAnyWidget("DdItemBg"));
 			if (bg)
 			{
 				bg.SetFlags(WidgetFlags.EXACTPOS | WidgetFlags.EXACTSIZE);
 				bg.SetPos(0, 0);
-				bg.SetSize(colW, rowH);
-				int shade = ARGB(255, 22, 27, 36);
-				if (r % 2 == 1)
-					shade = ARGB(255, 30, 36, 47);
-				if (i == m_Current)
-					shade = ARGB(255, 30, 58, 38);
-				bg.SetColor(shade);
+				bg.SetSize(colW, ITEM_ROW_H);
+				bg.SetColor(ShadeFor(i, rows));
 			}
 			TextWidget lbl = TextWidget.Cast(iw.FindAnyWidget("DdItemLabel"));
 			string txt = "";
@@ -91,7 +202,7 @@ class IsuDropdown
 			{
 				lbl.SetFlags(WidgetFlags.EXACTPOS | WidgetFlags.EXACTSIZE);
 				lbl.SetPos(12, 0);
-				lbl.SetSize(colW - 12, rowH);
+				lbl.SetSize(colW - 12, ITEM_ROW_H);
 				lbl.SetText(txt);
 				lbl.SetColor(ARGB(255, 246, 248, 252));
 			}
@@ -103,9 +214,7 @@ class IsuDropdown
 			// Fueller-Zellen sind nicht auswaehlbar (kein Eintrag in m_ItemBtns).
 			if (i < count)
 				m_ItemBtns.Insert(b);
-			m_AllCells.Insert(iw);
 		}
-		m_Container.SetSize(cw, rows * rowH);
 	}
 
 	void UpdateHead()
@@ -125,47 +234,28 @@ class IsuDropdown
 		m_Head.SetText(label + arrow);
 	}
 
-	// Zebra-Schattierung neu setzen und den aktuell gewaehlten Eintrag gruen
-	// hinterlegen (nach SelectByItem waere die Markierung sonst veraltet).
-	protected void RefreshHighlight()
+	// Liste im geteilten Popup oeffnen. Der Aufrufer schliesst vorher alle
+	// anderen Dropdowns (nur eines darf das Popup halten).
+	void OpenIn(Widget popup, Widget menuRoot)
 	{
-		if (!m_ItemBtns || !m_Items)
+		if (!popup || !m_Head)
 			return;
-		int count = m_Items.Count();
-		int rows = (count + m_Cols - 1) / m_Cols;
-		if (rows < 1)
-			rows = 1;
-		for (int i = 0; i < m_ItemBtns.Count(); i++)
-		{
-			if (!m_ItemBtns[i])
-				continue;
-			ImageWidget bg = ImageWidget.Cast(m_ItemBtns[i].FindAnyWidget("DdItemBg"));
-			if (!bg)
-				continue;
-			int r = i % rows;
-			int shade = ARGB(255, 22, 27, 36);
-			if (r % 2 == 1)
-				shade = ARGB(255, 30, 36, 47);
-			if (i == m_Current)
-				shade = ARGB(255, 30, 58, 38);
-			bg.SetColor(shade);
-		}
-	}
-
-	void Open()
-	{
-		if (!m_Container)
-			return;
+		m_Popup = popup;
 		m_Open = true;
-		RefreshHighlight();
-		m_Container.Show(true);
+		BuildItemsInto(popup, menuRoot);
+		popup.Show(true);
 		UpdateHead();
 	}
 
 	void Close()
 	{
-		if (m_Container)
-			m_Container.Show(false);
+		if (m_Open)
+			ClearCells();
+		if (m_Popup)
+		{
+			m_Popup.Show(false);
+			m_Popup = null;
+		}
 		m_Open = false;
 		UpdateHead();
 	}
@@ -180,7 +270,8 @@ class IsuDropdown
 		return m_Open;
 	}
 
-	// Index, falls w einer der Item-Buttons ist; sonst -1.
+	// Index, falls w einer der Item-Buttons ist; sonst -1. Geschlossene
+	// Dropdowns haben keine Items - liefern also immer -1.
 	int ItemIndex(Widget w)
 	{
 		if (!m_ItemBtns)
@@ -211,31 +302,68 @@ class IsuDropdown
 		UpdateHead();
 	}
 
+	// Kopf-Textfarbe (OFF-Zeilen werden ausgegraut)
+	void SetHeadTextColor(int color)
+	{
+		if (m_Head)
+			m_Head.SetTextColor(color);
+	}
+
 	// Items komplett neu setzen (Provider-Wechsel -> Modell-Dropdown zeigt jetzt
-	// die Modelle des neuen Providers). Alte Item-Buttons abraeumen, neu bauen.
+	// die Modelle des neuen Providers). Beim geschlossenen Dropdown reine
+	// Datenpflege ohne Widget-Arbeit - der fruehere Unlink-im-Klick-Handler-
+	// Pfad (Engine haelt danach freigegebene Pointer) entfaellt damit.
 	void Rebuild(TStringArray items, int current)
 	{
-		if (m_AllCells)
-		{
-			for (int i = 0; i < m_AllCells.Count(); i++)
-			{
-				if (m_AllCells[i])
-					m_AllCells[i].Unlink();
-			}
-		}
+		if (m_Open)
+			Close();
 		m_Items = items;
 		m_Current = current;
-		BuildItems();
-		Close();
+		UpdateHead();
+	}
+}
+
+// Eine NPC-Zeile im Menue: aus isu_arena_row.layout instanziiert (generische
+// Widget-Namen, FindAnyWidget loest im Zeilen-Subtree auf), traegt ihren
+// Slot-Index in die s_*-Statics des Menues. Zeilen werden dynamisch erzeugt/
+// entfernt ([+ NPC] / X) und im RowsHost des ScrollWidgets gestapelt.
+class IsuArenaRow
+{
+	Widget m_Root;
+	ImageWidget m_Card;
+	ImageWidget m_Accent;
+	ButtonWidget m_BtnAgent;
+	EditBoxWidget m_EditName;
+	ButtonWidget m_BtnRemove;
+	TextWidget m_Live;
+	ref IsuDropdown m_DdProvider;
+	ref IsuDropdown m_DdModel;
+	ref IsuDropdown m_DdRole;
+	ref IsuDropdown m_DdLoadout;
+	ref IsuDropdown m_DdVoice;
+	ref IsuDropdown m_DdLang;
+	int m_Slot;   // Index in die s_*-Arrays (0..9), NICHT die Anzeigeposition
+
+	void Destroy()
+	{
+		if (m_Root)
+			m_Root.Unlink();
+		m_Root = null;
 	}
 }
 
 class IsuArenaMenu extends UIScriptedMenu
 {
-	// Auswahl bleibt ueber Menue-Sessions erhalten
-	static ref TStringArray s_AgentIds = {"viktor", "birgit", "igor", "konrad"};
-	static ref TStringArray s_DefaultNames = {"Viktor", "Birgit", "Igor", "Konrad"};
-	static ref TStringArray s_Names = {"Viktor", "Birgit", "Igor", "Konrad"};
+	// Auswahl bleibt ueber Menue-Sessions erhalten.
+	// Slots 0-3 = die vier klassischen Agenten; 4-9 = Zusatz-Slots (npc5..npc10,
+	// gehen als v2-"npc:"-Segmente raus; Roster-Defaults in arena/agents.json).
+	static ref TStringArray s_AgentIds = {"viktor", "birgit", "igor", "konrad", "npc5", "npc6", "npc7", "npc8", "npc9", "npc10"};
+	static ref TStringArray s_DefaultNames = {"Viktor", "Birgit", "Igor", "Konrad", "Anna", "Boris", "Elena", "Franz", "Mila", "Sergej"};
+	static ref TStringArray s_Names = {"Viktor", "Birgit", "Igor", "Konrad", "Anna", "Boris", "Elena", "Franz", "Mila", "Sergej"};
+	// Sichtbare/konfigurierte Zeilen als Slot-Index-Liste, Reihenfolge =
+	// Anzeige-Reihenfolge. Start: nur ein NPC; [+ NPC] haengt den kleinsten
+	// unbenutzten Slot an, X entfernt die Zeile (mindestens eine bleibt).
+	static ref array<int> s_VisibleSlots = {0};
 	// Modellwahl ZWEISTUFIG: erst Provider, dann Modell. Praefix = Backend
 	// (resolve_backend): ohne = Anthropic Max-Plan, api/ = Anthropic-API,
 	// openai/ google/ xai/ = claude-code-router, local/ = llama-server.
@@ -273,8 +401,44 @@ class IsuArenaMenu extends UIScriptedMenu
 		if (p == 4) return s_LocalLabels;
 		return s_AnthropicLabels;
 	}
+
+	// Anzahl der NPC-Slots. Einzige Wahrheit fuer alle Schleifen - der geplante
+	// Umbau auf dynamische Slots muss dann nur noch hier ansetzen.
+	static int SlotCount()
+	{
+		return s_AgentIds.Count();
+	}
+
+	// Index sicher in [0, count) zwingen. Schuetzt BuildCommand vor
+	// Out-of-Bounds, wenn Label- und Werte-Listen mal ungleich lang sind.
+	static int ClampIdx(int v, int count)
+	{
+		if (v < 0 || v >= count)
+			return 0;
+		return v;
+	}
+
+	// Parallel-Arrays muessen gleich lang sein (Label-Liste treibt den Index,
+	// gelesen wird die Werte-Liste). Bei Pflegefehlern laut werden.
+	protected static void CheckPair(string what, int a, int b)
+	{
+		if (a != b)
+			Print("[IsuArena] WARNUNG: Listenlaengen ungleich (" + what + "): " + a.ToString() + " vs " + b.ToString());
+	}
 	static ref TStringArray s_PersonaKeys = {"jaeger", "bauer", "sanitaeter", "exmilitaer", "kampfmaschine"};
 	static ref TStringArray s_PersonaLabels = {"Hunter", "Farmer", "Medic", "Ex-military", "Fighter"};
+	// Loadout-Wahl pro Slot (Phase 4): Index 0 = Rollen-Default (KEIN ld:-
+	// Segment, agents.json entscheidet wie bisher). Die Dateien liegen in
+	// mod/loadouts/ und werden vom Supervisor beim Start nach
+	// ExpansionMod/Loadouts gespiegelt (ensure_loadouts). Immer BASIS-Namen
+	// ohne _Winter - die Winter-Variante waehlt der Supervisor selbst.
+	static ref TStringArray s_LoadoutFiles = {"", "IsuPresetScout.json", "IsuPresetAssault.json", "IsuPresetMedic.json", "IsuPresetSniper.json", "IsuViktorLoadout.json", "IsuIgorLoadout.json", "IsuKonradLoadout.json", "IsuSurvivorLoadout.json"};
+	// Index 0 "(keep)" = bisheriges Verhalten: Inventar der letzten Runde
+	// kommt zurueck (Restore/Adopt), beim allerersten Spawn Rollen-Loadout.
+	// Jede andere Wahl = FRISCH mit diesem Loadout equippen (Supervisor setzt
+	// --fresh-loadout, Alt-Koerper/Snapshot werden verworfen).
+	static ref TStringArray s_LoadoutLabels = {"(keep)", "Scout", "Assault", "Medic", "Sniper", "Hunter", "Farmer", "Military", "Survivor"};
+	static ref array<int> s_LoadoutIdx = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	// ElevenLabs-Stimmen (Name = Teilstring, discord_voice loest ihn gegen das
 	// Konto auf; unbekannte fallen sicher auf die Default-Stimme zurueck). Index
 	// 0-3 = die bisherigen Defaults pro Slot, danach die aktuellen ElevenLabs-
@@ -284,24 +448,28 @@ class IsuArenaMenu extends UIScriptedMenu
 	// gesendet wird s_VoiceNames (volle Aufloesung gegen ElevenLabs), angezeigt s_VoiceLabels.
 	static ref TStringArray s_VoiceLabels = {"Helmut", "Sarah", "George", "Liam", "Aria", "Roger", "Laura", "Charlie", "Callum", "River", "Charlotte", "Alice", "Matilda", "Will", "Jessica", "Eric", "Chris", "Brian", "Daniel", "Lily", "Bill", "Adam"};
 	// Default-Stimme je Slot (Index in s_VoiceNames): Viktor=Helmut, Birgit=Sarah,
-	// Igor=George, Konrad=Liam - genau die bisherigen agents.json-Stimmen.
-	static ref array<int> s_VoiceIdx = {0, 1, 2, 3};
+	// Igor=George, Konrad=Liam - genau die bisherigen agents.json-Stimmen;
+	// Zusatz-Slots kriegen die naechsten ElevenLabs-Standardstimmen.
+	static ref array<int> s_VoiceIdx = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 	// Ausgabe-Sprache der NPC. Codes MUESSEN mit run_agent.LANG_NAMES uebereinstimmen.
 	// Labels bewusst ASCII (EnforceScript-Datei-Encoding sicher).
 	static ref TStringArray s_LangCodes = {"de", "en", "fr", "es", "it", "pt", "nl", "pl", "ru", "uk", "tr", "sv", "cs", "da", "fi", "el", "ro", "hu", "no", "hr", "sk", "ja", "ko", "zh", "ar", "hi", "fil"};
 	static ref TStringArray s_LangLabels = {"Deutsch", "English", "Francais", "Espanol", "Italiano", "Portugues", "Nederlands", "Polski", "Russian", "Ukrainian", "Turkce", "Svenska", "Cestina", "Dansk", "Suomi", "Greek", "Romana", "Magyar", "Norsk", "Hrvatski", "Slovak", "Japanese", "Korean", "Chinese", "Arabic", "Hindi", "Filipino"};
-	static ref array<int> s_LangIdx = {0, 0, 0, 0};   // alle Default Deutsch
-	static ref array<bool> s_Enabled = {true, true, true, true};
-	// Default-Tiering: Viktor=Sonnet, Birgit=Haiku, Igor=Haiku, Konrad=Sonnet.
+	static ref array<int> s_LangIdx = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};   // alle Default Deutsch
+	static ref array<bool> s_Enabled = {true, true, true, true, true, true, true, true, true, true};
+	// Default-Tiering: Viktor=Sonnet, Birgit=Haiku, Igor=Haiku, Konrad=Sonnet;
+	// Zusatz-Slots starten guenstig auf Haiku.
 	// s_ProviderIdx = gewaehlter Provider je Slot (0=Anthropic), s_ModelIdx =
 	// Modell-Index INNERHALB des Providers (s_AnthropicModels: sonnet=0, haiku=1).
-	static ref array<int> s_ProviderIdx = {0, 0, 0, 0};
-	static ref array<int> s_ModelIdx = {0, 1, 1, 0};
-	static ref array<int> s_PersonaIdx = {0, 2, 1, 3};
-	static bool s_Hostile = false;
+	static ref array<int> s_ProviderIdx = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	static ref array<int> s_ModelIdx = {0, 1, 1, 0, 1, 1, 1, 1, 1, 1};
+	static ref array<int> s_PersonaIdx = {0, 2, 1, 3, 4, 0, 1, 2, 3, 4};
+	// Gesinnung/Modus der Runde: 0 = Neutral (co-op), 1 = Hostile (BR),
+	// 2 = Free (Survival). Geht als "hostile:<n>" an den Supervisor
+	// (Schnittstelle: Werte 0/1 verhalten sich exakt wie der alte Bool).
+	static int s_Mode = 0;
 	static float s_CampX = 4233.7;
 	static float s_CampZ = 8512.2;
-	static bool s_CampFromPlayer = false;
 	static ref array<int> s_IdleValues = {60, 120, 180, 300};
 	static int s_IdleIdx = 1;
 	static ref array<int> s_TurnValues = {6, 10, 15, 20, 0};
@@ -309,6 +477,17 @@ class IsuArenaMenu extends UIScriptedMenu
 	static bool s_Mic = true;
 	static bool s_GroupSpawn = false;   // false = getrennt spawnen, true = eng als Gruppe
 	static bool s_ComicChat = true;     // true = Comic-Sprechblasen ueber NPC-Koepfen (Client-HUD)
+	// Squad-Uebersichts-Panel (IsuSquadHud, Client) als Dreifach-Schalter:
+	// 0 = OFF, 1 = LEFT (bisherige Position links), 2 = RIGHT (rechts oben,
+	// Default - weicht dem Discord-Overlay links oben aus).
+	static int s_SquadHudMode = 2;
+	// Mission/Event der Runde. Die IDs MUESSEN mit den Dateien in
+	// arena/missions/*.json uebereinstimmen (Konvention wie s_LangCodes ==
+	// LANG_NAMES); Index 0 = "none" schickt KEIN mission-Segment mit (alter
+	// Start-Fluss, rueckwaertskompatibel).
+	static ref TStringArray s_MissionIds = {"none", "birgit", "horde"};
+	static ref TStringArray s_MissionLabels = {"No mission", "Mission: Birgit", "Event: Horde"};
+	static int s_MissionIdx = 0;
 	// Orchestrator (Schiedsrichter/Lagezentrum) an/aus. AUS = die vier NPCs
 	// laufen unabhaengig (sauberer Modell-Benchmark, jedes Modell loest die
 	// Lage allein). AN = der Supervisor startet daemon/orchestrator.py:
@@ -320,11 +499,12 @@ class IsuArenaMenu extends UIScriptedMenu
 	static bool s_Patrols = false;
 
 	// Identitaetsfarben je Slot (RGB 0..1): Viktor bernstein, Birgit tuerkis,
-	// Igor gruen, Konrad blau. Auch fuer die Namensschilder im Spiel gedacht,
-	// damit Menue und Kopf-Tag dieselbe Farbe tragen.
-	static ref array<float> s_ColR = {0.94, 0.36, 0.59, 0.22};
-	static ref array<float> s_ColG = {0.62, 0.79, 0.77, 0.54};
-	static ref array<float> s_ColB = {0.15, 0.65, 0.35, 0.87};
+	// Igor gruen, Konrad blau; danach rosa, violett, rot, hellcyan, oliv,
+	// graublau fuer die Zusatz-Slots. Auch fuer die Namensschilder im Spiel
+	// gedacht, damit Menue und Kopf-Tag dieselbe Farbe tragen.
+	static ref array<float> s_ColR = {0.94, 0.36, 0.59, 0.22, 0.85, 0.62, 0.85, 0.35, 0.65, 0.55};
+	static ref array<float> s_ColG = {0.62, 0.79, 0.77, 0.54, 0.35, 0.40, 0.30, 0.75, 0.70, 0.60};
+	static ref array<float> s_ColB = {0.15, 0.65, 0.35, 0.87, 0.55, 0.85, 0.25, 0.85, 0.30, 0.75};
 
 	// Direktsteuerung im Spiel: frei waehlbare Tasten aus einer kollisionsarmen
 	// Liste (die meisten Tasten sind von Spiel und Mods belegt) plus Zielmodus.
@@ -336,71 +516,104 @@ class IsuArenaMenu extends UIScriptedMenu
 	static int s_KeyRadialIdx = 10; // Default: Num , (Radialmenue oeffnen)
 	static bool s_TargetAll = false;
 
-	protected ButtonWidget m_BtnAgent0;
-	protected ButtonWidget m_BtnAgent1;
-	protected ButtonWidget m_BtnAgent2;
-	protected ButtonWidget m_BtnAgent3;
-	protected EditBoxWidget m_EditName0;
-	protected EditBoxWidget m_EditName1;
-	protected EditBoxWidget m_EditName2;
-	protected EditBoxWidget m_EditName3;
+	// Feld-Typen der Dropdowns (IsuDropdown.SetTags) - ApplyIfItem schaltet
+	// darueber, statt alle Dropdowns durchzuprobieren.
+	static const int DD_PROVIDER = 0;
+	static const int DD_MODEL = 1;
+	static const int DD_ROLE = 2;
+	static const int DD_VOICE = 3;
+	static const int DD_LANG = 4;
+	static const int DD_IDLE = 5;
+	static const int DD_TURNS = 6;
+	static const int DD_KEYSTOP = 7;
+	static const int DD_KEYGOTO = 8;
+	static const int DD_KEYRADIAL = 9;
+	static const int DD_MISSION = 10;
+	static const int DD_LOADOUT = 11;
+
+	static const float ROW_PITCH = 52.0;   // Zeilenabstand im RowsHost (40 Karte + 12 Luft)
+
+	protected ref array<ref IsuArenaRow> m_Rows;
+	protected Widget m_RowsHost;             // Kind des ArenaScroll, traegt die Zeilen
+	protected ButtonWidget m_BtnAddNpc;
+	protected TextWidget m_RowCountText;
 	protected ButtonWidget m_BtnMode;
 	protected ButtonWidget m_BtnSpawn;
 	protected ButtonWidget m_BtnTarget;
 	protected ButtonWidget m_BtnMic;
 	protected ButtonWidget m_BtnComic;
+	protected ButtonWidget m_BtnHud;
 	protected ButtonWidget m_BtnOrch;
 	protected ButtonWidget m_BtnPatrol;
 	protected ButtonWidget m_BtnCamp;
 	protected ButtonWidget m_BtnStart;
 	protected ButtonWidget m_BtnStop;
-	protected ButtonWidget m_BtnMission;
 	protected ButtonWidget m_BtnClose;
 	protected TextWidget m_StatusText;
 	protected ImageWidget m_StatusDot;
 	protected ImageWidget m_StatusPill;
 	protected TextWidget m_CostText;
 	protected TextWidget m_ModeNote;
-	protected ref array<ImageWidget> m_Cards;
-	protected ref array<ImageWidget> m_Accents;
-	protected ref array<TextWidget> m_Lives;
+	protected ImageWidget m_Background;      // Klick darauf schliesst offene Listen
+	protected string m_LastStatusRaw;        // Dirty-Check: Update() nur bei Aenderung
+	protected float m_StartSentAt = -100.0;  // Entprellung des Start-Buttons
+	protected float m_LiveAccum;             // Takt der Live-Spalte (0.5 s)
 
-	// Dropdowns
-	protected ref array<ref IsuDropdown> m_DdProvider;   // Stufe 1: Provider
-	protected ref array<ref IsuDropdown> m_DdModel;      // Stufe 2: Modell des Providers
-	protected ref array<ref IsuDropdown> m_DdRole;
-	protected ref array<ref IsuDropdown> m_DdVoice;   // Stimme pro Slot (grosses Panel = "Fenster")
-	protected ref array<ref IsuDropdown> m_DdLang;    // Ausgabe-Sprache pro Slot
+	// Globale Dropdowns (Zeilen-Dropdowns leben in m_Rows)
 	protected ref IsuDropdown m_DdIdle;
 	protected ref IsuDropdown m_DdTurns;
 	protected ref IsuDropdown m_DdKeyStop;
 	protected ref IsuDropdown m_DdKeyGoto;
 	protected ref IsuDropdown m_DdKeyRadial;
-	protected ref array<ref IsuDropdown> m_All;   // fuer "alle schliessen"
+	protected ref IsuDropdown m_DdMission;   // Mission/Event (ersetzt den festen "Mission: Birgit"-Knopf)
+	protected ref array<ref IsuDropdown> m_GlobalDds;   // Idle/Turns/Keys/Mission
+	protected ref array<ref IsuDropdown> m_All;   // globale + Zeilen-Dropdowns (nach jedem BuildRows neu)
+	protected IsuDropdown m_OpenDd;          // das gerade offene Dropdown (haelt das Popup)
+	protected Widget m_DdPopup;              // das EINE geteilte Listen-Panel aller Dropdowns
 
 	override Widget Init()
 	{
-		layoutRoot = GetGame().GetWorkspace().CreateWidgets("IsuVoice/GUI/isu_arena_menu.layout");
+		// Reentrance-Guard: ein zweiter Init() wuerde den kompletten Widget-Baum
+		// (~1100 Widgets) neu erzeugen, ohne den alten freizugeben.
+		if (layoutRoot)
+			return layoutRoot;
 
-		m_BtnAgent0 = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnAgent0"));
-		m_BtnAgent1 = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnAgent1"));
-		m_BtnAgent2 = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnAgent2"));
-		m_BtnAgent3 = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnAgent3"));
-		m_EditName0 = EditBoxWidget.Cast(layoutRoot.FindAnyWidget("EditName0"));
-		m_EditName1 = EditBoxWidget.Cast(layoutRoot.FindAnyWidget("EditName1"));
-		m_EditName2 = EditBoxWidget.Cast(layoutRoot.FindAnyWidget("EditName2"));
-		m_EditName3 = EditBoxWidget.Cast(layoutRoot.FindAnyWidget("EditName3"));
+		layoutRoot = GetGame().GetWorkspace().CreateWidgets("IsuVoice/GUI/isu_arena_menu.layout");
+		m_Background = ImageWidget.Cast(layoutRoot.FindAnyWidget("Background"));
+		m_DdPopup = layoutRoot.FindAnyWidget("DdPopup");
+		if (!m_DdPopup)
+			Print("[IsuArena] DdPopup fehlt im Layout - Dropdowns koennen nicht oeffnen.");
+
+		// Pflege-Asserts: Label-Listen treiben die Indizes, Werte-Listen werden
+		// gelesen - Laengen-Drift faellt sonst erst beim START-Klick auf.
+		CheckPair("AnthropicModels/Labels", s_AnthropicModels.Count(), s_AnthropicLabels.Count());
+		CheckPair("OpenAIModels/Labels", s_OpenAIModels.Count(), s_OpenAILabels.Count());
+		CheckPair("GoogleModels/Labels", s_GoogleModels.Count(), s_GoogleLabels.Count());
+		CheckPair("XaiModels/Labels", s_XaiModels.Count(), s_XaiLabels.Count());
+		CheckPair("LocalModels/Labels", s_LocalModels.Count(), s_LocalLabels.Count());
+		CheckPair("VoiceNames/Labels", s_VoiceNames.Count(), s_VoiceLabels.Count());
+		CheckPair("LangCodes/Labels", s_LangCodes.Count(), s_LangLabels.Count());
+		CheckPair("PersonaKeys/Labels", s_PersonaKeys.Count(), s_PersonaLabels.Count());
+		CheckPair("LoadoutFiles/Labels", s_LoadoutFiles.Count(), s_LoadoutLabels.Count());
+		CheckPair("SafeKeyCodes/Labels", s_SafeKeyCodes.Count(), s_SafeKeyLabels.Count());
+		CheckPair("MissionIds/Labels", s_MissionIds.Count(), s_MissionLabels.Count());
+
+		m_RowsHost = layoutRoot.FindAnyWidget("RowsHost");
+		m_BtnAddNpc = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnAddNpc"));
+		m_RowCountText = TextWidget.Cast(layoutRoot.FindAnyWidget("RowCountText"));
+		if (!m_RowsHost)
+			Print("[IsuArena] RowsHost fehlt im Layout - keine NPC-Zeilen moeglich.");
 		m_BtnMode = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnMode"));
 		m_BtnSpawn = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnSpawn"));
 		m_BtnTarget = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnTarget"));
 		m_BtnMic = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnMic"));
 		m_BtnComic = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnComic"));
+		m_BtnHud = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnHud"));
 		m_BtnOrch = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnOrch"));
 		m_BtnPatrol = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnPatrol"));
 		m_BtnCamp = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnCamp"));
 		m_BtnStart = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnStart"));
 		m_BtnStop = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnStop"));
-		m_BtnMission = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnMission"));
 		m_BtnClose = ButtonWidget.Cast(layoutRoot.FindAnyWidget("BtnClose"));
 		m_StatusText = TextWidget.Cast(layoutRoot.FindAnyWidget("StatusText"));
 		m_StatusDot = ImageWidget.Cast(layoutRoot.FindAnyWidget("StatusDot"));
@@ -408,67 +621,176 @@ class IsuArenaMenu extends UIScriptedMenu
 		m_CostText = TextWidget.Cast(layoutRoot.FindAnyWidget("CostText"));
 		m_ModeNote = TextWidget.Cast(layoutRoot.FindAnyWidget("ModeNote"));
 
-		m_Cards = new array<ImageWidget>();
-		m_Accents = new array<ImageWidget>();
-		m_Lives = new array<TextWidget>();
-		for (int ci = 0; ci < 4; ci++)
-		{
-			m_Cards.Insert(ImageWidget.Cast(layoutRoot.FindAnyWidget("Card" + ci.ToString())));
-			m_Accents.Insert(ImageWidget.Cast(layoutRoot.FindAnyWidget("Accent" + ci.ToString())));
-			m_Lives.Insert(TextWidget.Cast(layoutRoot.FindAnyWidget("Live" + ci.ToString())));
-		}
+		// Globale Dropdowns (Slot -1). Lange Listen (Tasten) zweispaltig.
+		m_GlobalDds = new array<ref IsuDropdown>();
+		m_DdIdle = MakeGlobalDd("IdleHead", IdleLabels(), s_IdleIdx, 1, 0, DD_IDLE);
+		m_DdTurns = MakeGlobalDd("TurnsHead", TurnLabels(), s_TurnsIdx, 1, 0, DD_TURNS);
+		m_DdKeyStop = MakeGlobalDd("KeyStopHead", s_SafeKeyLabels, s_KeyStopIdx, 2, 130, DD_KEYSTOP);
+		m_DdKeyGoto = MakeGlobalDd("KeyGotoHead", s_SafeKeyLabels, s_KeyGotoIdx, 2, 130, DD_KEYGOTO);
+		m_DdKeyRadial = MakeGlobalDd("KeyRadialHead", s_SafeKeyLabels, s_KeyRadialIdx, 2, 130, DD_KEYRADIAL);
+		// Mission/Event: der Kopf sitzt in der Start-Zeile am unteren Menuerand -
+		// das Popup klappt dort automatisch nach oben (Y-Clamping in OpenIn).
+		m_DdMission = MakeGlobalDd("MissionHead", s_MissionLabels, s_MissionIdx, 1, 0, DD_MISSION);
 
-		for (int idx = 0; idx < 4; idx++)
-		{
-			EditBoxWidget eb = NameBox(idx);
-			if (eb)
-				eb.SetText(s_Names[idx]);
-		}
-
-		// Dropdowns aufbauen. Lange Listen (Tasten) zweispaltig, damit sie nicht
-		// ueber den Bildschirmrand wachsen.
-		m_All = new array<ref IsuDropdown>();
-		m_DdProvider = new array<ref IsuDropdown>();
-		m_DdModel = new array<ref IsuDropdown>();
-		m_DdRole = new array<ref IsuDropdown>();
-		m_DdVoice = new array<ref IsuDropdown>();
-		m_DdLang = new array<ref IsuDropdown>();
-		for (int slot = 0; slot < 4; slot++)
-		{
-			// Stufe 1: Provider. Stufe 2: Modell des aktuell gewaehlten Providers.
-			m_DdProvider.Insert(MakeDd("ProviderHead" + slot.ToString(), "ProviderList" + slot.ToString(), s_Providers, s_ProviderIdx[slot], 1));
-			m_DdModel.Insert(MakeDd("ModelHead" + slot.ToString(), "ModelList" + slot.ToString(), ProviderModelLabels(s_ProviderIdx[slot]), s_ModelIdx[slot], 1));
-			m_DdRole.Insert(MakeDd("RoleHead" + slot.ToString(), "RoleList" + slot.ToString(), s_PersonaLabels, s_PersonaIdx[slot], 1));
-			// Stimme: das Listen-Panel ist gross + zentriert (s. Layout) und wirkt
-			// wie ein Fenster ueber dem Menue. 3 Spalten, damit 21 Stimmen passen.
-			m_DdVoice.Insert(MakeDd("VoiceHead" + slot.ToString(), "VoiceList" + slot.ToString(), s_VoiceLabels, s_VoiceIdx[slot], 3));
-			// Sprache: normales Dropdown, 26 Eintraege zweispaltig.
-			m_DdLang.Insert(MakeDd("LangHead" + slot.ToString(), "LangList" + slot.ToString(), s_LangLabels, s_LangIdx[slot], 2));
-			// Die fuenf Tabellen-Dropdowns ohne Pfeil (Spalten zu eng); der Hinweis
-			// unten erklaert, dass ein Klick die Liste oeffnet. Klickbar bleiben sie
-			// (Button-Hover). Idle/Turns/Tasten behalten ihren Pfeil (genug Platz).
-			m_DdProvider[slot].SetShowArrow(false);
-			m_DdModel[slot].SetShowArrow(false);
-			m_DdRole[slot].SetShowArrow(false);
-			m_DdVoice[slot].SetShowArrow(false);
-			m_DdLang[slot].SetShowArrow(false);
-		}
-		m_DdIdle = MakeDd("IdleHead", "IdleList", IdleLabels(), s_IdleIdx, 1);
-		m_DdTurns = MakeDd("TurnsHead", "TurnsList", TurnLabels(), s_TurnsIdx, 1);
-		m_DdKeyStop = MakeDd("KeyStopHead", "KeyStopList", s_SafeKeyLabels, s_KeyStopIdx, 2);
-		m_DdKeyGoto = MakeDd("KeyGotoHead", "KeyGotoList", s_SafeKeyLabels, s_KeyGotoIdx, 2);
-		m_DdKeyRadial = MakeDd("KeyRadialHead", "KeyRadialList", s_SafeKeyLabels, s_KeyRadialIdx, 2);
-
-		UpdateLabels();
+		// NPC-Zeilen dynamisch aufbauen (eine je Eintrag in s_VisibleSlots)
+		BuildRows();
 		return layoutRoot;
 	}
 
-	protected IsuDropdown MakeDd(string headName, string containerName, TStringArray items, int current, int cols)
+	protected IsuDropdown MakeGlobalDd(string headName, TStringArray items, int current, int cols, float colW, int kind)
 	{
 		IsuDropdown dd = new IsuDropdown();
-		dd.Setup(layoutRoot, headName, containerName, items, current, cols);
-		m_All.Insert(dd);
+		dd.Setup(layoutRoot, headName, items, current, cols, colW);
+		dd.SetTags(kind, -1);
+		m_GlobalDds.Insert(dd);
 		return dd;
+	}
+
+	protected IsuDropdown MakeRowDd(Widget rowRoot, string headName, TStringArray items, int current, int cols, float colW, int kind, int slot)
+	{
+		IsuDropdown dd = new IsuDropdown();
+		dd.Setup(rowRoot, headName, items, current, cols, colW);
+		dd.SetTags(kind, slot);
+		// Tabellen-Spalten sind eng - Pfeil aus (Klick oeffnet trotzdem).
+		dd.SetShowArrow(false);
+		return dd;
+	}
+
+	// Zeile fuer einen Slot bauen (Widgets aus isu_arena_row.layout, Dropdowns
+	// im Zeilen-Subtree aufloesen - FindAnyWidget sucht nur dort).
+	protected ref IsuArenaRow MakeRow(int slot)
+	{
+		IsuArenaRow row = new IsuArenaRow();
+		row.m_Slot = slot;
+		row.m_Root = GetGame().GetWorkspace().CreateWidgets("IsuVoice/GUI/isu_arena_row.layout", m_RowsHost);
+		if (!row.m_Root)
+		{
+			Print("[IsuArena] isu_arena_row.layout konnte nicht geladen werden.");
+			return row;
+		}
+		row.m_Root.SetFlags(WidgetFlags.EXACTPOS | WidgetFlags.EXACTSIZE);
+		row.m_Card = ImageWidget.Cast(row.m_Root.FindAnyWidget("RowCard"));
+		row.m_Accent = ImageWidget.Cast(row.m_Root.FindAnyWidget("RowAccent"));
+		row.m_BtnAgent = ButtonWidget.Cast(row.m_Root.FindAnyWidget("BtnAgent"));
+		row.m_EditName = EditBoxWidget.Cast(row.m_Root.FindAnyWidget("EditName"));
+		row.m_BtnRemove = ButtonWidget.Cast(row.m_Root.FindAnyWidget("BtnRemove"));
+		row.m_Live = TextWidget.Cast(row.m_Root.FindAnyWidget("LiveText"));
+		if (row.m_EditName)
+			row.m_EditName.SetText(s_Names[slot]);
+		row.m_DdProvider = MakeRowDd(row.m_Root, "ProviderHead", s_Providers, s_ProviderIdx[slot], 1, 190, DD_PROVIDER, slot);
+		row.m_DdModel = MakeRowDd(row.m_Root, "ModelHead", ProviderModelLabels(s_ProviderIdx[slot]), s_ModelIdx[slot], 1, 230, DD_MODEL, slot);
+		row.m_DdRole = MakeRowDd(row.m_Root, "RoleHead", s_PersonaLabels, s_PersonaIdx[slot], 1, 160, DD_ROLE, slot);
+		row.m_DdLoadout = MakeRowDd(row.m_Root, "LoadoutHead", s_LoadoutLabels, s_LoadoutIdx[slot], 1, 160, DD_LOADOUT, slot);
+		row.m_DdVoice = MakeRowDd(row.m_Root, "VoiceHead", s_VoiceLabels, s_VoiceIdx[slot], 3, 180, DD_VOICE, slot);
+		row.m_DdLang = MakeRowDd(row.m_Root, "LangHead", s_LangLabels, s_LangIdx[slot], 3, 160, DD_LANG, slot);
+		return row;
+	}
+
+	// Alle Zeilen neu aufbauen (nach [+ NPC], X oder beim Init). Baut auch
+	// m_All (globale + Zeilen-Dropdowns) neu auf.
+	protected void BuildRows()
+	{
+		CloseAllDropdowns();
+		if (m_Rows)
+		{
+			ReadNames();
+			for (int i = 0; i < m_Rows.Count(); i++)
+			{
+				if (m_Rows[i])
+					m_Rows[i].Destroy();
+			}
+		}
+		m_Rows = new array<ref IsuArenaRow>();
+		if (m_RowsHost && s_VisibleSlots)
+		{
+			for (int v = 0; v < s_VisibleSlots.Count(); v++)
+				m_Rows.Insert(MakeRow(s_VisibleSlots[v]));
+		}
+		RelayoutRows();
+
+		m_All = new array<ref IsuDropdown>();
+		for (int g = 0; g < m_GlobalDds.Count(); g++)
+			m_All.Insert(m_GlobalDds[g]);
+		for (int r = 0; r < m_Rows.Count(); r++)
+		{
+			IsuArenaRow row = m_Rows[r];
+			if (!row)
+				continue;
+			m_All.Insert(row.m_DdProvider);
+			m_All.Insert(row.m_DdModel);
+			m_All.Insert(row.m_DdRole);
+			m_All.Insert(row.m_DdLoadout);
+			m_All.Insert(row.m_DdVoice);
+			m_All.Insert(row.m_DdLang);
+		}
+		UpdateLabels();
+	}
+
+	// Zeilen im RowsHost stapeln und die Content-Hoehe fuers Scrollen setzen.
+	protected void RelayoutRows()
+	{
+		if (!m_RowsHost || !m_Rows)
+			return;
+		for (int i = 0; i < m_Rows.Count(); i++)
+		{
+			if (m_Rows[i] && m_Rows[i].m_Root)
+			{
+				m_Rows[i].m_Root.SetPos(0, i * ROW_PITCH);
+				m_Rows[i].m_Root.SetSize(1584, 40);
+			}
+		}
+		float hostW, hostH;
+		m_RowsHost.GetSize(hostW, hostH);
+		float contentH = m_Rows.Count() * ROW_PITCH;
+		if (contentH < 208)
+			contentH = 208;
+		m_RowsHost.SetSize(hostW, contentH);
+		if (m_RowCountText)
+			m_RowCountText.SetText(m_Rows.Count().ToString() + " / " + SlotCount().ToString());
+	}
+
+	// [+ NPC]: kleinsten noch unbenutzten Slot anhaengen.
+	protected void AddNextSlot()
+	{
+		if (s_VisibleSlots.Count() >= SlotCount())
+			return;
+		for (int slot = 0; slot < SlotCount(); slot++)
+		{
+			if (s_VisibleSlots.Find(slot) < 0)
+			{
+				s_VisibleSlots.Insert(slot);
+				BuildRows();
+				return;
+			}
+		}
+	}
+
+	// X an einer Zeile: Slot aus der sichtbaren Liste nehmen (mindestens
+	// eine Zeile bleibt stehen).
+	protected void RemoveSlot(int slot)
+	{
+		if (s_VisibleSlots.Count() <= 1)
+			return;
+		int at = s_VisibleSlots.Find(slot);
+		if (at < 0)
+			return;
+		// RemoveOrdered statt Remove: Remove tauscht das letzte Element an die
+		// Stelle und wuerde die Anzeige-Reihenfolge der Zeilen zerwuerfeln.
+		s_VisibleSlots.RemoveOrdered(at);
+		BuildRows();
+	}
+
+	// Zeile zu einem Slot (fuer ApplyIfItem-Folgeaktionen wie Modell-Rebuild).
+	protected IsuArenaRow RowForSlot(int slot)
+	{
+		if (!m_Rows)
+			return null;
+		for (int i = 0; i < m_Rows.Count(); i++)
+		{
+			if (m_Rows[i] && m_Rows[i].m_Slot == slot)
+				return m_Rows[i];
+		}
+		return null;
 	}
 
 	protected TStringArray IdleLabels()
@@ -502,16 +824,89 @@ class IsuArenaMenu extends UIScriptedMenu
 		return true;
 	}
 
+	// Taetigkeits-Kuerzel der Live-Spalte (actionId aus dem Nametag-RPC)
+	protected static string ActionVerb(int actionId)
+	{
+		if (actionId == 0)
+			return "fighting";
+		if (actionId == 1)
+			return "looting";
+		if (actionId == 2)
+			return "following";
+		if (actionId == 3)
+			return "moving";
+		return "waiting";
+	}
+
+	// Nametag-Eintrag eines NPC ueber den (effektiven) Namen finden - der
+	// Store ist NetID-basiert, das Menue kennt nur Namen.
+	protected static IsuAgentTag FindTagByName(string name)
+	{
+		foreach (string key, IsuAgentTag t : IsuNametagStore.s_Agents)
+		{
+			if (t && t.name == name)
+				return t;
+		}
+		return null;
+	}
+
+	// Live-Spalte: HP + Taetigkeit aus dem Nametag-Store (dieselbe Quelle wie
+	// Namensschilder/Squad-HUD, kein zusaetzlicher RPC-Verkehr). Kein Eintrag
+	// im Store = (noch) nicht gespawnt -> der UpdateLabels-Text bleibt stehen.
+	protected void UpdateLiveCells()
+	{
+		if (!m_Rows)
+			return;
+		for (int i = 0; i < m_Rows.Count(); i++)
+		{
+			IsuArenaRow row = m_Rows[i];
+			if (!row || !row.m_Live)
+				continue;
+			int idx = row.m_Slot;
+			if (!s_Enabled[idx])
+				continue;
+			IsuAgentTag tag = FindTagByName(s_Names[idx]);
+			if (tag)
+			{
+				row.m_Live.SetText(tag.hp.ToString() + " HP  " + ActionVerb(tag.actionId));
+				row.m_Live.SetColor(ARGBF(1.0, s_ColR[idx], s_ColG[idx], s_ColB[idx]));
+			}
+		}
+	}
+
 	override void Update(float timeslice)
 	{
 		super.Update(timeslice);
+
+		// Live-Spalte im 0,5-s-Takt - unabhaengig vom Status-Dirty-Check unten.
+		m_LiveAccum += timeslice;
+		if (m_LiveAccum >= 0.5)
+		{
+			m_LiveAccum = 0;
+			UpdateLiveCells();
+		}
+
 		if (!m_StatusText)
 			return;
 
 		// Supervisor-Status -> Ampel. Die Schluesselwoerter kommen aus
 		// arena_supervisor.write_status (LAEUFT/GESTOPPT/FEHLER/WARTE/...).
+		// Dirty-Check: der Status aendert sich selten, Substring/SetText/SetColor
+		// jeden Frame waeren nur Garbage.
 		string raw = IsuArenaStatusStore.s_Text;
+		if (raw == m_LastStatusRaw)
+			return;
+		m_LastStatusRaw = raw;
 		string disp = raw;
+		// Kosten-Anhang (" | cost 1.23 USD", vom Supervisor alle ~30 s) in das
+		// eigene Feld unten abspalten, damit die Status-Pill lesbar bleibt.
+		int ci = disp.IndexOf(" | cost ");
+		if (ci > -1)
+		{
+			if (m_CostText)
+				m_CostText.SetText("Round " + disp.Substring(ci + 3, disp.Length() - ci - 3));
+			disp = disp.Substring(0, ci);
+		}
 		if (disp.Length() > 40)
 			disp = disp.Substring(0, 37) + "...";
 		m_StatusText.SetText(disp);
@@ -568,32 +963,33 @@ class IsuArenaMenu extends UIScriptedMenu
 		super.OnHide();
 	}
 
-	protected ButtonWidget AgentButton(int idx)
-	{
-		if (idx == 0) return m_BtnAgent0;
-		if (idx == 1) return m_BtnAgent1;
-		if (idx == 2) return m_BtnAgent2;
-		return m_BtnAgent3;
-	}
-
-	protected EditBoxWidget NameBox(int idx)
-	{
-		if (idx == 0) return m_EditName0;
-		if (idx == 1) return m_EditName1;
-		if (idx == 2) return m_EditName2;
-		return m_EditName3;
-	}
-
 	protected string CleanName(string raw, int idx)
 	{
 		string n = raw;
 		n.Replace("|", "");
 		n.Replace(":", "");
 		n.Replace("\"", "");
+		// Zeilenumbrueche zerlegen das zeilenbasierte Dateiprotokoll des
+		// Supervisors; Laenge kappen, damit kein Roman im RPC landet.
+		n.Replace("\n", "");
+		n.Replace("\r", "");
 		n = n.Trim();
+		if (n.Length() > 24)
+			n = n.Substring(0, 24);
 		if (n == "")
 			n = s_DefaultNames[idx];
 		return n;
+	}
+
+	// Tasten-Konflikt sichtbar machen: frueher wurde still umgebogen und der
+	// Spieler wunderte sich, warum eine andere Taste im Kopf stand (X4).
+	protected void KeyConflictHint(int wanted, int got)
+	{
+		if (wanted < 0 || wanted >= s_SafeKeyLabels.Count())
+			return;
+		if (got < 0 || got >= s_SafeKeyLabels.Count())
+			return;
+		IsuArenaStatusStore.s_Text = s_SafeKeyLabels[wanted] + " already in use - using " + s_SafeKeyLabels[got];
 	}
 
 	// Gewuenschten Tasten-Index zurueckgeben, falls frei; sonst den naechsten
@@ -615,22 +1011,28 @@ class IsuArenaMenu extends UIScriptedMenu
 
 	protected void CloseAllDropdowns()
 	{
+		m_OpenDd = null;
 		if (!m_All)
 			return;
 		for (int d = 0; d < m_All.Count(); d++)
-			m_All[d].Close();
+		{
+			if (m_All[d])
+				m_All[d].Close();
+		}
 	}
 
-	// EditBoxen -> s_Names (persistente Statics), bereinigt
+	// EditBoxen der sichtbaren Zeilen -> s_Names (persistente Statics), bereinigt
 	protected void ReadNames()
 	{
-		for (int idx = 0; idx < 4; idx++)
+		if (!m_Rows)
+			return;
+		for (int i = 0; i < m_Rows.Count(); i++)
 		{
-			EditBoxWidget eb = NameBox(idx);
-			if (!eb)
+			IsuArenaRow nrow = m_Rows[i];
+			if (!nrow || !nrow.m_EditName)
 				continue;
-			s_Names[idx] = CleanName(eb.GetText(), idx);
-			eb.SetText(s_Names[idx]);
+			s_Names[nrow.m_Slot] = CleanName(nrow.m_EditName.GetText(), nrow.m_Slot);
+			nrow.m_EditName.SetText(s_Names[nrow.m_Slot]);
 		}
 	}
 
@@ -638,62 +1040,78 @@ class IsuArenaMenu extends UIScriptedMenu
 	// Toggle-Buttons). Die Dropdown-Koepfe pflegen ihren Text selbst.
 	protected void UpdateLabels()
 	{
-		for (int idx = 0; idx < 4; idx++)
+		if (m_Rows)
 		{
-			string state = "OFF";
-			if (s_Enabled[idx])
-				state = "ON";
-			ButtonWidget ab = AgentButton(idx);
-			if (ab)
-				ab.SetText(state);
-
-			ImageWidget acc = null;
-			ImageWidget card = null;
-			TextWidget live = null;
-			if (m_Accents && idx < m_Accents.Count())
-				acc = m_Accents[idx];
-			if (m_Cards && idx < m_Cards.Count())
-				card = m_Cards[idx];
-			if (m_Lives && idx < m_Lives.Count())
-				live = m_Lives[idx];
-
-			if (s_Enabled[idx])
+			for (int i = 0; i < m_Rows.Count(); i++)
 			{
-				if (acc)
-					acc.SetColor(ARGBF(1.0, s_ColR[idx], s_ColG[idx], s_ColB[idx]));
-				if (card)
-					card.SetColor(ARGBF(0.95, 0.075, 0.090, 0.120));
-				if (live)
+				IsuArenaRow row = m_Rows[i];
+				if (!row)
+					continue;
+				int idx = row.m_Slot;
+				string state = "OFF";
+				if (s_Enabled[idx])
+					state = "ON";
+				if (row.m_BtnAgent)
+					row.m_BtnAgent.SetText(state);
+				// Dropdown-Koepfe der Zeile ausgrauen, wenn der Slot OFF ist
+				// (Klicks sind dann in OnClick gesperrt).
+				int headCol = ARGB(255, 255, 255, 255);
+				if (!s_Enabled[idx])
+					headCol = ARGB(255, 105, 110, 118);
+				if (row.m_DdProvider)
+					row.m_DdProvider.SetHeadTextColor(headCol);
+				if (row.m_DdModel)
+					row.m_DdModel.SetHeadTextColor(headCol);
+				if (row.m_DdRole)
+					row.m_DdRole.SetHeadTextColor(headCol);
+				if (row.m_DdLoadout)
+					row.m_DdLoadout.SetHeadTextColor(headCol);
+				if (row.m_DdVoice)
+					row.m_DdVoice.SetHeadTextColor(headCol);
+				if (row.m_DdLang)
+					row.m_DdLang.SetHeadTextColor(headCol);
+				if (s_Enabled[idx])
 				{
-					live.SetText("selected");
-					live.SetColor(ARGBF(1.0, s_ColR[idx], s_ColG[idx], s_ColB[idx]));
+					if (row.m_Accent)
+						row.m_Accent.SetColor(ARGBF(1.0, s_ColR[idx], s_ColG[idx], s_ColB[idx]));
+					if (row.m_Card)
+						row.m_Card.SetColor(ARGBF(0.95, 0.075, 0.090, 0.120));
+					if (row.m_Live)
+					{
+						row.m_Live.SetText("selected");
+						row.m_Live.SetColor(ARGBF(1.0, s_ColR[idx], s_ColG[idx], s_ColB[idx]));
+					}
 				}
-			}
-			else
-			{
-				if (acc)
-					acc.SetColor(ARGBF(0.35, s_ColR[idx], s_ColG[idx], s_ColB[idx]));
-				if (card)
-					card.SetColor(ARGBF(0.85, 0.045, 0.050, 0.065));
-				if (live)
+				else
 				{
-					live.SetText("off");
-					live.SetColor(ARGBF(1.0, 0.45, 0.45, 0.48));
+					if (row.m_Accent)
+						row.m_Accent.SetColor(ARGBF(0.35, s_ColR[idx], s_ColG[idx], s_ColB[idx]));
+					if (row.m_Card)
+						row.m_Card.SetColor(ARGBF(0.85, 0.045, 0.050, 0.065));
+					if (row.m_Live)
+					{
+						row.m_Live.SetText("off");
+						row.m_Live.SetColor(ARGBF(1.0, 0.45, 0.45, 0.48));
+					}
 				}
 			}
 		}
 
 		if (m_BtnMode)
 		{
-			if (s_Hostile)
+			if (s_Mode == 1)
 				m_BtnMode.SetText("Hostile");
+			else if (s_Mode == 2)
+				m_BtnMode.SetText("Free");
 			else
 				m_BtnMode.SetText("Neutral");
 		}
 		if (m_ModeNote)
 		{
-			if (s_Hostile)
+			if (s_Mode == 1)
 				m_ModeNote.SetText("(battle royale)");
+			else if (s_Mode == 2)
+				m_ModeNote.SetText("(survival)");
 			else
 				m_ModeNote.SetText("(co-op)");
 		}
@@ -727,6 +1145,15 @@ class IsuArenaMenu extends UIScriptedMenu
 			else
 				m_BtnComic.SetText("OFF");
 		}
+		if (m_BtnHud)
+		{
+			if (s_SquadHudMode == 1)
+				m_BtnHud.SetText("LEFT");
+			else if (s_SquadHudMode == 2)
+				m_BtnHud.SetText("RIGHT");
+			else
+				m_BtnHud.SetText("OFF");
+		}
 		if (m_BtnOrch)
 		{
 			if (s_Orchestrator)
@@ -743,11 +1170,14 @@ class IsuArenaMenu extends UIScriptedMenu
 		}
 
 		// Der Start-Button sagt IMMER, was er tun wird - eine versehentliche
-		// Hostile-Wahl soll kein unbemerktes BR ausloesen.
+		// Hostile-Wahl soll kein unbemerktes BR ausloesen (Warnlabel nur
+		// bei Modus 1; Free ist harmlos, kriegt aber ein eigenes Label).
 		if (m_BtnStart)
 		{
-			if (s_Hostile)
+			if (s_Mode == 1)
 				m_BtnStart.SetText("START: HOSTILE (BR)");
+			else if (s_Mode == 2)
+				m_BtnStart.SetText("START: FREE (survival)");
 			else
 				m_BtnStart.SetText("START (neutral)");
 		}
@@ -756,29 +1186,46 @@ class IsuArenaMenu extends UIScriptedMenu
 	protected string BuildCommand()
 	{
 		ReadNames();
-		string cmd = "start";
-		for (int idx = 0; idx < 4; idx++)
+		// Protokoll v2: Versions-Tag + Slot-Anzahl (der Supervisor erkennt damit
+		// zerrissene/unvollstaendige Kommandos, statt still weniger zu starten).
+		string cmd = "start|v:2|count:" + s_VisibleSlots.Count().ToString();
+		// Nur die sichtbaren Zeilen mitsenden - nicht angezeigte Slots existieren
+		// fuer diese Runde nicht (der Supervisor startet nur gesehene Segmente).
+		for (int v = 0; v < s_VisibleSlots.Count(); v++)
 		{
+			int idx = s_VisibleSlots[v];
 			string flag = "0";
 			if (s_Enabled[idx])
 				flag = "1";
 			TStringArray pmids = ProviderModelIds(s_ProviderIdx[idx]);
-			int midx = s_ModelIdx[idx];
-			if (midx < 0 || midx >= pmids.Count())
-				midx = 0;
-			string modelId = pmids.Get(midx);
-			cmd = cmd + "|" + s_AgentIds[idx] + ":" + flag + ":" + modelId + ":" + s_PersonaKeys[s_PersonaIdx[idx]] + ":" + s_Names[idx];
+			string modelId = pmids.Get(ClampIdx(s_ModelIdx[idx], pmids.Count()));
+			// Alle Indizes clampen: die Label-Listen treiben die Auswahl, gelesen
+			// werden die Werte-Listen - Laengen-Drift darf hier nicht crashen.
+			string persona = s_PersonaKeys[ClampIdx(s_PersonaIdx[idx], s_PersonaKeys.Count())];
+			string voice = s_VoiceNames[ClampIdx(s_VoiceIdx[idx], s_VoiceNames.Count())];
+			string lang = s_LangCodes[ClampIdx(s_LangIdx[idx], s_LangCodes.Count())];
+			// Stamm-Slots 0-3 im Alt-Format (aeltere Supervisor verstehen sie
+			// weiter), Zusatz-Slots als v2-"npc:"-Segment mit freier ID.
+			if (idx <= 3)
+				cmd = cmd + "|" + s_AgentIds[idx] + ":" + flag + ":" + modelId + ":" + persona + ":" + s_Names[idx];
+			else
+				cmd = cmd + "|npc:" + s_AgentIds[idx] + ":" + flag + ":" + modelId + ":" + persona + ":" + s_Names[idx];
 			// Stimme + Sprache als eigenes, entkoppeltes Segment (der Name oben
 			// darf ':' enthalten - darum NICHT ins Slot-Tupel quetschen).
-			cmd = cmd + "|av:" + s_AgentIds[idx] + ":" + s_VoiceNames[s_VoiceIdx[idx]] + ":" + s_LangCodes[s_LangIdx[idx]];
+			cmd = cmd + "|av:" + s_AgentIds[idx] + ":" + voice + ":" + lang;
+			// Loadout-Wahl (Phase 4): nur mitschicken, wenn NICHT Rollen-Default
+			// (Index 0) - fehlendes Segment = altes Verhalten (agents.json).
+			int ldi = ClampIdx(s_LoadoutIdx[idx], s_LoadoutFiles.Count());
+			if (ldi > 0)
+				cmd = cmd + "|ld:" + s_AgentIds[idx] + ":" + s_LoadoutFiles[ldi];
 		}
-		string hostile = "0";
-		if (s_Hostile)
-			hostile = "1";
 		string mic = "0";
 		if (s_Mic)
 			mic = "1";
-		cmd = cmd + "|hostile:" + hostile;
+		// Modus-Encoding (Schnittstelle zum Supervisor): das bestehende Feld
+		// "hostile" traegt jetzt drei Werte - 0 = Neutral (co-op),
+		// 1 = Hostile (BR), 2 = Free (Survival). 0/1 unveraendert alt.
+		cmd = cmd + "|hostile:" + s_Mode.ToString();
 		cmd = cmd + "|camp:" + s_CampX.ToString() + "," + s_CampZ.ToString();
 		cmd = cmd + "|idle:" + s_IdleValues[s_IdleIdx].ToString();
 		cmd = cmd + "|turns:" + s_TurnValues[s_TurnsIdx].ToString();
@@ -795,6 +1242,11 @@ class IsuArenaMenu extends UIScriptedMenu
 		if (s_Patrols)
 			patrols = "1";
 		cmd = cmd + "|patrols:" + patrols;
+		// Mission/Event nur mitschicken, wenn eine gewaehlt ist ("No mission" =
+		// klassischer Start ohne Segment). Format unveraendert "mission:<id>" -
+		// der Supervisor-Parser bleibt rueckwaertskompatibel.
+		if (s_MissionIdx > 0 && s_MissionIdx < s_MissionIds.Count())
+			cmd = cmd + "|mission:" + s_MissionIds.Get(s_MissionIdx);
 		return cmd;
 	}
 
@@ -810,101 +1262,158 @@ class IsuArenaMenu extends UIScriptedMenu
 
 	// Klick auf einen Dropdown-Item-Button -> Auswahl uebernehmen, in die
 	// passende Static schreiben, Liste schliessen. true, wenn w ein Item war.
+	// Nur das offene Dropdown hat Items - ueber dessen Tags (Feld + Slot) wird
+	// direkt verzweigt, statt alle Dropdowns durchzuprobieren.
 	protected bool ApplyIfItem(Widget w)
 	{
-		for (int slot = 0; slot < 4; slot++)
+		if (!m_OpenDd)
+			return false;
+		int sel = m_OpenDd.ItemIndex(w);
+		if (sel < 0)
+			return false;
+		int slot = m_OpenDd.GetSlotTag();
+		int kind = m_OpenDd.GetKindTag();
+		IsuDropdown dd = m_OpenDd;
+		m_OpenDd = null;
+
+		switch (kind)
 		{
-			int pi = m_DdProvider[slot].ItemIndex(w);
-			if (pi >= 0)
+			case DD_PROVIDER:
 			{
-				s_ProviderIdx[slot] = pi;
+				s_ProviderIdx[slot] = sel;
 				s_ModelIdx[slot] = 0;
-				m_DdProvider[slot].SelectByItem(pi);
-				// Modell-Dropdown daneben mit den Modellen des neuen Providers fuellen
-				m_DdModel[slot].Rebuild(ProviderModelLabels(pi), 0);
+				dd.SelectByItem(sel);
+				// Modell-Dropdown der Zeile mit den Modellen des neuen Providers fuellen
+				IsuArenaRow prow = RowForSlot(slot);
+				if (prow && prow.m_DdModel)
+					prow.m_DdModel.Rebuild(ProviderModelLabels(sel), 0);
 				return true;
 			}
-			int mi = m_DdModel[slot].ItemIndex(w);
-			if (mi >= 0)
+			case DD_MODEL:
 			{
-				s_ModelIdx[slot] = mi;
-				m_DdModel[slot].SelectByItem(mi);
+				s_ModelIdx[slot] = sel;
+				dd.SelectByItem(sel);
 				return true;
 			}
-			int ri = m_DdRole[slot].ItemIndex(w);
-			if (ri >= 0)
+			case DD_ROLE:
 			{
-				s_PersonaIdx[slot] = ri;
-				m_DdRole[slot].SelectByItem(ri);
+				s_PersonaIdx[slot] = sel;
+				dd.SelectByItem(sel);
 				return true;
 			}
-			int vi = m_DdVoice[slot].ItemIndex(w);
-			if (vi >= 0)
+			case DD_LOADOUT:
 			{
-				s_VoiceIdx[slot] = vi;
-				m_DdVoice[slot].SelectByItem(vi);
+				s_LoadoutIdx[slot] = sel;
+				dd.SelectByItem(sel);
 				return true;
 			}
-			int li = m_DdLang[slot].ItemIndex(w);
-			if (li >= 0)
+			case DD_VOICE:
 			{
-				s_LangIdx[slot] = li;
-				m_DdLang[slot].SelectByItem(li);
+				s_VoiceIdx[slot] = sel;
+				dd.SelectByItem(sel);
+				return true;
+			}
+			case DD_LANG:
+			{
+				s_LangIdx[slot] = sel;
+				dd.SelectByItem(sel);
+				return true;
+			}
+			case DD_IDLE:
+			{
+				s_IdleIdx = sel;
+				dd.SelectByItem(sel);
+				return true;
+			}
+			case DD_TURNS:
+			{
+				s_TurnsIdx = sel;
+				dd.SelectByItem(sel);
+				return true;
+			}
+			case DD_KEYSTOP:
+			{
+				int rks = ResolveFreeKey(sel, s_KeyGotoIdx, s_KeyRadialIdx);
+				if (rks != sel)
+					KeyConflictHint(sel, rks);
+				s_KeyStopIdx = rks;
+				dd.SelectByItem(rks);
+				return true;
+			}
+			case DD_KEYGOTO:
+			{
+				int rkg = ResolveFreeKey(sel, s_KeyStopIdx, s_KeyRadialIdx);
+				if (rkg != sel)
+					KeyConflictHint(sel, rkg);
+				s_KeyGotoIdx = rkg;
+				dd.SelectByItem(rkg);
+				return true;
+			}
+			case DD_KEYRADIAL:
+			{
+				int rkr = ResolveFreeKey(sel, s_KeyStopIdx, s_KeyGotoIdx);
+				if (rkr != sel)
+					KeyConflictHint(sel, rkr);
+				s_KeyRadialIdx = rkr;
+				dd.SelectByItem(rkr);
+				return true;
+			}
+			case DD_MISSION:
+			{
+				s_MissionIdx = sel;
+				dd.SelectByItem(sel);
 				return true;
 			}
 		}
-		int ii = m_DdIdle.ItemIndex(w);
-		if (ii >= 0)
+		dd.SelectByItem(sel);
+		return true;
+	}
+
+	// Klick auf die freie Menueflaeche (Background) schliesst offene Listen.
+	// OnClick reicht dafuer nicht: die Engine routet es nur fuer ButtonWidgets,
+	// das ImageWidget liefert nur OnMouseButtonDown (ignorepointer 0 im Layout).
+	override bool OnMouseButtonDown(Widget w, int x, int y, int button)
+	{
+		if (w == m_Background)
 		{
-			s_IdleIdx = ii;
-			m_DdIdle.SelectByItem(ii);
+			CloseAllDropdowns();
 			return true;
 		}
-		int ti = m_DdTurns.ItemIndex(w);
-		if (ti >= 0)
+		// Rechtsklick auf Camp: zurueck auf den Karten-Default (der Supervisor
+		// ersetzt die Default-Koordinate je Karte durch ihren Landpunkt).
+		if (w == m_BtnCamp && button == MouseState.RIGHT)
 		{
-			s_TurnsIdx = ti;
-			m_DdTurns.SelectByItem(ti);
+			s_CampX = 4233.7;
+			s_CampZ = 8512.2;
+			IsuArenaStatusStore.s_Text = "Camp reset to map default.";
+			UpdateLabels();
 			return true;
 		}
-		int ks = m_DdKeyStop.ItemIndex(w);
-		if (ks >= 0)
-		{
-			int rks = ResolveFreeKey(ks, s_KeyGotoIdx, s_KeyRadialIdx);
-			s_KeyStopIdx = rks;
-			m_DdKeyStop.SelectByItem(rks);
-			return true;
-		}
-		int kg = m_DdKeyGoto.ItemIndex(w);
-		if (kg >= 0)
-		{
-			int rkg = ResolveFreeKey(kg, s_KeyStopIdx, s_KeyRadialIdx);
-			s_KeyGotoIdx = rkg;
-			m_DdKeyGoto.SelectByItem(rkg);
-			return true;
-		}
-		int kr = m_DdKeyRadial.ItemIndex(w);
-		if (kr >= 0)
-		{
-			int rkr = ResolveFreeKey(kr, s_KeyStopIdx, s_KeyGotoIdx);
-			s_KeyRadialIdx = rkr;
-			m_DdKeyRadial.SelectByItem(rkr);
-			return true;
-		}
-		return false;
+		return super.OnMouseButtonDown(w, x, y, button);
 	}
 
 	override bool OnClick(Widget w, int x, int y, int button)
 	{
-		// Dropdown-Koepfe: oeffnen/schliessen (immer nur einer offen)
+		if (!m_All)
+			return super.OnClick(w, x, y, button);
+		// Dropdown-Koepfe: oeffnen/schliessen (immer nur einer offen, alle teilen
+		// sich das eine DdPopup-Panel)
 		for (int d = 0; d < m_All.Count(); d++)
 		{
-			if (m_All[d].IsHead(w))
+			if (m_All[d] && m_All[d].IsHead(w))
 			{
+				// OFF-Zeilen sind gesperrt: Dropdowns wuerden Wirkung
+				// suggerieren, die der Start gar nicht sendet (X8).
+				int hslot = m_All[d].GetSlotTag();
+				if (hslot >= 0 && hslot < s_Enabled.Count() && !s_Enabled[hslot])
+					return true;
 				bool wasOpen = m_All[d].IsOpen();
 				CloseAllDropdowns();
 				if (!wasOpen)
-					m_All[d].Open();
+				{
+					m_All[d].OpenIn(m_DdPopup, layoutRoot);
+					m_OpenDd = m_All[d];
+				}
 				return true;
 			}
 		}
@@ -914,19 +1423,39 @@ class IsuArenaMenu extends UIScriptedMenu
 		// alles andere schliesst offene Listen
 		CloseAllDropdowns();
 
-		for (int idx = 0; idx < 4; idx++)
+		// Zeilen-Buttons: ON/OFF-Toggle und X (Zeile entfernen)
+		if (m_Rows)
 		{
-			if (w == AgentButton(idx))
+			for (int ri = 0; ri < m_Rows.Count(); ri++)
 			{
-				s_Enabled[idx] = !s_Enabled[idx];
-				UpdateLabels();
-				return true;
+				IsuArenaRow crow = m_Rows[ri];
+				if (!crow)
+					continue;
+				if (w == crow.m_BtnAgent)
+				{
+					s_Enabled[crow.m_Slot] = !s_Enabled[crow.m_Slot];
+					UpdateLabels();
+					return true;
+				}
+				if (w == crow.m_BtnRemove)
+				{
+					RemoveSlot(crow.m_Slot);
+					return true;
+				}
 			}
+		}
+		if (w == m_BtnAddNpc)
+		{
+			AddNextSlot();
+			return true;
 		}
 
 		if (w == m_BtnMode)
 		{
-			s_Hostile = !s_Hostile;
+			// Zyklisch Neutral -> Hostile -> Free -> Neutral
+			s_Mode = s_Mode + 1;
+			if (s_Mode > 2)
+				s_Mode = 0;
 			UpdateLabels();
 			return true;
 		}
@@ -954,6 +1483,15 @@ class IsuArenaMenu extends UIScriptedMenu
 			UpdateLabels();
 			return true;
 		}
+		if (w == m_BtnHud)
+		{
+			// Zyklisch OFF -> LEFT -> RIGHT -> OFF
+			s_SquadHudMode = s_SquadHudMode + 1;
+			if (s_SquadHudMode > 2)
+				s_SquadHudMode = 0;
+			UpdateLabels();
+			return true;
+		}
 		if (w == m_BtnOrch)
 		{
 			s_Orchestrator = !s_Orchestrator;
@@ -974,22 +1512,34 @@ class IsuArenaMenu extends UIScriptedMenu
 				vector pos = player.GetPosition();
 				s_CampX = pos[0];
 				s_CampZ = pos[2];
-				s_CampFromPlayer = true;
 			}
 			UpdateLabels();
 			return true;
 		}
 		if (w == m_BtnStart)
 		{
+			// Entprellung: Doppelklick darf nicht zwei Supervisor-Requests
+			// ausloesen (jeder Start faehrt sonst die komplette Startsequenz an).
+			float now = GetGame().GetTickTime();
+			if (now - m_StartSentAt < 3.0)
+				return true;
+			// Plausibilitaet: ohne aktive sichtbare Zeile gibt es nichts zu starten.
+			bool anyOn = false;
+			for (int e = 0; e < s_VisibleSlots.Count(); e++)
+			{
+				if (s_Enabled[s_VisibleSlots[e]])
+					anyOn = true;
+			}
+			if (!anyOn)
+			{
+				IsuArenaStatusStore.s_Text = "No NPC enabled - nothing to start.";
+				return true;
+			}
+			m_StartSentAt = now;
+			// Mission/Event haengt BuildCommand selbst an (Dropdown, IDs siehe
+			// s_MissionIds): "birgit" = Rettungsmission (Spawn Lukow, Rally Kopa,
+			// Banditen-Patrouille), "horde" = Horden-Event, "none" = ohne Segment.
 			SendCommand(BuildCommand());
-			return true;
-		}
-		if (w == m_BtnMission)
-		{
-			// Skript-Mission "Birgit befreien": wie START, aber mit Mission-Flag.
-			// Der Supervisor setzt dann Spawn (Lukow), Rally (Kopa), Briefings
-			// und die Gefangene; die Banditen sind eine feste Patrouille auf Livonia.
-			SendCommand(BuildCommand() + "|mission:birgit");
 			return true;
 		}
 		if (w == m_BtnStop)
@@ -1013,13 +1563,17 @@ modded class MissionGameplay
 	ref IsuArenaMenu m_IsuArenaMenu;
 	ref IsuRadialMenu m_IsuRadialMenu;
 
-	// Schwebende Namensschilder jeden Frame ueber die Agenten-Koepfe setzen
-	// (Client). Die Render-/Projektionslogik liegt in IsuNameplateHud.
+	// Schwebende Namensschilder + Squad-Uebersicht jeden Frame aktualisieren
+	// (Client). Render-/Projektionslogik in IsuNameplateHud bzw. IsuSquadHud;
+	// beide lesen denselben IsuNametagStore (kein zusaetzlicher RPC-Verkehr).
 	override void OnUpdate(float timeslice)
 	{
 		super.OnUpdate(timeslice);
 		if (GetGame() && !GetGame().IsDedicatedServer())
+		{
 			IsuNameplateHud.Tick();
+			IsuSquadHud.Tick();
+		}
 	}
 
 	override void OnKeyPress(int key)
@@ -1099,6 +1653,18 @@ modded class MissionGameplay
 		{
 			IsuRadialMenu.s_AimX = hitPos[0];
 			IsuRadialMenu.s_AimZ = hitPos[2];
+		}
+		// Anvisiertes loses Item (fuer den "Hol das"-Zweig des "Go to"-Chips).
+		string aimItemClass;
+		if (IsuNpcCommand.AimRaycastItem(aimItemClass))
+		{
+			IsuRadialMenu.s_HasAimItem = true;
+			IsuRadialMenu.s_AimItemClass = aimItemClass;
+		}
+		else
+		{
+			IsuRadialMenu.s_HasAimItem = false;
+			IsuRadialMenu.s_AimItemClass = "";
 		}
 		eAIBase ai = eAIBase.Cast(aimedObj);
 		if (ai)

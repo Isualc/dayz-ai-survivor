@@ -40,7 +40,10 @@ Zwei JSON-Dateien im Server-Profilordner verbinden Mod und Daemon:
   },
   "inventory": [
     { "classname": "Apple", "kind": "food", "quantity": 125.0,
-      "health": 100.0, "in_hands": false }
+      "health": 100.0, "in_hands": false },
+    { "classname": "QuiltedJacket_Blue", "kind": "clothing", "quantity": 0.0,
+      "health": 95.0, "in_hands": false, "worn": true,
+      "warmth": 0.85, "cargo_size": 20, "slot": "Body" }
   ],
   "command": {
     "id": "a1b2c3d4e5f6",
@@ -50,17 +53,18 @@ Zwei JSON-Dateien im Server-Profilordner verbinden Mod und Daemon:
     "dist_to_target": 42.5
   },
   "nearby": [
-    { "kind": "player", "classname": "SurvivorM_Boris", "name": "der Spieler",
+    { "kind": "player", "classname": "SurvivorM_Boris", "name": "Clausi",
       "x": 4530.0, "y": 12.0, "z": 2468.0, "distance": 5.4 }
   ],
   "chat": [
-    { "id": 3, "channel": 0, "sender": "der Spieler", "text": "hallo bot", "uptime": 555.0 }
+    { "id": 3, "channel": 0, "sender": "Clausi", "text": "hallo bot", "uptime": 555.0 }
   ],
   "errors": []
 }
 ```
 
 - `command.status`: `idle` → noch nie ein Befehl | `running` | `done` | `failed` (Grund in `detail`)
+- `inventory[].worn`: am Körper getragen (Kleidungs-/Schulter-Slot, nicht Hand, nicht Cargo). `warmth`/`cargo_size`/`slot` liefert die Mod nur für `kind=="clothing"` aus der Item-Config (heatIsolation, Cargo-Slots Breite×Höhe, erster inventorySlot) — Grundlage für `dress_best`. Boden-Kleidung (`nearby` mit `item_kind=="clothing"`) trägt dieselben drei Felder.
 - `nearby.kind`: `player`, `ai`, `infected`, `animal`, `vehicle`, `item`. Radius 100 m, Items nur bis 20 m und max. 25 Stück, gesamt max. 40 Einträge.
 - `chat`: Ringpuffer der letzten 30 Nachrichten. `id` ist monoton, der Daemon dedupliziert darüber.
 - `errors`: Ringpuffer der letzten 10 Bridge-Fehler.
@@ -102,6 +106,30 @@ Alle Felder immer mitschicken (der EnforceScript-JsonFileLoader mag keine Überr
 | `unfollow` | — | Zurück in die eigene Gruppe, stehenbleiben | `done` |
 
 Seit v0.3 trägt `state.npc` zusätzlich `name` (Chat-Absendername, via `spawn.text` setzbar, Default "Viktor") und `following` (bool). `spawn.text` = Anzeigename des Survivors. Seit v0.4: `unconscious`, `in_vehicle` plus Befehle `unstick`, `vehicle_exit`, `give_item`, `drop`. Seit v0.5 (Survival-Tiefe): `drink_well`, `fill_container` (Brunnen in 4 m nötig, kind=water), `consume_item` (text+y, pile-bewusst über stackedUnit=pcs), `light_fire`, `cook` (brennendes Feuer in 4 m, gart alles Rohe), `build_fence_frame` (2x WoodenLog aus Inventar oder Boden in 5 m, experimentell); neue nearby-Kinds `water`, `fire`, `fire_burning`. Die Rezept-/Ketten-Logik (craft, cook_meal, drink_at_well, find_item, explore_step) lebt in `daemon/tactics.py`.
+
+### Seit v0.8 (Welt & Medizin)
+
+`state.json` trägt zusätzlich einen `world`-Block (Top-Level, neben `npc`) sowie `wet` und `disease` in `npc`:
+
+```json
+"world": { "time": "14:30", "sun": "day", "rain": 0.2, "fog": 0.05, "wind": 4.3, "temp_c": 18.5 },
+"npc": { "wet": 0.0, "disease": { "agents": { "cholera": 180 }, "sick": true } }
+```
+
+- `world.time`: In-Game-Uhrzeit "HH:MM" (`GetWorld().GetDate`).
+- `world.sun`: `dawn` | `day` | `dusk` | `night` — Heuristik nach Jahreszeit (Sommer ca. 5–21 Uhr, Übergangszeit 6–19, Winter 8–17), keine echte Sonnenstandsberechnung.
+- `world.rain` / `world.fog`: 0..1 (`Weather.GetRain()/GetFog().GetActual()`), `world.wind` in m/s, `world.temp_c` = Umgebungstemperatur am NPC in °C (Environment, rechnet Höhe/Innenraum/Wärmequellen ein).
+- `npc.wet`: 0..1 (Vanilla-Stat WET kennt nur 0/1).
+- `npc.disease.agents`: NUR Erreger über der Melde-Schwelle (halbe Vanilla-Aktivierungsschwelle: cholera 125, salmonella 30, influenza 300, wound 50, brain 1000), Wert = Agent-Count. `sick` = mindestens ein Erreger drüber. Der Daemon liest tolerant: fehlender Block = gesund.
+
+Neue Aktionen:
+
+| action | Parameter | Wirkung | Endstatus |
+|---|---|---|---|
+| `find_water` | (`max_dist` = Suchradius m, Default 300) | Radiales Sampling (8 Richtungen, 25-m-Schritte) nach offenem Wasser (`SurfaceIsPond`/`SurfaceIsSea`); liefert den letzten LANDpunkt vor dem Wassertreffer, damit der NPC am Ufer steht statt zu schwimmen | `done` (detail = `x z pond\|sea`) / `failed` |
+| `treat_other` | `target` = Name, `item` = Classname | Patient (Spieler oder Agent) in 3 m behandeln, Item wird aus dem NPC-Inventar verbraucht: BandageDressing/Rag = stärkste Blutungsquelle schließen, Splint = Beinbruch schienen, SalineBagIV/BloodBagIV = +500 Blut (Blutgruppen-Check bewusst weggelassen) | `done` / `failed` |
+
+`spawn_infected` versteht jetzt zusätzlich `x`, `z` und `count` (1..10, hart gekappt): mit Koordinaten spawnen die Infizierten mit 5–10 m Streuung um den Punkt (detail = `<classname> x<n>` bei mehr als einem), ohne Koordinaten bleibt exakt das alte Verhalten (25 m voraus, 1 Stück). `count` und `max_dist` sind in der Mod float-Felder (der EnforceScript-JsonFileLoader deserialisiert ints unzuverlässig, siehe `IsuCommand.br`).
 
 ## Geplant für Phase 3+
 

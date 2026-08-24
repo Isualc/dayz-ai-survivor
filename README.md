@@ -1,6 +1,6 @@
 # dayz-ai-survivor
 
-An autonomous DayZ survivor driven by Claude Code. The architecture has three layers: **reflexes** run on the server in the DayZ-Expansion AI (EnforceScript), **tactics** run in a local Python daemon, and **strategy + speech** come from Claude over MCP. What began as pure locomotion is now a full **multi-agent system**: up to four Claude-driven NPCs at once, each with its own memory, model, and voice, plus audible speech (Discord + 3D in-game), floating nameplates, an in-game setup menu, and direct commands via hotkeys and a command wheel.
+An autonomous DayZ survivor driven by Claude Code. The architecture has three layers: **reflexes** run on the server in the DayZ-Expansion AI (EnforceScript), **tactics** run in a local Python daemon, and **strategy + speech** come from Claude over MCP. What began as pure locomotion is now a full **multi-agent system**: up to **ten** LLM-driven NPCs at once (Claude, GPT, Gemini, Grok or local Gemma per slot), each with its own memory, role, loadout, and voice, plus audible speech (Discord + 3D in-game), floating nameplates, three game modes (co-op / battle royale / free survival), missions, a spectator web server with league scoring, full survival chains (hunting, fishing, cooking, clothing logic, reloading), an in-game setup menu, and direct commands via hotkeys and a command wheel.
 
 ![ISU Survivor key art — a squad of Claude-driven survivors in the field, with the tagline "DayZ NPCs with a real AI brain"](docs/images/cover.jpg)
 
@@ -135,7 +135,7 @@ start_game.bat     start the dev server + supervisor + DayZ client (pick the map
 close_game.bat     shut everything down gracefully (preserves server persistence)
 ```
 
-`start_game.bat` brings up server, supervisor and client. Once you're in, open the **setup menu** (Insert key) to add up to four NPCs and configure everything: model, role, idle cadence, turn limit, hotkeys, disposition (co-op vs. battle-royale), spawn mode, and per-NPC name/voice. Each NPC runs its own model, voice and memory.
+`start_game.bat` brings up server, supervisor and client. Once you're in, open the **setup menu** (Insert key) to add up to ten NPCs and configure everything: model, role, idle cadence, turn limit, hotkeys, disposition (co-op vs. battle-royale), spawn mode, and per-NPC name/voice. Each NPC runs its own model, voice and memory.
 
 **The brain on its own (headless, no client):**
 

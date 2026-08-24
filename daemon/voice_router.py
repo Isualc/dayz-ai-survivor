@@ -26,6 +26,11 @@ from mic_listener import (rms, stt_transcribe, pick_input_device,
                           GAP_SECONDS, MIN_SECONDS, MAX_SECONDS,
                           PREROLL_SECONDS)
 
+try:
+    from players_registry import resolve as resolve_player
+except ImportError:                        # Registry (noch) nicht vorhanden
+    resolve_player = None
+
 DAEMON_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.dirname(DAEMON_DIR)
 _SERVER_DIR = os.environ.get("DAYZ_SERVER_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\DayZServer")
@@ -35,7 +40,36 @@ ROSTER_FILE = os.path.join(REPO_DIR, "arena", "agents.json")
 ACTIVE_ROSTER_FILE = os.path.join(REPO_DIR, "arena", "active_roster.json")
 
 ELEVEN_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
+# MIC_NAME ist der Funk-Absendername des EINEN lokalen Mikrofons (Single-Host,
+# wie bisher). Sprecher-Stempelung laeuft trotzdem ueber die players_registry:
+# steht MIC_NAME (oder sein Alias) dort drin, wird der kanonische Funk-Name
+# aus der Registry verwendet (z.B. Tippfehler/Gross-Kleinschreibung in der
+# Env-Variable werden auf die registrierte Schreibweise normalisiert). Ist
+# der Name unbekannt, bleibt MIC_NAME unveraendert - kein Verhaltensbruch.
 MIC_NAME = os.environ.get("ISU_MIC_NAME", "Player")
+
+
+def resolve_speaker_name(raw_name: str) -> str:
+    """Normalisiert den Funk-Absendername ueber die players_registry.
+
+    MEHRSPIELER-VORBEREITUNG (noch nicht implementiert): Dieser Router nutzt
+    EIN Mikrofon fuer alle Sprecher (Single-Host-Fluss, mic_listener waehlt
+    EIN Eingabegeraet in main()). Sobald mehrere echte Menschen mit eigenen
+    Mikros mitspielen sollen, braucht players.json pro Eintrag ein Feld
+    "mic_name" (welches Audiogeraet zu welchem Spieler gehoert) und der
+    vorgesehene Weg ist EIN eigener mic_listener/voice_router-Prozess PRO
+    Eintrag (je ein --selected-Aufruf mit eigenem ISU_MIC_DEVICE/ISU_MIC_NAME
+    in der Prozess-Umgebung), nicht ein einzelner Prozess, der mehrere
+    Geraete gleichzeitig abhoert. Diese Funktion bliebe dabei unveraendert -
+    jeder Prozess stempelt weiterhin nur seinen eigenen MIC_NAME. Bis dahin
+    wird hier NICHTS am mic_listener-Start geaendert (Auflage: Single-Host-
+    Fluss darf sich nicht verschlechtern)."""
+    if resolve_player is None:
+        return raw_name
+    entry = resolve_player(raw_name)
+    if entry and entry.get("funk"):
+        return entry["funk"]
+    return raw_name
 # Datei-Log: der Router laeuft in einem eigenen Konsolenfenster - stuerzt er
 # ab, ist das Fenster weg und mit ihm die Spur. Hierhin schreibt er mit.
 LOG_FILE = os.path.join(REPO_DIR, "agent_home", "journal", "voice_router.log")
@@ -53,9 +87,8 @@ def log(msg: str):
 
 
 def agent_home(agent_id: str) -> str:
-    if agent_id == "viktor":
-        return os.path.join(REPO_DIR, "agent_home")
-    return os.path.join(REPO_DIR, "agent_homes", agent_id)
+    import agent_paths
+    return agent_paths.agent_home_dir(agent_id)
 
 
 def inbox_append(agent_id: str, entry: dict) -> None:
@@ -142,6 +175,14 @@ def main() -> int:
     log("ANSPRACHE: Namen im Satz nennen ('Igor, komm her'). OHNE Namen")
     log("antwortet der Agent, der dir am naechsten steht.")
 
+    # Sprecher-Stempelung ueber die players_registry (Schnittstelle 5): der
+    # rohe MIC_NAME (ISU_MIC_NAME) wird einmalig auf den registrierten
+    # Funk-Namen normalisiert (z.B. andere Gross-/Kleinschreibung oder ein
+    # in players.json hinterlegter Alias). Unbekannter Name -> unveraendert.
+    speaker_name = resolve_speaker_name(MIC_NAME)
+    if speaker_name != MIC_NAME:
+        log(f"Sprecher '{MIC_NAME}' -> Registry-Funkname '{speaker_name}'.")
+
     device, rate, floor = pick_input_device(logger=log)
     block = int(rate * 0.03)
     preroll_max = max(1, int(PREROLL_SECONDS / 0.03))
@@ -185,7 +226,7 @@ def main() -> int:
             return
         log(f"FUNK an {', '.join(targets).upper()} ({reason}): {text}")
         for target in targets:
-            inbox_append(target, {"user": MIC_NAME, "text": text, "t": time.time()})
+            inbox_append(target, {"user": speaker_name, "text": text, "t": time.time()})
 
     with sd.InputStream(samplerate=rate, channels=1, dtype="int16",
                         blocksize=block, device=device) as stream:

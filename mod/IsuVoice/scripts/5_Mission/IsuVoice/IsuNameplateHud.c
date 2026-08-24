@@ -12,6 +12,11 @@ class IsuNameplateHud
 	const int POOL = 6;
 	const float MAX_DIST = 120.0;
 	const int SPEECH_FADE_MS = 3000;   // sanftes Ausblenden der Blase nach Ablauf
+	// Deckel fuer den Sprechblasen-Hintergrund: voll opak (1.0) war viel zu
+	// dunkel. Die Blase dunkelt das Spielgeschehen nur noch leicht ab; damit
+	// der Text auf dem dunkel-transparenten Bg lesbar bleibt, ist die Speech-
+	// Textfarbe im Layout hell (0.92/0.93/0.95 statt nahe-schwarz).
+	const float SPEECH_BG_MAX_ALPHA = 0.35;
 
 	protected Widget m_Root;
 	protected ref array<Widget> m_Tags;
@@ -205,7 +210,7 @@ class IsuNameplateHud
 				sAlpha = Math.Clamp(sAlpha, 0.0, 1.0);
 				spt.SetText(t.speech);
 				spt.SetAlpha(sAlpha);
-				sbg.SetAlpha(sAlpha);
+				sbg.SetAlpha(sAlpha * SPEECH_BG_MAX_ALPHA);
 				sbg.Show(true);
 				spt.Show(true);
 			}

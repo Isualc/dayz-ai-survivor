@@ -167,6 +167,29 @@ class IsuArenaControl
 		Print("[IsuSurvivor] NPC-Befehl #" + s_NpcSeq.ToString() + ": " + line);
 	}
 
+	// Karten-Substitution des Lagerpunkts: Das Menue persistiert den
+	// Chernarus-Default (4233.7/8512.2) und sendet ihn auf JEDER Karte mit.
+	// Python (arena_supervisor.MAP_CAMPS) ersetzt ihn fuer Spawn und Briefing
+	// durch den Karten-Punkt - das Zelt setzte die Mod bisher aber aus dem
+	// ROHEN Wert (Befund 02.07.: Zelt stand auf Livonia bei den Chernarus-
+	// Koordinaten, die NPCs hatten zwei "Lager"-Wahrheiten). Darum hier
+	// DIESELBE Substitution. Die Tabelle MUSS mit MAP_CAMPS in
+	// daemon/arena_supervisor.py uebereinstimmen (Konvention wie s_LangCodes).
+	// Ein bewusst gesetzter eigener Punkt (weicht vom Default ab) bleibt.
+	static vector MapDefaultCamp(float x, float z)
+	{
+		float dist = Math.AbsFloat(x - 4233.7) + Math.AbsFloat(z - 8512.2);
+		if (dist >= 2.0)
+			return Vector(x, 0, z);
+		string world = g_Game.GetWorldName();
+		world.ToLower();
+		if (world.Contains("enoch"))
+			return Vector(7900.0, 0, 6700.0);
+		if (world.Contains("sakhal"))
+			return Vector(7680.0, 0, 7800.0);
+		return Vector(x, 0, z);
+	}
+
 	static void HandleCommand(string cmd)
 	{
 		s_Seq++;
@@ -191,7 +214,10 @@ class IsuArenaControl
 			array<string> xz = new array<string>();
 			coords.Split(",", xz);
 			if (xz.Count() == 2)
-				IsuBaseCamp.Relocate(xz[0].ToFloat(), xz[1].ToFloat());
+			{
+				vector campPos = MapDefaultCamp(xz[0].ToFloat(), xz[1].ToFloat());
+				IsuBaseCamp.Relocate(campPos[0], campPos[2]);
+			}
 		}
 	}
 }

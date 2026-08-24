@@ -1,0 +1,30 @@
+{
+  "id": "birgit",
+  "name": "Rettungsmission: Birgit befreien",
+  "comment": "1:1-Port des bisher hart im arena_supervisor codierten mission:birgit-Pfads. Trupp startet am zentralen Lager (KEIN Flugplatz), Ziel Kopa-Gefaengnis (NW-Livonia, aus BI cfgeventspawns.xml 'Traffic_Kopa' belegt; KORREKTUR 06-18: alter Wert 6021/8018 war Nidek). Banditen = feste Raiders-Patrouille in der Livonia-AIPatrolSettings (bereits eingebaut, laedt beim Serverstart) - darum 'patrols' hier leer und nur force_ambient_patrols. Die Gefangene spawnt erst nach der Saeuberung (Arena.check_birgit_release im Supervisor).",
+  "map": "enoch",
+  "map_label": "Livonia",
+  "camp": [7900.0, 6700.0],
+  "rally": [5968.0, 9102.0],
+  "briefing": "MISSION: BIRGIT BEFREIEN. Ihr seid an eurem Treffpunkt im zentralen Livonia aufgewacht (x7900 z6700, Landesinneres - KEIN Flugplatz) - du, deine Kameraden und der Spieler. Birgit ist NICHT hier. Ihr letzter Funk kam vom alten Gefaengnis auf dem Huegel bei Kopa (x{tx} z{tz}, Nordwesten): sie wollte dort nach Vorraeten und Spuren suchen. Seitdem Funkstille, seit Stunden. Schlechte Nachricht: In dem Gefaengnis haben sich BANDITEN eingenistet, schwer bewaffnet - Birgit ist dort vermutlich ihre Gefangene.\n\nEUER AUFTRAG: Sie da rausholen. Aber NICHT blind reinrennen - die Banditen sind in der Ueberzahl. Geht LEISE vor. Ihr seid bereits ELITE ausgeruestet: jeder traegt eine SUPPRESSIERTE Waffe, Munition, Medizin und Verpflegung - ihr muesst NICHT erst lange looten und koennt die Wachen lautlos ausschalten. Geht moeglichst DIREKT Richtung Kopa; nur wenn euch unterwegs etwas klar Besseres in die Haende faellt, nehmt es kurz mit, aber macht keine grossen Umwege.\n\nVORGEHEN: 1) observe und Waffe ziehen (equip_best; Igor nimmt seine Nahkampfwaffe). Birgit ist NICHT bei euch - sie ist die Gefangene, wartet NICHT auf sie. Sammelt euch nur kurz mit den ZWEI anderen Kameraden (und dem Spieler, wenn er mitkommt), dann brecht SOFORT zur Mission auf. 2) Legt eine MARSCHORDNUNG fest und HALTET sie: einer geht vorne als Spaeher (Viktor), die anderen FOLGEN ihm in Formation (follow auf den Namen des Vordermanns) statt jeder fuer sich zu navigieren - so bleibt ihr zusammen. Nur der Vordermann ruft move_to Richtung Kopa (x{tx} z{tz}). 3) Looted unterwegs Militaer-Stellungen (Waffen, Muni, Schalldaempfer). 4) Naehert euch dem Gefaengnis VORSICHTIG - erst aufklaeren, nicht stuermen. 5) Schaltet die Banditen aus, mit Schalldaempfer leise. 6) ERST wenn die Banditen erledigt sind und ihr am Gefaengnis steht, ist Birgit sicher - dann holt ihr sie raus und zieht euch GEMEINSAM zurueck. Haltet per Funk (say) zusammen. Der Weg ist weit - marschiert beharrlich, brecht NICHT wegen der Distanz ab.",
+  "role_briefings": {
+    "captive": "DU BIST IN GEFANGENSCHAFT. Du bist zum alten Gefaengnis bei Kopa gegangen, um nach Vorraeten und Spuren zu suchen - und bist BANDITEN in die Haende gefallen, die sich dort eingenistet haben. Sie halten dich fest. Dein Team (Viktor, Igor, Konrad und der Spieler) weiss, dass dein letzter Funk von hier kam, und ist unterwegs, um dich zu befreien.\n\nDEINE LAGE: bewacht und in der Unterzahl. Lauf NICHT eigenmaechtig los - an den Wachen kaemst du nicht vorbei. Halte dich bedeckt, vermeide Aufmerksamkeit, bleib in Deckung nahe dem Gefaengnis. Funk ab und zu LEISE per say, dass du noch lebst und wo du steckst ('Bin im Gefaengnis bei Kopa, bewacht'), damit dein Team dich findet. Wehr dich nur, wenn dich ein Bandit DIREKT angreift. Sobald dein Team die Banditen ausgeschaltet hat und bei dir ist, schliesst du dich ihm an (follow) und ihr zieht euch gemeinsam zurueck. Durchhalten - sie kommen.",
+    "freed": "BEFREIT! Dein Team hat die Banditen am Kopa-Gefaengnis ausgeschaltet und dich rausgeholt. Du bist wieder frei. Mach SOFORT observe, ruest dich aus (equip_best, deine Bandagen bereit), schliess dich deinem Team an (follow auf den naechsten Kameraden) und zieht euch GEMEINSAM vom Gefaengnis zurueck. Nach so einem Gefecht hat sicher jemand etwas abbekommen - versorge Verwundete unterwegs. Bedank dich kurz, aber haltet euch nicht lange an dem gefaehrlichen Ort auf."
+  },
+  "patrols": [],
+  "force_ambient_patrols": true,
+  "objective": {
+    "type": "rescue",
+    "target": [5968.0, 9102.0],
+    "captive": "birgit",
+    "combat_agents": ["viktor", "igor", "konrad"],
+    "roles": {"viktor": "jaeger", "igor": "bauer", "konrad": "exmilitaer", "birgit": "sanitaeter"},
+    "offsets": {"viktor": [0.0, 0.0], "igor": [9.0, 5.0], "konrad": [-9.0, 5.0]},
+    "loadouts": {"viktor": "IsuMissionViktor", "igor": "IsuMissionIgor", "konrad": "IsuMissionKonrad"},
+    "release": {"radius_m": 45.0, "calm_sec": 30.0}
+  },
+  "events": [],
+  "success": {"type": "captive_released"},
+  "on_success_broadcast": null,
+  "on_fail_broadcast": null
+}

@@ -1,0 +1,146 @@
+FrameWidgetClass IsuArenaRow {
+ clipchildren 0
+ position 0 0
+ size 1584 40
+ hexactpos 1
+ vexactpos 1
+ hexactsize 1
+ vexactsize 1
+ {
+  ImageWidgetClass RowCard {
+   ignorepointer 1
+   color 0.075 0.090 0.120 0.95
+   position 0 0
+   size 1584 40
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  ImageWidgetClass RowAccent {
+   ignorepointer 1
+   color 0.94 0.62 0.15 1
+   position 0 0
+   size 6 40
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  ButtonWidgetClass BtnAgent {
+   position 12 1
+   size 56 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "ON"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ImageWidgetClass NameBg {
+   ignorepointer 1
+   color 0.10 0.12 0.16 0.95
+   position 72 1
+   size 150 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   mode blend
+  }
+  EditBoxWidgetClass EditName {
+   position 76 1
+   size 142 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text ""
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass ProviderHead {
+   position 228 1
+   size 190 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text ""
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass ModelHead {
+   position 424 1
+   size 230 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text ""
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass RoleHead {
+   position 660 1
+   size 160 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text ""
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass LoadoutHead {
+   position 826 1
+   size 160 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text ""
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass VoiceHead {
+   position 992 1
+   size 160 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text ""
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  ButtonWidgetClass LangHead {
+   position 1158 1
+   size 150 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text ""
+   font "gui/fonts/sdf_MetronBook24"
+  }
+  TextWidgetClass LiveText {
+   ignorepointer 1
+   position 1314 1
+   size 200 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "off"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.5 0.5 0.52 1
+  }
+  ButtonWidgetClass BtnRemove {
+   position 1534 1
+   size 42 38
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   text "X"
+   font "gui/fonts/sdf_MetronBook24"
+  }
+ }
+}

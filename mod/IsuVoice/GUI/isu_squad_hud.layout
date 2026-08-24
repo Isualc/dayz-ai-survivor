@@ -1,0 +1,635 @@
+FrameWidgetClass IsuSquadHudRoot {
+ position 16 180
+ size 340 396
+ hexactpos 1
+ vexactpos 1
+ hexactsize 1
+ vexactsize 1
+ clipchildren 0
+ {
+  FrameWidgetClass SqRow0 {
+   position 0 0
+   size 340 62
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   clipchildren 0
+   {
+    ImageWidgetClass SqBg0 {
+     ignorepointer 1
+     color 0.04 0.05 0.07 0.30
+     position 0 0
+     size 340 62
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass SqChip0 {
+     ignorepointer 1
+     color 0.94 0.62 0.15 1
+     position 0 0
+     size 6 62
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    TextWidgetClass SqName0 {
+     ignorepointer 1
+     position 14 2
+     size 130 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.9 0.9 0.9 1
+    }
+    TextWidgetClass SqDist0 {
+     ignorepointer 1
+     position 148 2
+     size 70 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.7 0.7 0.72 1
+    }
+    TextWidgetClass SqAct0 {
+     ignorepointer 1
+     position 222 2
+     size 118 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.7 0.7 0.72 1
+    }
+    ImageWidgetClass SqHpBg0 {
+     ignorepointer 1
+     color 0.10 0.11 0.13 0.35
+     position 14 24
+     size 60 5
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass SqHpFill0 {
+     ignorepointer 1
+     color 0.48 0.78 0.30 1
+     position 14 24
+     size 60 5
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    MultilineTextWidgetClass SqIntent0 {
+     ignorepointer 1
+     position 14 31
+     size 320 30
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     "text color" 0.55 0.57 0.60 1
+     wrap 1
+    }
+   }
+  }
+  FrameWidgetClass SqRow1 {
+   position 0 66
+   size 340 62
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   clipchildren 0
+   {
+    ImageWidgetClass SqBg1 {
+     ignorepointer 1
+     color 0.04 0.05 0.07 0.30
+     position 0 0
+     size 340 62
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass SqChip1 {
+     ignorepointer 1
+     color 0.36 0.79 0.65 1
+     position 0 0
+     size 6 62
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    TextWidgetClass SqName1 {
+     ignorepointer 1
+     position 14 2
+     size 130 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.9 0.9 0.9 1
+    }
+    TextWidgetClass SqDist1 {
+     ignorepointer 1
+     position 148 2
+     size 70 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.7 0.7 0.72 1
+    }
+    TextWidgetClass SqAct1 {
+     ignorepointer 1
+     position 222 2
+     size 118 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.7 0.7 0.72 1
+    }
+    ImageWidgetClass SqHpBg1 {
+     ignorepointer 1
+     color 0.10 0.11 0.13 0.35
+     position 14 24
+     size 60 5
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass SqHpFill1 {
+     ignorepointer 1
+     color 0.48 0.78 0.30 1
+     position 14 24
+     size 60 5
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    MultilineTextWidgetClass SqIntent1 {
+     ignorepointer 1
+     position 14 31
+     size 320 30
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     "text color" 0.55 0.57 0.60 1
+     wrap 1
+    }
+   }
+  }
+  FrameWidgetClass SqRow2 {
+   position 0 132
+   size 340 62
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   clipchildren 0
+   {
+    ImageWidgetClass SqBg2 {
+     ignorepointer 1
+     color 0.04 0.05 0.07 0.30
+     position 0 0
+     size 340 62
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass SqChip2 {
+     ignorepointer 1
+     color 0.59 0.77 0.35 1
+     position 0 0
+     size 6 62
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    TextWidgetClass SqName2 {
+     ignorepointer 1
+     position 14 2
+     size 130 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.9 0.9 0.9 1
+    }
+    TextWidgetClass SqDist2 {
+     ignorepointer 1
+     position 148 2
+     size 70 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.7 0.7 0.72 1
+    }
+    TextWidgetClass SqAct2 {
+     ignorepointer 1
+     position 222 2
+     size 118 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.7 0.7 0.72 1
+    }
+    ImageWidgetClass SqHpBg2 {
+     ignorepointer 1
+     color 0.10 0.11 0.13 0.35
+     position 14 24
+     size 60 5
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass SqHpFill2 {
+     ignorepointer 1
+     color 0.48 0.78 0.30 1
+     position 14 24
+     size 60 5
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    MultilineTextWidgetClass SqIntent2 {
+     ignorepointer 1
+     position 14 31
+     size 320 30
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     "text color" 0.55 0.57 0.60 1
+     wrap 1
+    }
+   }
+  }
+  FrameWidgetClass SqRow3 {
+   position 0 198
+   size 340 62
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   clipchildren 0
+   {
+    ImageWidgetClass SqBg3 {
+     ignorepointer 1
+     color 0.04 0.05 0.07 0.30
+     position 0 0
+     size 340 62
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass SqChip3 {
+     ignorepointer 1
+     color 0.22 0.54 0.87 1
+     position 0 0
+     size 6 62
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    TextWidgetClass SqName3 {
+     ignorepointer 1
+     position 14 2
+     size 130 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.9 0.9 0.9 1
+    }
+    TextWidgetClass SqDist3 {
+     ignorepointer 1
+     position 148 2
+     size 70 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.7 0.7 0.72 1
+    }
+    TextWidgetClass SqAct3 {
+     ignorepointer 1
+     position 222 2
+     size 118 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.7 0.7 0.72 1
+    }
+    ImageWidgetClass SqHpBg3 {
+     ignorepointer 1
+     color 0.10 0.11 0.13 0.35
+     position 14 24
+     size 60 5
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass SqHpFill3 {
+     ignorepointer 1
+     color 0.48 0.78 0.30 1
+     position 14 24
+     size 60 5
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    MultilineTextWidgetClass SqIntent3 {
+     ignorepointer 1
+     position 14 31
+     size 320 30
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     "text color" 0.55 0.57 0.60 1
+     wrap 1
+    }
+   }
+  }
+  FrameWidgetClass SqRow4 {
+   position 0 264
+   size 340 62
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   clipchildren 0
+   {
+    ImageWidgetClass SqBg4 {
+     ignorepointer 1
+     color 0.04 0.05 0.07 0.30
+     position 0 0
+     size 340 62
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass SqChip4 {
+     ignorepointer 1
+     color 0.80 0.82 0.85 1
+     position 0 0
+     size 6 62
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    TextWidgetClass SqName4 {
+     ignorepointer 1
+     position 14 2
+     size 130 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.9 0.9 0.9 1
+    }
+    TextWidgetClass SqDist4 {
+     ignorepointer 1
+     position 148 2
+     size 70 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.7 0.7 0.72 1
+    }
+    TextWidgetClass SqAct4 {
+     ignorepointer 1
+     position 222 2
+     size 118 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.7 0.7 0.72 1
+    }
+    ImageWidgetClass SqHpBg4 {
+     ignorepointer 1
+     color 0.10 0.11 0.13 0.35
+     position 14 24
+     size 60 5
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass SqHpFill4 {
+     ignorepointer 1
+     color 0.48 0.78 0.30 1
+     position 14 24
+     size 60 5
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    MultilineTextWidgetClass SqIntent4 {
+     ignorepointer 1
+     position 14 31
+     size 320 30
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     "text color" 0.55 0.57 0.60 1
+     wrap 1
+    }
+   }
+  }
+  FrameWidgetClass SqRow5 {
+   position 0 330
+   size 340 62
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   clipchildren 0
+   {
+    ImageWidgetClass SqBg5 {
+     ignorepointer 1
+     color 0.04 0.05 0.07 0.30
+     position 0 0
+     size 340 62
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass SqChip5 {
+     ignorepointer 1
+     color 0.80 0.82 0.85 1
+     position 0 0
+     size 6 62
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    TextWidgetClass SqName5 {
+     ignorepointer 1
+     position 14 2
+     size 130 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.9 0.9 0.9 1
+    }
+    TextWidgetClass SqDist5 {
+     ignorepointer 1
+     position 148 2
+     size 70 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.7 0.7 0.72 1
+    }
+    TextWidgetClass SqAct5 {
+     ignorepointer 1
+     position 222 2
+     size 118 20
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     color 0.7 0.7 0.72 1
+    }
+    ImageWidgetClass SqHpBg5 {
+     ignorepointer 1
+     color 0.10 0.11 0.13 0.35
+     position 14 24
+     size 60 5
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    ImageWidgetClass SqHpFill5 {
+     ignorepointer 1
+     color 0.48 0.78 0.30 1
+     position 14 24
+     size 60 5
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     mode blend
+    }
+    MultilineTextWidgetClass SqIntent5 {
+     ignorepointer 1
+     position 14 31
+     size 320 30
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     text ""
+     font "gui/fonts/etelkatextpro22"
+     "text color" 0.55 0.57 0.60 1
+     wrap 1
+    }
+   }
+  }
+ }
+}

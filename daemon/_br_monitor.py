@@ -13,7 +13,25 @@ from datetime import datetime
 
 _SERVER_DIR = os.environ.get("DAYZ_SERVER_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\DayZServer")
 PROFILE = os.path.join(_SERVER_DIR, "profiles", "IsuSurvivor")
-IDS = ("viktor", "birgit", "igor", "konrad")
+REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _load_ids():
+    """Aktive Agenten aus arena/active_roster.json (der Supervisor schreibt
+    sie bei jedem Start); Fallback: die vier Stamm-Agenten. So erfasst die
+    BR-Telemetrie auch dynamische Zusatz-Slots (npc5..npc10)."""
+    try:
+        path = os.path.join(REPO_DIR, "arena", "active_roster.json")
+        with open(path, "r", encoding="utf-8") as f:
+            ids = tuple(a["id"] for a in json.load(f)["agents"])
+        if ids:
+            return ids
+    except (OSError, json.JSONDecodeError, KeyError, TypeError):
+        pass
+    return ("viktor", "birgit", "igor", "konrad")
+
+
+IDS = _load_ids()
 
 
 def read_state(npc_id):

@@ -70,6 +70,37 @@ class IsuNpcCommand
 		return true;
 	}
 
+	// Classname des ersten anvisierten LOSEN Bodenitems (nicht attached, nicht in
+	// einem Inventar). Fuer den "Hol das"-Zweig des Radials: zeigt der Spieler auf
+	// Loot, holt und traegt der NPC es. Leer, wenn kein Item getroffen wurde.
+	static bool AimRaycastItem(out string itemClass)
+	{
+		itemClass = "";
+		vector from = GetGame().GetCurrentCameraPosition();
+		vector dir = GetGame().GetCurrentCameraDirection();
+		vector to = from + dir * 120.0;
+
+		vector cPos;
+		vector cDir;
+		int cComp;
+		set<Object> results = new set<Object>();
+		PlayerBase pb = PlayerBase.Cast(GetGame().GetPlayer());
+
+		if (!DayZPhysics.RaycastRV(from, to, cPos, cDir, cComp, results, null, pb, true, false, ObjIntersectView))
+			return false;
+
+		foreach (Object o : results)
+		{
+			ItemBase it = ItemBase.Cast(o);
+			if (it && !it.GetHierarchyParent())
+			{
+				itemClass = it.GetType();
+				return true;
+			}
+		}
+		return false;
+	}
+
 	// Sofort stehenbleiben. all -> alle Agenten; sonst anvisierter NPC, und
 	// falls keiner anvisiert ist, der naechste zur Spielerposition.
 	static void SendHalt(bool all)

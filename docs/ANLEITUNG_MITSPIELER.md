@@ -1,6 +1,6 @@
 # Mitspielen auf dem ISU-Survivor-Server
 
-Auf diesem DayZ-Server leben bis zu vier KI-Überlebende: Viktor der Jäger, Angie die Sanitäterin, Igor der Bauer und Konrad der Ex-Soldat. Hinter jedem steckt ein eigenes Sprachmodell, das wirklich spielt: Sie looten, kämpfen, frieren, schließen Bündnisse und merken sich, wen sie getroffen haben. Du redest mit ihnen über den ganz normalen Spiel-Chat, und sie antworten dir im Chat und (wenn der Host Funk aktiviert hat) mit eigener Stimme im Discord.
+Auf diesem DayZ-Server leben bis zu zehn KI-Überlebende — die Stamm-Besetzung: Viktor der Jäger, Birgit die Sanitäterin, Igor der Bauer und Konrad der Ex-Soldat (der Host kann Namen und Rollen frei vergeben und weitere dazuschalten). Hinter jedem steckt ein eigenes Sprachmodell, das wirklich spielt: Sie looten, jagen, angeln, kochen, kämpfen, frieren, schließen Bündnisse und merken sich, wen sie getroffen haben. Du redest mit ihnen über den ganz normalen Spiel-Chat, und sie antworten dir im Chat und (wenn der Host Funk aktiviert hat) mit eigener Stimme im Discord.
 
 ## Was du brauchst
 
@@ -36,7 +36,7 @@ Wirft dich der Server beim Join raus, fehlt fast immer eine Mod oder eine ist ve
 
 ## Mit den Überlebenden reden
 
-Die KI-Überlebenden hören deinen **Text-Chat im Direct-Kanal** auf etwa 60 Meter. Sprich sie mit Namen an, dann antwortet genau der Richtige: "Konrad, was trägst du an Waffen?" weckt Konrad und nicht die anderen drei. Ohne Namen reagiert, wer dir am nächsten steht.
+Die KI-Überlebenden hören deinen **Text-Chat im Direct-Kanal** auf etwa 60 Meter. Sprich sie mit Namen an, dann antwortet genau der Richtige: "Konrad, was trägst du an Waffen?" weckt Konrad und nicht die anderen. Ohne Namen reagiert, wer dir am nächsten steht.
 
 Ein paar Dinge, die du wissen solltest:
 
@@ -49,7 +49,7 @@ Ein paar Dinge, die du wissen solltest:
 
 ## Spielregeln im Umgang mit ihnen
 
-Im normalen Koop-Modus greifen die Überlebenden Menschen niemals zuerst an. Du kannst ihnen Gegenstände hinlegen, mit ihnen looten gehen oder sie um Hilfe bitten ("Angie, ich blute!"). Hat der Host den Battle-Royale-Modus gestartet, gelten Bewaffnete als Ziel, dann halte Abstand oder leg die Waffe weg.
+Im normalen Koop-Modus greifen die Überlebenden Menschen niemals zuerst an. Du kannst ihnen Gegenstände hinlegen, mit ihnen looten gehen oder sie um Hilfe bitten ("Birgit, ich blute!"). Hat der Host den Battle-Royale-Modus gestartet, gelten Bewaffnete als Ziel, dann halte Abstand oder leg die Waffe weg.
 
 Die Taste **Einfg** öffnet das Arena-Steuermenü. Es funktioniert technisch bei jedem, der @IsuVoice geladen hat. Bitte lass die Finger davon, das Menü startet und stoppt die KI-Gehirne und gehört dem Host.
 

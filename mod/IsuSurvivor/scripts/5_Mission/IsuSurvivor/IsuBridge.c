@@ -62,6 +62,13 @@ class IsuBridge
 	private EntityAI m_CorpseTarget;
 	private string m_StoreFilter;   // store_container: optionaler Item-Classname-Filter
 	private AnimalBase m_HarvestTarget;
+	private AnimalBase m_HuntTarget;      // hunt: lebendes Beutetier (Pirsch)
+	private float m_HuntKillRange;        // hunt: Distanz, ab der Schuss/Schlag sitzt
+	// Kleidungs-Kennwerte (heatIsolation/Cargo/Slot) aus der Item-Config,
+	// einmal pro Classname gecacht - der State laeuft mit 1 Hz.
+	private static ref map<string, float> s_WarmthCache = new map<string, float>();
+	private static ref map<string, int> s_CargoCache = new map<string, int>();
+	private static ref map<string, string> s_SlotCache = new map<string, string>();
 	private int m_FactionCheckTicks;
 	private bool m_Slinged;            // sling: Waffe geschultert -> Sprinttempo
 	private string m_NpcName;
@@ -168,7 +175,7 @@ class IsuBridge
 
 		GetGame().GetCallQueue(CALL_CATEGORY_SYSTEM).CallLater(Tick, 1000, true);
 
-		Print("[IsuSurvivor] bridge v0.12-coop slot '" + id + "' started");
+		Print("[IsuSurvivor] bridge v0.13-weltmed slot '" + id + "' started");
 	}
 
 	void Tick()
@@ -338,6 +345,7 @@ class IsuBridge
 		m_EngageTarget = null;
 		m_CorpseTarget = null;
 		m_HarvestTarget = null;
+		m_HuntTarget = null;
 		m_TriedUnstick = false;
 		m_WearPendingItem = null;
 		m_WearPendingTries = 0;
@@ -377,6 +385,10 @@ class IsuBridge
 
 			case "harvest":
 				CmdHarvest(cmd);
+				break;
+
+			case "hunt":
+				CmdHunt(cmd);
 				break;
 
 			case "loot_container":
@@ -519,6 +531,18 @@ class IsuBridge
 				CmdUnpackAmmo(cmd);
 				break;
 
+			case "reload":
+				CmdReload();
+				break;
+
+			case "find_water":
+				CmdFindWater(cmd);
+				break;
+
+			case "treat_other":
+				CmdTreatOther(cmd);
+				break;
+
 			default:
 				m_CmdStatus = "failed";
 				m_CmdDetail = "unbekannte action: " + cmd.action;
@@ -659,6 +683,7 @@ class IsuBridge
 		m_EngageTarget = null;
 		m_CorpseTarget = null;
 		m_HarvestTarget = null;
+		m_HuntTarget = null;
 		m_CmdId = "player_halt";
 		m_CmdAction = "stop";
 		CmdStop();
@@ -675,6 +700,7 @@ class IsuBridge
 		m_EngageTarget = null;
 		m_CorpseTarget = null;
 		m_HarvestTarget = null;
+		m_HuntTarget = null;
 		m_CmdId = "player_goto";
 		m_CmdAction = "move_to";
 		m_CmdDetail = "";
@@ -768,6 +794,7 @@ class IsuBridge
 		m_EngageTarget = null;
 		m_CorpseTarget = null;
 		m_HarvestTarget = null;
+		m_HuntTarget = null;
 	}
 
 	// Dem ausloesenden Spieler in Formation folgen (Gruppenbeitritt).
@@ -814,6 +841,29 @@ class IsuBridge
 		CmdEngage(c);
 	}
 
+	// "Hol das" (Radial-Zeiger auf ein Item): hingehen, aufheben und danach
+	// anziehen/schultern. Reutzt die Pickup-Maschinerie (CmdPickup laeuft zum
+	// naechsten passenden Bodenitem und hebt es auf); m_CmdAction="fetch" sorgt
+	// dafuer, dass DoTakePickupItem im Anschluss CmdWear ausloest.
+	void PlayerFetch(string cls)
+	{
+		if (!NpcReadyOnFoot())
+			return;
+		if (cls == "")
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "fetch braucht Classname";
+			return;
+		}
+		ResetForPlayerCmd();
+		m_CmdId = "player_fetch";
+		m_CmdAction = "fetch";
+		IsuCommand c = new IsuCommand();
+		c.action = "pickup";
+		c.text = cls;
+		CmdPickup(c);
+	}
+
 	static void RouteFollow(int low, int high, string name)
 	{
 		foreach (string idFo, IsuBridge instFo : s_Instances)
@@ -850,6 +900,25 @@ class IsuBridge
 		IsuBridge b = FindNearestInstance(ppos);
 		if (b)
 			b.PlayerLoot();
+	}
+
+	static void RouteFetch(int low, int high, string cls)
+	{
+		foreach (string idFe, IsuBridge instFe : s_Instances)
+		{
+			if (instFe.MatchesNetworkId(low, high))
+			{
+				instFe.PlayerFetch(cls);
+				return;
+			}
+		}
+	}
+
+	static void RouteFetchNearest(vector ppos, string cls)
+	{
+		IsuBridge b = FindNearestInstance(ppos);
+		if (b)
+			b.PlayerFetch(cls);
 	}
 
 	static void RouteEngage(int low, int high)
@@ -964,6 +1033,18 @@ class IsuBridge
 				RouteEngageNearest(Vector(p[2].ToFloat(), 0, p[3].ToFloat()));
 			return;
 		}
+
+		// "Hol das" (Radial-Zeiger auf ein Item). Letztes Feld = Item-Classname.
+		//   fetch|single|<low>|<high>|<classname>
+		//   fetch|nearest|<px>|<pz>|<classname>
+		if (action == "fetch")
+		{
+			if (mode == "single" && p.Count() >= 5)
+				RouteFetch(p[2].ToInt(), p[3].ToInt(), p[4]);
+			else if (mode == "nearest" && p.Count() >= 5)
+				RouteFetchNearest(Vector(p[2].ToFloat(), 0, p[3].ToFloat()), p[4]);
+			return;
+		}
 	}
 
 	private void CmdDespawn()
@@ -1061,15 +1142,31 @@ class IsuBridge
 		EnsureHandsFree(null);
 		if (m_Npc.eAI_TakeItemToInventory(m_PickupItem, true))
 		{
-			m_CmdStatus = "done";
-			m_CmdDetail = type;
-		}
-		else
-		{
-			m_CmdStatus = "failed";
-			m_CmdDetail = "Inventar voll - kein Platz fuer " + type + " (erst etwas droppen/anziehen)";
+			m_PickupItem = null;
+			m_PickupWalking = false;
+			ReleaseClaim();
+			// "fetch" (Radial-Zeiger "Hol das"): direkt nach dem Aufheben anziehen
+			// bzw. schultern. CmdWear findet das Stueck jetzt im Inventar und
+			// uebernimmt die volle Blocker-/Inhalt-Sicherung. Hat es keinen
+			// Body-Slot (Nahrung, Munition), meldet CmdWear das - aufgehoben ist es
+			// trotzdem schon.
+			if (m_CmdAction == "fetch")
+			{
+				IsuCommand wc = new IsuCommand();
+				wc.action = "wear";
+				wc.text = type;
+				CmdWear(wc);
+			}
+			else
+			{
+				m_CmdStatus = "done";
+				m_CmdDetail = type;
+			}
+			return;
 		}
 
+		m_CmdStatus = "failed";
+		m_CmdDetail = "Inventar voll - kein Platz fuer " + type + " (erst etwas droppen/anziehen)";
 		m_PickupItem = null;
 		m_PickupWalking = false;
 		ReleaseClaim();
@@ -1277,6 +1374,114 @@ class IsuBridge
 			return "BearSteakMeat";
 		}
 		return "ChickenBreastMeat";
+	}
+
+	// Jagd (Pirsch): lebendes PASSIVES Tier verfolgen und erlegen. Mit
+	// schussbereiter Feuerwaffe in der Hand faellt das Tier auf 35 m
+	// (Distanzschuss, serverseitig vereinfacht wie unpack_ammo/fish), sonst
+	// muss der NPC auf 4 m heran - realistisch nur bei Huhn/Hase, Rehe
+	// fliehen schneller. Raubtiere (Wolf/Baer) uebernimmt engage.
+	// cmd.text = optionaler Classname-Filter (z.B. "Cervus" fuer Hirsch).
+	// Danach harvest zum Zerlegen.
+	private void CmdHunt(IsuCommand cmd)
+	{
+		if (!NpcReadyOnFoot())
+			return;
+
+		AnimalBase target = null;
+		float nearest = 151.0;
+		array<Object> objects = new array<Object>();
+		array<CargoBase> cargos = new array<CargoBase>();
+		GetGame().GetObjectsAtPosition3D(m_Npc.GetPosition(), 150.0, objects, cargos);
+
+		foreach (Object obj : objects)
+		{
+			AnimalBase animal = AnimalBase.Cast(obj);
+			if (!animal || !animal.IsAlive())
+				continue;
+			if (IsPredator(animal.GetType()))
+				continue;
+			if (cmd.text != "" && !animal.GetType().Contains(cmd.text))
+				continue;
+			float dist = vector.Distance(m_Npc.GetPosition(), animal.GetPosition());
+			if (dist < nearest)
+			{
+				nearest = dist;
+				target = animal;
+			}
+		}
+
+		if (!target)
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "kein lebendes Beutetier in 150 m (kind=animal in der Umgebung; Raubtiere: engage)";
+			return;
+		}
+
+		m_HuntKillRange = 4.0;
+		Weapon_Base wpn = Weapon_Base.Cast(m_Npc.GetHumanInventory().GetEntityInHands());
+		if (wpn && !wpn.IsRuined() && wpn.Expansion_HasAmmo())
+			m_HuntKillRange = 35.0;
+
+		m_HuntTarget = target;
+		m_Slinged = false;
+
+		if (!StartWalk(target.GetPosition()))
+			return;
+
+		m_CmdStatus = "running";
+		m_CmdDetail = target.GetType();
+	}
+
+	private void UpdateHunt()
+	{
+		if (!m_Npc || !m_Npc.IsAlive())
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "npc gestorben";
+			m_HuntTarget = null;
+			return;
+		}
+
+		if (!m_HuntTarget)
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "Beutetier verschwunden";
+			return;
+		}
+
+		if (!m_HuntTarget.IsAlive())
+		{
+			m_CmdStatus = "done";
+			m_CmdDetail = m_HuntTarget.GetType() + " erlegt - jetzt harvest zum Zerlegen";
+			m_HuntTarget = null;
+			return;
+		}
+
+		float now = GetGame().GetTickTime();
+		if (now - m_CmdStartTime > 120)
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "Beutetier entkommen (120 s) - mit schussbereiter Feuerwaffe in der Hand klappt die Jagd auf 35 m";
+			m_HuntTarget = null;
+			return;
+		}
+
+		vector targetPos = m_HuntTarget.GetPosition();
+		float dist = vector.Distance(m_Npc.GetPosition(), targetPos);
+		if (dist <= m_HuntKillRange)
+		{
+			string prey = m_HuntTarget.GetType();
+			m_HuntTarget.SetHealth("", "", 0);
+			m_CmdStatus = "done";
+			m_CmdDetail = prey + " erlegt - jetzt harvest zum Zerlegen";
+			m_HuntTarget = null;
+			return;
+		}
+
+		// Beutetier bewegt sich (flieht): Wegpunkt nachziehen
+		if (Dist2D(m_MoveTarget, targetPos) > 5.0)
+			StartWalk(targetPos);
 	}
 
 	// Naechsten lootbaren Behaelter ausraeumen: Leichen (tote Infizierte,
@@ -1964,6 +2169,191 @@ class IsuBridge
 
 		m_CmdStatus = "done";
 		m_CmdDetail = boxType + " entpackt: " + childName + " x" + itemCount.ToString() + " (" + where + ")";
+	}
+
+	// Munition umladen: lose Ammo-Stapel -> passende Magazine (auch das in der
+	// Waffe steckende) und das interne Magazin der Waffe. Ergaenzt unpack_ammo
+	// zur Kette Kiste -> Stapel -> reload -> volles Magazin; den Magazin-
+	// WECHSEL im Gefecht macht die eAI selbst, sobald ein gefuelltes Magazin
+	// im Inventar liegt. Vereinfachtes Server-Umladen ohne Animation - bewusst
+	// (wie die Infusion): Frust vermeiden statt Realismus zelebrieren.
+	private void CmdReload()
+	{
+		if (!NpcReady())
+			return;
+
+		// Zielwaffe: in der Hand bevorzugt, sonst erste brauchbare Feuerwaffe
+		array<EntityAI> items = new array<EntityAI>();
+		m_Npc.GetInventory().EnumerateInventory(InventoryTraversalType.PREORDER, items);
+		Weapon_Base wpn = Weapon_Base.Cast(m_Npc.GetHumanInventory().GetEntityInHands());
+		if (!wpn)
+		{
+			foreach (EntityAI went : items)
+			{
+				Weapon_Base cand = Weapon_Base.Cast(went);
+				if (cand && !cand.IsRuined())
+				{
+					wpn = cand;
+					break;
+				}
+			}
+		}
+		if (!wpn)
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "keine Feuerwaffe (Hand/Inventar) zum Nachladen";
+			return;
+		}
+		string wtype = wpn.GetType();
+
+		// Lose Munitionsstapel (Ammo_*; AmmoBox erst per unpack_ammo oeffnen)
+		array<Magazine> piles = new array<Magazine>();
+		foreach (EntityAI pent : items)
+		{
+			Magazine pmag = Magazine.Cast(pent);
+			if (!pmag)
+				continue;
+			string pt = pmag.GetType();
+			if (pt.IndexOf("Ammo") != 0)
+				continue;
+			if (pt.IndexOf("AmmoBox") == 0)
+				continue;
+			if (pmag.GetAmmoCount() <= 0)
+				continue;
+			piles.Insert(pmag);
+		}
+
+		// Phase A: kompatible Magazine der Waffe fuellen (loses UND gestecktes)
+		TStringArray wmags = new TStringArray();
+		GetGame().ConfigGetTextArray("CfgWeapons " + wtype + " magazines", wmags);
+		int loadedMag = 0;
+		string magName = "";
+		if (piles.Count() > 0 && wmags.Count() > 0)
+		{
+			foreach (EntityAI ment : items)
+			{
+				Magazine mg = Magazine.Cast(ment);
+				if (!mg)
+					continue;
+				string mt = mg.GetType();
+				if (mt.IndexOf("Mag_") != 0)
+					continue;
+				bool fits = false;
+				foreach (string wm : wmags)
+				{
+					if (wm == mt)
+						fits = true;
+				}
+				if (!fits)
+					continue;
+				int space = mg.GetAmmoMax() - mg.GetAmmoCount();
+				if (space <= 0)
+					continue;
+				TStringArray accepts = new TStringArray();
+				mg.ConfigGetTextArray("ammoItems", accepts);
+				foreach (Magazine pile : piles)
+				{
+					if (space <= 0)
+						break;
+					if (!pile || pile.GetAmmoCount() <= 0)
+						continue;
+					string pt2 = pile.GetType();
+					bool ok = false;
+					foreach (string acc : accepts)
+					{
+						if (acc == pt2)
+							ok = true;
+					}
+					if (!ok)
+						continue;
+					int take = space;
+					if (pile.GetAmmoCount() < take)
+						take = pile.GetAmmoCount();
+					mg.ServerSetAmmoCount(mg.GetAmmoCount() + take);
+					pile.ServerSetAmmoCount(pile.GetAmmoCount() - take);
+					space -= take;
+					loadedMag += take;
+					magName = mt;
+					if (pile.GetAmmoCount() <= 0)
+						GetGame().ObjectDelete(pile);
+				}
+			}
+		}
+
+		// Phase B: internes Magazin der Waffe direkt befuellen (Mosin/SKS/
+		// Flinten). chamberableFrom nennt die akzeptierten Ammo-Stapel.
+		int loadedInt = 0;
+		if (wpn.HasInternalMagazine(-1))
+		{
+			TStringArray chAmmo = new TStringArray();
+			GetGame().ConfigGetTextArray("CfgWeapons " + wtype + " chamberableFrom", chAmmo);
+			int spaceInt = wpn.GetInternalMagazineMaxCartridgeCount(0) - wpn.GetInternalMagazineCartridgeCount(0);
+			foreach (Magazine pile2 : piles)
+			{
+				if (spaceInt <= 0)
+					break;
+				if (!pile2 || pile2.GetAmmoCount() <= 0)
+					continue;
+				string pt3 = pile2.GetType();
+				bool okc = false;
+				foreach (string ca : chAmmo)
+				{
+					if (ca == pt3)
+						okc = true;
+				}
+				if (!okc)
+					continue;
+				string bullet = "";
+				if (!AmmoTypesAPI.MagazineTypeToAmmoType(pt3, bullet))
+					continue;
+				while (spaceInt > 0 && pile2.GetAmmoCount() > 0)
+				{
+					if (!wpn.PushCartridgeToInternalMagazine(0, 0.0, bullet))
+						break;
+					pile2.ServerSetAmmoCount(pile2.GetAmmoCount() - 1);
+					spaceInt = spaceInt - 1;
+					loadedInt++;
+				}
+				// Leere Kammer gleich mitfuellen, solange der Stapel reicht
+				if (wpn.IsChamberEmpty(0) && pile2.GetAmmoCount() > 0)
+				{
+					if (wpn.PushCartridgeToChamber(0, 0.0, bullet))
+					{
+						pile2.ServerSetAmmoCount(pile2.GetAmmoCount() - 1);
+						loadedInt++;
+					}
+				}
+				if (pile2.GetAmmoCount() <= 0)
+					GetGame().ObjectDelete(pile2);
+			}
+		}
+
+		if (loadedMag == 0 && loadedInt == 0)
+		{
+			m_CmdStatus = "failed";
+			if (piles.Count() == 0)
+				m_CmdDetail = "keine lose Munition im Inventar (AmmoBox erst mit unpack_ammo oeffnen; Magazine wechselt der Kampf selbst)";
+			else
+				m_CmdDetail = "nichts umgeladen: Munition passt nicht zur " + wtype + " oder Magazine sind schon voll";
+			return;
+		}
+
+		// FSM/Netz-Zustand an den neuen Munitionsstand angleichen (Muster
+		// SpawnAttachedMagazine), sonst glitcht die Waffe beim Feuern.
+		wpn.RandomizeFSMState();
+		wpn.Synchronize();
+
+		m_CmdStatus = "done";
+		string note = "";
+		if (loadedMag > 0)
+			note = loadedMag.ToString() + " Schuss in " + magName;
+		if (loadedInt > 0)
+		{
+			if (note != "")
+				note = note + ", ";
+			note = note + loadedInt.ToString() + " Schuss direkt in die " + wtype;
+		}
+		m_CmdDetail = note;
 	}
 
 	// Hand freiraeumen, bevor eine Waffe gezogen wird: eAI_TakeItemToHands
@@ -2895,8 +3285,8 @@ class IsuBridge
 			}
 
 			// Kein exakter Namensmatch und kein Kamerad. Weicht der Funk-/Voice-
-			// Name vom DayZ-Profilnamen ab (Voice-Name vs. Profilname im Spiel),
-			// scheiterte follow hier. Ist genau EIN menschlicher
+			// Name vom DayZ-Profilnamen ab (z.B. "Isualc" im Voice vs. "Clausi"
+			// im Spiel), scheiterte follow hier. Ist genau EIN menschlicher
 			// Spieler (mit Identity; eAI haben keine) in Reichweite, ist er
 			// eindeutig gemeint - ihm folgen statt zu scheitern.
 			PlayerBase soleHuman = null;
@@ -3819,22 +4209,50 @@ class IsuBridge
 		if (classname == "")
 			classname = "ZmbM_HermitSkinny_Beige";
 
-		vector pos;
+		vector center;
+		int count = 1;
+		bool scatter = false;
 		if (cmd.x != 0 || cmd.z != 0)
 		{
-			pos = ResolvePos(cmd);
+			// Mit Koordinaten (Missionen/Horde): count 1..10 hart gekappt,
+			// kleine Streuung 5-10 m, damit die Horde nicht auf einem Punkt stapelt.
+			center = ResolvePos(cmd);
+			scatter = true;
+			count = Math.Round(cmd.count);
+			if (count < 1)
+				count = 1;
+			if (count > 10)
+				count = 10;
 		}
 		else
 		{
+			// Ohne Koordinaten: altes Verhalten - 25 m voraus, genau 1 Stueck.
 			if (!NpcReady())
 				return;
-			pos = m_Npc.GetPosition() + m_Npc.GetDirection() * 25.0;
-			pos[1] = GetGame().SurfaceY(pos[0], pos[2]);
+			center = m_Npc.GetPosition() + m_Npc.GetDirection() * 25.0;
+			center[1] = GetGame().SurfaceY(center[0], center[2]);
 		}
 
-		// initAI = true, sonst steht der Infizierte hirnlos herum
-		Object obj = GetGame().CreateObject(classname, pos, false, true);
-		if (!obj)
+		int spawned = 0;
+		for (int i = 0; i < count; i++)
+		{
+			vector pos = center;
+			if (scatter)
+			{
+				float ang = Math.RandomFloatInclusive(0, Math.PI2);
+				float rad = Math.RandomFloatInclusive(5.0, 10.0);
+				pos[0] = pos[0] + Math.Sin(ang) * rad;
+				pos[2] = pos[2] + Math.Cos(ang) * rad;
+				pos[1] = GetGame().SurfaceY(pos[0], pos[2]);
+			}
+
+			// initAI = true, sonst steht der Infizierte hirnlos herum
+			Object obj = GetGame().CreateObject(classname, pos, false, true);
+			if (obj)
+				spawned++;
+		}
+
+		if (spawned == 0)
 		{
 			m_CmdStatus = "failed";
 			m_CmdDetail = "CreateObject fehlgeschlagen: " + classname;
@@ -3842,7 +4260,206 @@ class IsuBridge
 		}
 
 		m_CmdStatus = "done";
-		m_CmdDetail = classname;
+		if (spawned == 1)
+			m_CmdDetail = classname;
+		else
+			m_CmdDetail = classname + " x" + spawned.ToString();
+	}
+
+	// ------------------------------------------------------ Welt & Medizin
+
+	// Naechstes offenes Wasser (Teich/Meer) per radialem Sampling finden:
+	// 8 Richtungen, 25-m-Schritte bis max_dist (Default 300). Geliefert wird
+	// der LETZTE Landpunkt VOR dem Wassertreffer - der NPC soll am Ufer
+	// stehen, nicht schwimmen. detail bei Erfolg: "x z pond|sea".
+	private void CmdFindWater(IsuCommand cmd)
+	{
+		if (!NpcReady())
+			return;
+
+		float maxDist = cmd.max_dist;
+		if (maxDist <= 0)
+			maxDist = 300.0;
+
+		vector origin = m_Npc.GetPosition();
+		float bestDist = maxDist + 1.0;
+		vector bestPoint = origin;
+		string bestKind = "";
+
+		for (int dir = 0; dir < 8; dir++)
+		{
+			float angle = dir * (Math.PI2 / 8.0);
+			float dx = Math.Sin(angle);
+			float dz = Math.Cos(angle);
+			vector lastLand = origin;
+
+			for (float step = 25.0; step <= maxDist; step = step + 25.0)
+			{
+				float sx = origin[0] + dx * step;
+				float sz = origin[2] + dz * step;
+
+				string kind = "";
+				if (GetGame().SurfaceIsPond(sx, sz))
+					kind = "pond";
+				else if (GetGame().SurfaceIsSea(sx, sz))
+					kind = "sea";
+
+				if (kind == "")
+				{
+					// noch Land: Punkt als potenziellen Ufer-Standort merken
+					lastLand = Vector(sx, GetGame().SurfaceY(sx, sz), sz);
+					continue;
+				}
+
+				if (step < bestDist)
+				{
+					bestDist = step;
+					bestPoint = lastLand;
+					bestKind = kind;
+				}
+				break;   // erster Wassertreffer beendet diese Richtung
+			}
+		}
+
+		if (bestKind == "")
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "kein Wasser in " + maxDist.ToString() + " m gefunden";
+			return;
+		}
+
+		float bx = bestPoint[0];
+		float bz = bestPoint[2];
+		m_CmdStatus = "done";
+		m_CmdDetail = bx.ToString() + " " + bz.ToString() + " " + bestKind;
+	}
+
+	// Einen Kameraden (Agent oder Spieler) in 3 m medizinisch versorgen.
+	// cmd.target = Name, cmd.item = Classname aus dem EIGENEN Inventar.
+	// Server-authoritativ, Mechanik wie die Vanilla-Target-Aktionen
+	// (actionbandagebase.c / actionsplinttarget.c), nur ohne Animation.
+	private void CmdTreatOther(IsuCommand cmd)
+	{
+		if (!NpcReady())
+			return;
+
+		if (cmd.target == "" || cmd.item == "")
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "treat_other braucht target=Name und item=Classname";
+			return;
+		}
+
+		// Patient per Name: erst Agenten-Kamerad (Registry), dann menschlicher
+		// Spieler (Identity-Name) - gleiche Reihenfolge wie hand_over/follow.
+		PlayerBase patient = IsuAgentRegistry.FindByName(cmd.target);
+		if (!patient)
+		{
+			array<Man> players = new array<Man>();
+			GetGame().GetPlayers(players);
+			foreach (Man man : players)
+			{
+				PlayerBase pb = PlayerBase.Cast(man);
+				if (!pb || !pb.GetIdentity() || !pb.IsAlive())
+					continue;
+				if (pb.GetIdentity().GetName() != cmd.target)
+					continue;
+				patient = pb;
+				break;
+			}
+		}
+
+		if (!patient)
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "kein lebender Spieler/Survivor namens '" + cmd.target + "'";
+			return;
+		}
+
+		if (vector.Distance(m_Npc.GetPosition(), patient.GetPosition()) > 3.0)
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = cmd.target + " ist zu weit weg (max 3 m zum Behandeln)";
+			return;
+		}
+
+		// Medizin-Item aus dem EIGENEN Inventar (wird verbraucht)
+		ItemBase med = null;
+		array<EntityAI> items = new array<EntityAI>();
+		m_Npc.GetInventory().EnumerateInventory(InventoryTraversalType.PREORDER, items);
+		foreach (EntityAI ent : items)
+		{
+			ItemBase it = ItemBase.Cast(ent);
+			if (it && it.GetType() == cmd.item)
+			{
+				med = it;
+				break;
+			}
+		}
+
+		if (!med)
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "nicht im Inventar: " + cmd.item;
+			return;
+		}
+
+		string medType = med.GetType();
+
+		if (medType == "BandageDressing" || medType == "Rag")
+		{
+			if (!patient.IsBleeding())
+			{
+				m_CmdStatus = "failed";
+				m_CmdDetail = cmd.target + " blutet nicht";
+				return;
+			}
+			// Wie Vanilla ApplyBandage: staerkste Blutungsquelle schliessen,
+			// 1 Einheit verbrauchen (Rag-Stack) bzw. Item loeschen.
+			if (patient.GetBleedingManagerServer())
+				patient.GetBleedingManagerServer().RemoveMostSignificantBleedingSourceEx(med);
+			if (med.HasQuantity())
+				med.AddQuantity(-1, true);
+			else
+				med.Delete();
+			m_CmdStatus = "done";
+			m_CmdDetail = cmd.target + " verbunden (" + medType + ")";
+			return;
+		}
+
+		if (medType == "Splint")
+		{
+			if (patient.GetBrokenLegs() != eBrokenLegs.BROKEN_LEGS)
+			{
+				m_CmdStatus = "failed";
+				m_CmdDetail = cmd.target + " hat keinen unversorgten Beinbruch";
+				return;
+			}
+			// Wie Vanilla ActionSplintTarget: Beine teilheilen, Schiene anlegen.
+			patient.ApplySplint();
+			patient.GetInventory().CreateInInventory("Splint_Applied");
+			patient.SetBrokenLegs(eBrokenLegs.BROKEN_LEGS_SPLINT);
+			med.Delete();
+			m_CmdStatus = "done";
+			m_CmdDetail = cmd.target + " geschient";
+			return;
+		}
+
+		if (medType == "SalineBagIV" || medType == "BloodBagIV")
+		{
+			// Vereinfachte Infusion: +500 Blut sofort (Vanilla regeneriert ueber
+			// den Saline-Modifier bzw. transferiert ueber Zeit). Blutgruppen-Check
+			// BEWUSST weggelassen - haemolytisches Roulette waere fuer die
+			// Agenten nur Frust ohne Erkenntnisgewinn.
+			patient.AddHealth("GlobalHealth", "Blood", 500);
+			med.Delete();
+			m_CmdStatus = "done";
+			m_CmdDetail = cmd.target + " infundiert (+500 Blut, " + medType + ")";
+			return;
+		}
+
+		m_CmdStatus = "failed";
+		m_CmdDetail = "unbekanntes Behandlungs-Item: " + medType + " (BandageDressing/Rag/Splint/SalineBagIV/BloodBagIV)";
 	}
 
 	// ------------------------------------------------------ Befehls-Updates
@@ -3852,10 +4469,21 @@ class IsuBridge
 		if (m_CmdStatus != "running")
 			return;
 
-		if (m_CmdAction == "move_to" || m_CmdAction == "flee" || m_CmdAction == "pickup" || m_CmdAction == "loot_corpse" || m_CmdAction == "loot_container" || m_CmdAction == "store_container" || m_CmdAction == "harvest" || m_CmdAction == "regroup")
+		// Pending-Items ZUERST: der fetch-Pfad wechselt nach dem Aufheben in
+		// die Anzieh-Phase (CmdWear setzt m_WearPendingItem), m_CmdAction
+		// bleibt aber "fetch" - der Action-String-Dispatch liesse den Retry
+		// sonst nie laufen (Kommando haengt ewig in "running", Item-Claim
+		// blockiert die anderen Bots).
+		if (m_WearPendingItem)
+			UpdateWearRetry();
+		else if (m_EquipPendingItem)
+			UpdateEquipRetry();
+		else if (m_CmdAction == "move_to" || m_CmdAction == "flee" || m_CmdAction == "pickup" || m_CmdAction == "fetch" || m_CmdAction == "loot_corpse" || m_CmdAction == "loot_container" || m_CmdAction == "store_container" || m_CmdAction == "harvest" || m_CmdAction == "regroup")
 			UpdateWalk();
 		else if (m_CmdAction == "engage")
 			UpdateEngage();
+		else if (m_CmdAction == "hunt")
+			UpdateHunt();
 		else if (m_CmdAction == "wear")
 			UpdateWearRetry();
 		else if (m_CmdAction == "equip_best" || m_CmdAction == "equip")
@@ -4000,7 +4628,8 @@ class IsuBridge
 		// Pickup-Ziel kann zwischenzeitlich verschwinden: jedes eAI-Aufheben
 		// ist Clone+Delete, was unsere Referenz nullt, obwohl ein gleiches
 		// Item oft weiter daliegt. EINMAL neu suchen, bevor wir aufgeben.
-		if (m_CmdAction == "pickup" && !m_PickupItem)
+		// Gilt auch fuer "fetch" (Radial "Hol das" = Pickup + Anziehen).
+		if ((m_CmdAction == "pickup" || m_CmdAction == "fetch") && !m_PickupItem)
 		{
 			ItemBase again = FindNearestGroundItem(m_PickupFilter, 50.0);
 			if (again)
@@ -4019,7 +4648,7 @@ class IsuBridge
 		float dist = Dist2D(m_Npc.GetPosition(), m_MoveTarget);
 
 		float arriveDist = 3.0;
-		if (m_CmdAction == "pickup")
+		if (m_CmdAction == "pickup" || m_CmdAction == "fetch")
 			arriveDist = 2.0;
 
 		if (dist < arriveDist)
@@ -4065,7 +4694,7 @@ class IsuBridge
 	{
 		RestoreSpeed();
 
-		if (m_CmdAction == "pickup")
+		if (m_CmdAction == "pickup" || m_CmdAction == "fetch")
 		{
 			DoTakePickupItem();
 			return;
@@ -4107,7 +4736,7 @@ class IsuBridge
 		IsuState state = new IsuState();
 		state.seq = m_Seq;
 		state.uptime = GetGame().GetTickTime();
-		state.bridge_version = "0.7.1";
+		state.bridge_version = "0.8.0";
 
 		if (m_Npc)
 		{
@@ -4128,11 +4757,16 @@ class IsuBridge
 			state.npc.heat_comfort = m_Npc.GetStatHeatComfort().Get();
 			if (m_Npc.GetStomach())
 				state.npc.stomach_volume = m_Npc.GetStomach().GetStomachVolume();
+			if (m_Npc.GetStatWet())
+				state.npc.wet = m_Npc.GetStatWet().Get();
 			state.npc.fighting = m_Npc.m_eAI_IsFightingFSM;
 			state.npc.name = m_NpcName;
 			state.npc.following = m_Following;
 			state.npc.unconscious = m_Npc.IsUnconscious();
 			state.npc.in_vehicle = m_Npc.IsInTransport();
+			// Blutung sichtbar machen: ohne das Feld wusste der NPC nie, DASS
+			// er blutet (run_agent macht daraus den DU-BLUTEST-Weckruf).
+			state.npc.bleeding = m_Npc.IsBleeding();
 
 			EntityAI inHands = m_Npc.GetHumanInventory().GetEntityInHands();
 			if (inHands)
@@ -4140,7 +4774,10 @@ class IsuBridge
 
 			CollectInventory(state);
 			CollectNearby(state, pos);
+			CollectDisease(state);
 		}
+
+		CollectWorld(state);
 
 		state.command.id = m_CmdId;
 		state.command.action = m_CmdAction;
@@ -4185,6 +4822,25 @@ class IsuBridge
 			EntityAI parent = item.GetHierarchyParent();
 			if (parent && Weapon_Base.Cast(parent))
 				info.parent = parent.GetType();
+
+			// Am Koerper getragen (Slot-Attachment direkt am NPC, nicht Hand,
+			// nicht Cargo) - Grundlage fuer die Kleidungswahl (dress_best).
+			if (parent && parent == m_Npc && ent != inHands)
+				info.worn = true;
+
+			// Kleidung: Waerme/Slot aus der Config, Stauraum vom Entity
+			if (info.kind == "clothing")
+			{
+				float cw;
+				int cs;
+				string csl;
+				ClothingStats(info.classname, cw, cs, csl);
+				info.warmth = cw;
+				info.cargo_size = ItemCargoSize(item);
+				if (info.cargo_size == 0)
+					info.cargo_size = cs;
+				info.slot = csl;
+			}
 
 			// Waffen haben keine GetQuantity (stand immer "x0", obwohl
 			// geladen) - stattdessen die echte Munition zaehlen:
@@ -4234,6 +4890,57 @@ class IsuBridge
 			return "clothing";
 
 		return "other";
+	}
+
+	// Kleidungs-Kennwerte aus der Item-Config, pro Classname gecacht:
+	// warmth = heatIsolation (0..1), cargoSize = Stauraum in Slots
+	// (Breite*Hoehe der Cargo-Klasse, 0 = keiner), slot = erster
+	// Koerper-Slot (Body/Legs/Feet/Headgear/Gloves/Vest/Back/Shoulder).
+	// Grundlage fuer die systematische Kleidungswahl des Gehirns
+	// (frieren -> Waerme zaehlt, moderat -> Stauraum zaehlt).
+	private void ClothingStats(string type, out float warmth, out int cargoSize, out string slot)
+	{
+		if (s_WarmthCache.Contains(type))
+		{
+			warmth = s_WarmthCache.Get(type);
+			cargoSize = s_CargoCache.Get(type);
+			slot = s_SlotCache.Get(type);
+			return;
+		}
+
+		string cfg = "CfgVehicles " + type + " ";
+		warmth = GetGame().ConfigGetFloat(cfg + "heatIsolation");
+
+		// Cargo-Groesse per Config schlug fehl (Vererbungs-Pfad liefert 0) -
+		// der Cache haelt hier nur den Config-Versuch als Fallback; die echte
+		// Groesse kommt in ItemCargoSize direkt vom Entity.
+		cargoSize = 0;
+		array<int> dims = new array<int>();
+		GetGame().ConfigGetIntArray(cfg + "Cargo itemsCargoSize", dims);
+		if (dims.Count() >= 2)
+			cargoSize = dims.Get(0) * dims.Get(1);
+
+		slot = "";
+		TStringArray slots = new TStringArray();
+		GetGame().ConfigGetTextArray(cfg + "inventorySlot", slots);
+		if (slots.Count() > 0)
+			slot = slots.Get(0);
+
+		s_WarmthCache.Insert(type, warmth);
+		s_CargoCache.Insert(type, cargoSize);
+		s_SlotCache.Insert(type, slot);
+	}
+
+	// Echte Cargo-Kapazitaet (Slots) direkt vom Entity - der Config-Pfad
+	// "Cargo itemsCargoSize" liefert ueber die Vererbung 0.
+	private int ItemCargoSize(ItemBase item)
+	{
+		if (!item || !item.GetInventory())
+			return 0;
+		CargoBase cargo = item.GetInventory().GetCargo();
+		if (!cargo)
+			return 0;
+		return cargo.GetWidth() * cargo.GetHeight();
 	}
 
 	private void CollectNearby(IsuState state, vector center)
@@ -4326,6 +5033,19 @@ class IsuBridge
 				info.kind = "item";
 				info.item_kind = GroundItemKind(item);
 				info.cargo = CountContents(item);
+				// Boden-Kleidung: Waerme/Slot aus der Config, Stauraum vom Entity
+				if (info.item_kind == "clothing")
+				{
+					float gw;
+					int gs;
+					string gsl;
+					ClothingStats(info.classname, gw, gs, gsl);
+					info.warmth = gw;
+					info.cargo_size = ItemCargoSize(item);
+					if (info.cargo_size == 0)
+						info.cargo_size = gs;
+					info.slot = gsl;
+				}
 				itemCount++;
 			}
 			else
@@ -4386,6 +5106,91 @@ class IsuBridge
 		if (Magazine.Cast(item))
 			return "ammo";
 		return ClassifyItem(item);
+	}
+
+	// Welt-Zustand: In-Game-Zeit, Sonnenphase, Wetter. Laeuft auch ohne NPC
+	// (Zeit/Wetter sind global); nur temp_c braucht den NPC (Environment).
+	private void CollectWorld(IsuState state)
+	{
+		int year;
+		int month;
+		int day;
+		int hour;
+		int minute;
+		GetGame().GetWorld().GetDate(year, month, day, hour, minute);
+
+		string hh = hour.ToString();
+		if (hour < 10)
+			hh = "0" + hh;
+		string mm = minute.ToString();
+		if (minute < 10)
+			mm = "0" + mm;
+		state.world.time = hh + ":" + mm;
+
+		// Sonnenphase grob nach Jahreszeit (Mittelbreiten wie Chernarus/Livonia):
+		// Sommer lange, Winter kurze Tage. Die Heuristik reicht fuers Verhalten
+		// (Aufbruch, Nachtwache) - echte Sonnenstands-Berechnung waere Overkill.
+		int sunrise;
+		int sunset;
+		if (month >= 5 && month <= 8)
+		{
+			sunrise = 5;
+			sunset = 21;
+		}
+		else if (month == 3 || month == 4 || month == 9 || month == 10)
+		{
+			sunrise = 6;
+			sunset = 19;
+		}
+		else
+		{
+			sunrise = 8;
+			sunset = 17;
+		}
+
+		string sun = "night";
+		if (hour >= sunrise - 1 && hour < sunrise + 1)
+			sun = "dawn";
+		else if (hour >= sunrise + 1 && hour < sunset - 1)
+			sun = "day";
+		else if (hour >= sunset - 1 && hour < sunset + 1)
+			sun = "dusk";
+		state.world.sun = sun;
+
+		Weather weather = GetGame().GetWeather();
+		if (weather)
+		{
+			state.world.rain = weather.GetRain().GetActual();
+			state.world.fog = weather.GetFog().GetActual();
+			state.world.wind = weather.GetWindSpeed();
+		}
+
+		// Umgebungstemperatur am NPC (Environment rechnet Hoehe, Innenraum,
+		// Naesse-Umfeld und Waermequellen mit ein)
+		if (m_Npc && m_Npc.m_Environment)
+			state.world.temp_c = m_Npc.m_Environment.GetTemperature();
+	}
+
+	// Krankheits-Erreger des NPC (PlayerAgentPool). Melde-Schwelle = halbe
+	// Vanilla-Aktivierungsschwelle (cholera.c 250, salmonella.c 60,
+	// influenza.c 600, woundinfection.c 100, braindisease.c 2000) - so kann
+	// das Gehirn reagieren (Tabletten, Wasser abkochen), BEVOR die Symptome
+	// zuschlagen. Erreger unter der Schwelle tauchen NICHT auf.
+	private void CollectDisease(IsuState state)
+	{
+		AddDiseaseAgent(state, "cholera", eAgents.CHOLERA, 125);
+		AddDiseaseAgent(state, "salmonella", eAgents.SALMONELLA, 30);
+		AddDiseaseAgent(state, "influenza", eAgents.INFLUENZA, 300);
+		AddDiseaseAgent(state, "wound", eAgents.WOUND_AGENT, 50);
+		AddDiseaseAgent(state, "brain", eAgents.BRAIN, 1000);
+		state.npc.disease.sick = state.npc.disease.agents.Count() > 0;
+	}
+
+	private void AddDiseaseAgent(IsuState state, string name, int agentId, int threshold)
+	{
+		int agentCount = m_Npc.GetSingleAgentCount(agentId);
+		if (agentCount >= threshold)
+			state.npc.disease.agents.Set(name, agentCount);
 	}
 
 	// --------------------------------------------------------------- Helpers

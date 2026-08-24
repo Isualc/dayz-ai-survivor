@@ -1,0 +1,33 @@
+{
+  "id": "horde",
+  "name": "Verteidigung: Horde am Lager",
+  "comment": "Verteidigungsmission am Lagerpunkt aus dem Menue (camp=null). Drei Wellen Infizierte im Ring 80-120 m ums Lager, gespawnt ueber das Bridge-Kommando spawn_infected mit x/z/count (Fallback ohne Koordinaten, wenn die Mod die Felder noch nicht kennt). Erfolg: keine Infizierten mehr am Lager ODER 15-min-Zeitlimit. Laeuft auf jeder Karte (map leer = kein Karten-Check).",
+  "map": "",
+  "map_label": "",
+  "camp": null,
+  "rally": null,
+  "briefing": "MISSION: LAGER VERTEIDIGEN. Euer Lager ist euer Rueckzugsort - und es ist nicht mehr sicher: das Lagezentrum meldet eine HORDE Infizierter im Anmarsch. Bleibt ZUSAMMEN am Lager, geht NICHT auf eigene Faust los. Macht euch bereit: observe, Waffe ziehen (equip_best; bei wenigen einzelnen Infizierten lieber leise Nahkampf, equip_melee), Ruecken zueinander, Sichtlinien aufteilen. Die Infizierten kommen in WELLEN aus verschiedenen Richtungen - haltet Stellung am Lager, meldet Kontakte kurz per Funk (say) und helft angeschlagenen Kameraden (Bandagen). Erst wenn keine Infizierten mehr kommen, ist das Lager gesichert.",
+  "role_briefings": {},
+  "patrols": [],
+  "force_ambient_patrols": false,
+  "force_group": true,
+  "objective": {
+    "type": "defend",
+    "radius_m": 200.0,
+    "timeout_sec": 900.0
+  },
+  "events": [
+    {"at_sec": 0, "type": "broadcast", "text": "FUNK von Lagezentrum: Horde im Anmarsch aufs Lager, macht euch bereit!", "prio": true},
+    {"at_sec": 30, "type": "spawn_infected", "count": 4, "ring_min_m": 80.0, "ring_max_m": 120.0},
+    {"at_sec": 120, "type": "spawn_infected", "count": 5, "ring_min_m": 80.0, "ring_max_m": 120.0},
+    {"at_sec": 210, "type": "spawn_infected", "count": 6, "ring_min_m": 80.0, "ring_max_m": 120.0}
+  ],
+  "success": {
+    "type": "all_infected_dead",
+    "timeout_sec": 900.0,
+    "radius_m": 200.0,
+    "clear_sec": 60.0
+  },
+  "on_success_broadcast": "FUNK von Lagezentrum: Lager gesichert - keine Infizierten mehr in der Naehe. Gut gemacht. Verarztet Verwundete und sammelt euch am Lager.",
+  "on_fail_broadcast": "FUNK von Lagezentrum: Zeitlimit erreicht, Horde-Alarm beendet. Sichert das Lager, verarztet Verwundete und bleibt wachsam."
+}
