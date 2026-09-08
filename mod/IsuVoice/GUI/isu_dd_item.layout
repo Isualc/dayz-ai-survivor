@@ -1,39 +1,40 @@
 ButtonWidgetClass IsuDdItem {
  position 0 0
- size 296 32
+ size 320 36
  hexactpos 1
  vexactpos 1
  hexactsize 1
  vexactsize 1
- color 0.13 0.16 0.22 1
+ style Empty
  text ""
  font "gui/fonts/sdf_MetronBook24"
- "text halign" left
- "text valign" center
  {
   ImageWidgetClass DdItemBg {
-   ignorepointer 1
    position 0 0
-   size 296 32
+   size 320 36
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   color 0.09 0.11 0.15 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
    mode blend
   }
   TextWidgetClass DdItemLabel {
-   ignorepointer 1
    position 12 0
-   size 284 32
+   size 296 36
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
+   ignorepointer 1
+   userID 16
    text ""
    font "gui/fonts/sdf_MetronBook24"
-   color 0.96 0.97 0.99 1
+   "exact text" 1
+   "exact text size" 16
    "text valign" center
+   color 0.922 0.937 0.894 1
   }
  }
 }

@@ -81,11 +81,11 @@ class IsuNameplateHud
 
 	protected string ActionText(int actionId)
 	{
-		if (actionId == 0) return "kämpft";
-		if (actionId == 1) return "lootet";
-		if (actionId == 2) return "folgt";
-		if (actionId == 3) return "geht";
-		return "wartet";
+		if (actionId == 0) return IsuUiText.Choose("fighting", "kämpft");
+		if (actionId == 1) return IsuUiText.Choose("looting", "lootet");
+		if (actionId == 2) return IsuUiText.Choose("following", "folgt");
+		if (actionId == 3) return IsuUiText.Choose("moving", "geht");
+		return IsuUiText.Choose("waiting", "wartet");
 	}
 
 	protected int SlotColor(int slot)
@@ -190,6 +190,7 @@ class IsuNameplateHud
 
 			TextWidget it = m_Intents[poolIdx];
 			if (it)
+				// Generated intentions and speech below are never UI-translated.
 				it.SetText(t.intent);
 
 			// Comic-Sprechblase: zeigt was der NPC gesagt hat, ~6 s lang, nur wenn

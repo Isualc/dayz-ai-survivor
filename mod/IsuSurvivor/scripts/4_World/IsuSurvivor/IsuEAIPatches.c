@@ -192,18 +192,13 @@ modded class eAIBase
 						targeted = false;
 						return false;
 					}
-					// Fremder NPC: ist seine Fraktion UNS (civilian) gegenueber
-					// FEINDLICH, behandeln wir ihn als Feind. Sonst wuerde ein
-					// ziviler Begleiter (civilian.IsFriendly->true zu allen) auch
-					// Banditen/feindliche Patrouillen ignorieren. Friedliche
-					// Survivor wurden zu spaet als Bedrohung erkannt. Jetzt: alle ausser Trader.
-					// Kein blindes Vertrauen: jeder fremde NPC ist potenziell feindlich.
-					if (!otherAI.GetType().Contains("Trader"))   // Fremder (ausser Trader) = Feind
-					{
-						friendly = false;
-						targeted = true;
-						return true;
-					}
+					// Fremde NPCs beurteilt Expansion unten anhand ihrer Fraktion
+					// und der tatsaechlichen Bedrohung. Insbesondere sind Guards
+					// nicht schon wegen ihres NPC-Typs feindlich: sie muessen die
+					// Waffe heben/kaempfen und uns als Bedrohung betrachten.
+					// Kein kuenstliches targeted=true: das provozierte neutrale
+					// Wachen auch ohne Angriffsbefehl. Banditen und echte
+					// Gegenwehr bleiben durch super.PlayerIsEnemy erhalten.
 				}
 			}
 		}

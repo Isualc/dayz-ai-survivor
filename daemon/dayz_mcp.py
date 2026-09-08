@@ -20,6 +20,7 @@ from mcp.server.fastmcp import FastMCP
 import bridge as bridge_mod
 from bridge import Bridge, format_observation, inventory_signature, DEFAULT_PROFILE
 import tactics
+import survival
 
 # Mitspieler-Registry (Schnittstelle 5): loest Funk-/Alias-Namen auf den
 # DayZ-Profilnamen auf. Abhaengigkeitsfrei; fehlt sie, faellt der Namens-
@@ -86,6 +87,15 @@ VOICE_OUTBOX = args.outbox or os.path.join(_agent_home(args.npc_id), "voice_outb
 # neuer Funk auftaucht, damit der Agent sofort auf den Spieler reagiert.
 VOICE_INBOX = os.path.join(os.path.dirname(VOICE_OUTBOX), "voice_inbox.jsonl")
 BRIDGE.voice_inbox = VOICE_INBOX
+# Recipe and outcome memory belong to this survivor, across ALL model providers.
+tactics.LEARNED_FILE = os.path.join(os.path.dirname(VOICE_OUTBOX), "learned_recipes.json")
+SURVIVAL_MEMORY = os.path.join(os.path.dirname(VOICE_OUTBOX), "survival_learning.json")
+# Eigene Ablagen (drop) pro Agent: loot_area/explore_step/survival lassen sie
+# liegen, statt sie zwei Minuten später wieder einzusammeln (Viktor 08.09.).
+tactics.DROP_LEDGER = os.path.join(os.path.dirname(VOICE_OUTBOX), "dropped_items.json")
+# Kritische Welt-Ereignisse (run_agent-Watcher: Blutung/Gefahr/Bewusstlos)
+# brechen laufende Langaktionen ab - wie Spieler-Funk, nur über diese Datei.
+BRIDGE.urgent_flag = os.path.join(os.path.dirname(VOICE_OUTBOX), "urgent_event.json")
 LAST_CHAT_ID = 0
 LAST_INV_SIG = None  # Inventar-Kennung des letzten observe (Delta-Erkennung)
 
@@ -285,6 +295,11 @@ _travel_thread: threading.Thread | None = None
 _travel_stop: threading.Event | None = None
 
 
+def _hud_text(english: str, german: str) -> str:
+    """Localize only built-in HUD labels; agent-authored text stays untouched."""
+    return german if AGENT_LANG == "de" else english
+
+
 def _write_intent_line(text: str) -> None:
     """intent_<id>.txt schreiben (Nameplate-Gedankenzeile), bildschirmtauglich
     latinisiert und auf Laenge gekappt. Best effort."""
@@ -346,6 +361,30 @@ _TRAVEL_MAX_DETOUR = 2500.0             # max. Quergang pro Hindernis-SEITE (m);
 
 
 def _travel_worker(gx: float, gz: float, stop: threading.Event) -> None:
+    """Hold ownership even between commands, visible to the Runner controller."""
+    path = os.path.join(BRIDGE.dir, f"travel_active_{BRIDGE.npc_id}.json")
+    token = f"{os.getpid()}:{threading.get_ident()}:{time.time_ns()}"
+    lease = {"pid": os.getpid(), "token": token, "x": gx, "z": gz}
+    BRIDGE.survival_travel_active = True
+    try:
+        os.makedirs(BRIDGE.dir, exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as stream:
+            json.dump(lease, stream)
+        os.replace(tmp, path)
+        _travel_body(gx, gz, stop)
+    finally:
+        try:
+            with open(path, encoding="utf-8") as stream:
+                current = json.load(stream)
+            if current.get("token") == token:
+                os.unlink(path)
+                BRIDGE.survival_travel_active = False
+        except (OSError, ValueError):
+            BRIDGE.survival_travel_active = False
+
+
+def _travel_body(gx: float, gz: float, stop: threading.Event) -> None:
     """Kettet move_to-Segmente Richtung (gx,gz). Fortschritt = der NPC hat
     sich >=30 m bewegt (auch seitlich - Umwege zaehlen). Bei Blockade: erst
     unstick, dann Wall-Following quer zur Ziellinie. Erst wenn beide Seiten
@@ -416,13 +455,17 @@ def _travel_worker(gx: float, gz: float, stop: threading.Event) -> None:
         px, pz = p
         d = math.hypot(gx - px, gz - pz)
         if d <= _TRAVEL_ARRIVE:
-            _write_intent_line(f"angekommen bei {gx:.0f}/{gz:.0f}")
+            _write_intent_line(_hud_text(
+                f"Arrived at {gx:.0f}/{gz:.0f}",
+                f"Angekommen bei {gx:.0f}/{gz:.0f}"))
             _write_travel_event("arrived", gx, gz, f"Distanz {d:.0f} m")
             return
         goal_bearing = math.atan2(gz - pz, gx - px)
 
         # 1) Zielkurs (gerade aufs Ziel)
-        _write_intent_line(f"unterwegs nach {gx:.0f}/{gz:.0f}, noch {d:.0f} m")
+        _write_intent_line(_hud_text(
+            f"Heading to {gx:.0f}/{gz:.0f}, {d:.0f} m left",
+            f"Unterwegs nach {gx:.0f}/{gz:.0f}, noch {d:.0f} m"))
         moved = _segment(goal_bearing, min(_TRAVEL_SEG, d))
         if moved < 0:
             _write_travel_event("aborted", gx, gz, "kein Koerper in der Welt")
@@ -470,8 +513,9 @@ def _travel_worker(gx: float, gz: float, stop: threading.Event) -> None:
         for side in sides:
             for ang in _TRAVEL_DETOUR_ANGLES:
                 bearing = goal_bearing + math.radians(side * ang)
-                _write_intent_line(f"Hindernis voraus - weiche aus "
-                                   f"({side * ang:+.0f} Grad)")
+                _write_intent_line(_hud_text(
+                    f"Obstacle ahead - changing course ({side * ang:+.0f} degrees)",
+                    f"Hindernis voraus - ändere Kurs ({side * ang:+.0f} Grad)"))
                 moved = _segment(bearing, _TRAVEL_DETOUR_SEG,
                                  timeout=_TRAVEL_DETOUR_TIMEOUT)
                 if moved < 0:
@@ -509,19 +553,25 @@ def _travel_worker(gx: float, gz: float, stop: threading.Event) -> None:
             committed = 0
             backoff = 1
             stagnation = 0
-            _write_intent_line("Sackgasse auf dieser Seite - drehe um")
+            _write_intent_line(_hud_text(
+                "Dead end on this side - turning around",
+                "Sackgasse auf dieser Seite - drehe um"))
         if lat < -_TRAVEL_MAX_DETOUR and -1 not in excluded:
             excluded.add(-1)
             committed = 0
             backoff = 1
             stagnation = 0
-            _write_intent_line("Sackgasse auf dieser Seite - drehe um")
+            _write_intent_line(_hud_text(
+                "Dead end on this side - turning around",
+                "Sackgasse auf dieser Seite - drehe um"))
         if len(excluded) >= 2 or stagnation >= 15:
             success_side = 0   # aussichtslos -> stuck-Event unten
         if not success_side:
             q = _pos() or (px, pz)
             nd = math.hypot(gx - q[0], gz - q[1])
-            _write_intent_line(f"komme nicht weiter Richtung {gx:.0f}/{gz:.0f}")
+            _write_intent_line(_hud_text(
+                f"Cannot make progress toward {gx:.0f}/{gz:.0f}",
+                f"Komme nicht weiter Richtung {gx:.0f}/{gz:.0f}"))
             _write_travel_event(
                 "stuck", gx, gz,
                 f"blockiert trotz Ausweichversuchen (beide Seiten, 90/135 "
@@ -565,14 +615,21 @@ def _observe_text(full: bool = False) -> str:
     return text
 
 
+def _safe_state() -> dict:
+    """State lesen, ohne an einer Stub-/Test-Bridge zu scheitern (best effort)."""
+    try:
+        return BRIDGE.read_state() or {}
+    except (AttributeError, OSError, ValueError, TypeError):
+        return {}
+
+
 def _outcome(result: dict, success_text: str, needle: str = "") -> str:
     status = result.get("status", "unbekannt")
     detail = result.get("detail") or ""
     if status == "done":
         return f"{success_text} {detail}".rstrip()
     if status == "interrupted":
-        return ("ABGEBROCHEN: Der Spieler funkt dich gerade an. Hoer SOFORT zu "
-                "und reagiere auf seinen Funk, bevor du weitermachst.")
+        return bridge_mod.interrupt_text(result)
     if status == "running":
         dist = result.get("dist_to_target", -1.0)
         if dist is not None and dist >= 0:
@@ -602,6 +659,44 @@ def observe(full: bool = False) -> str:
     wenn du die Lage nicht sicher kennst. Unveraendertes Inventar wird als
     Einzeiler gezeigt; observe(full=true) erzwingt die volle Liste."""
     return _observe_text(full=full)
+
+
+@mcp.tool()
+def survival_tick(explore: bool = True) -> str:
+    """Einen kurzen autonomen Ueberlebensschritt starten, ohne LLM-Folgekette.
+    Priorisiert Blutung, Gefahr, Durst, Hunger, Temperatur, Krankheit, Inventar,
+    Loot und Jagd. Kehrt sofort zurueck; nachfolgende Server-Snapshots pruefen
+    Ergebnisse und lernen dauerhaft. Laufende Reise/Folgeauftraege bleiben aktiv.
+    explore=False beschraenkt auf sichtbare Versorgung, ohne Erkundungsmarsch.
+    Bei needs_llm=true das genannte Problem gezielt selbst loesen."""
+    return json.dumps(survival.survival_tick(
+        BRIDGE, AGENT_NAME, SURVIVAL_MEMORY, allow_explore=explore), ensure_ascii=False)
+
+
+@mcp.tool()
+def survival_memory() -> str:
+    """Messbare Survival-Erfahrungen, letzte Ergebnisse und echte Faehigkeiten.
+    verified bedeutet durch Inventar/Vitalwerte/Position belegtes Ergebnis,
+    nicht bloss einen Erfolgstext. Medikamenteinnahme beweist keine Heilung.
+    Die Erfahrung bleibt bei einem Modellwechsel und nach Neustarts erhalten."""
+    return json.dumps(survival.memory_summary(SURVIVAL_MEMORY), ensure_ascii=False)
+
+
+@mcp.tool()
+def harvest_crops() -> str:
+    """Reife Pflanzen aus einem sichtbaren Garten ernten (max. 3 m).
+    Nutzt echte PlantBase.Harvest der Servermod. Saeen/Waessern ist damit nicht
+    implementiert. Liegt der Garten weiter weg, zuerst move_to/travel_to nutzen;
+    abgelegte Ernte danach mit pickup oder loot_area aufnehmen."""
+    state = BRIDGE.read_state() or {}
+    gardens = [e for e in state.get("nearby", []) if e.get("kind") == "garden"
+               and e.get("harvestable") is True]
+    if not gardens:
+        return "Kein erntereifer Garten sichtbar (oder Servermod ohne Garten-Telemetrie)."
+    if min(e.get("distance", 999) for e in gardens) > 3:
+        garden = min(gardens, key=lambda e: e.get("distance", 999))
+        return f"Erntereifer Garten bei x={garden.get('x')} z={garden.get('z')}; erst auf 3 m naehern."
+    return _outcome(BRIDGE.run("harvest_crops", timeout=20), "Pflanze geerntet; Ertrag am Boden aufnehmen:")
 
 
 @mcp.tool()
@@ -708,6 +803,13 @@ def pickup(classname: str = "", item_name: str = "", item: str = "",
     _abort_travel()
     result = BRIDGE.run("pickup", text=needle, timeout=60, interruptible=True)
     out = _outcome(result, "Aufgehoben:", needle=needle)
+    if result.get("status") == "done":
+        # Gezieltes Aufheben hebt die Ablage-Sperre auf: das Gehirn will das
+        # Item ausdrücklich wieder (Ballast-Filter gilt nur für Auto-Loot).
+        picked = (result.get("detail") or "").strip().split(" ")[0]
+        for cn in {picked, needle}:
+            if cn:
+                tactics.forget_drop(cn)
     # Munitionskiste sofort aufmachen - sonst zeigt sie "x0" und wirkt leer,
     # NPCs werfen sie dann irrtuemlich weg statt die Munition zu nutzen.
     detail = result.get("detail") or ""
@@ -808,7 +910,10 @@ def wear(classname: str = "", item_name: str = "", item: str = "",
     """Kleidungsstueck anziehen (gegen Kaelte - die VITALS zeigen, ob du
     frierst). Sucht im Inventar UND am Boden im Umkreis von 10 m, ein
     vorheriges pickup ist nicht noetig. Ist der Koerper-Slot belegt, wird
-    automatisch getauscht: das alte Stueck landet am Boden."""
+    automatisch getauscht; der Inhalt des alten Stuecks wandert vorher in
+    deine anderen Taschen. Meldet das Ergebnis "AM BODEN: ..." oder
+    "ACHTUNG: ... liegt mit N Item(s) am Boden", dann pickup/loot_container
+    darauf - sonst ist das Zeug weg."""
     needle = _needle(classname, item_name, item, name)
     if not needle:
         return "Bitte classname angeben, z.B. wear(classname=\"BeanieHat\")."
@@ -839,9 +944,22 @@ def equip_best() -> str:
     # (tactics.pick_best_weapon) bleibt nur fuer die Loot-Bewertung im Einsatz.
     result = BRIDGE.run("equip_best", timeout=30)
     detail = result.get("detail") or ""
+    if result.get("status") != "done" and "verschwunden" in detail.lower():
+        # Expansion KLONT die Waffe beim Take-to-Hands (Original gelöscht);
+        # ältere Mod-Builds verlieren damit den Zeiger und melden
+        # "verschwunden", obwohl die Waffe in der Hand liegt (Igor 20:51).
+        # Handinhalt prüfen, bevor das als Fehlschlag zählt.
+        time.sleep(2.0)
+        hands = (BRIDGE.read_state() or {}).get("npc", {}).get("in_hands", "")
+        if hands and (tactics.classify_weapon(hands) or tactics.classify_melee(hands)):
+            result = {"status": "done", "detail": hands}
+            detail = hands
+        else:
+            result = BRIDGE.run("equip_best", timeout=30)
+            detail = result.get("detail") or ""
     if result.get("status") == "done":
         _EQUIP_FAILS = 0
-        return f"Ausgeruestet: {detail}"
+        return f"Ausgerüstet: {detail}"
     if "keine brauchbare Waffe" in detail:
         _EQUIP_FAILS = 0   # kein transienter Glitch, sondern echte Leere
         return "Keine brauchbare Waffe im Inventar (ruinierte zaehlen nicht)."
@@ -898,15 +1016,18 @@ def unpack_ammo(classname: str = "") -> str:
 
 
 @mcp.tool()
-def reload() -> str:
-    """Lose Munition (Ammo_*-Stapel) in passende Magazine und in Waffen mit
-    internem Magazin (Mosin, SKS, Flinten) umladen - fuer die Waffe in deiner
-    Hand (sonst die beste im Inventar). SO wird aus gelooteter Munition
-    Feuerkraft: AmmoBox erst mit unpack_ammo oeffnen, dann reload. Das
-    Magazin-WECHSELN im Gefecht passiert automatisch, sobald ein gefuelltes
-    Magazin im Inventar liegt. Sag dir observe, dass deine Waffe UNGELADEN
-    ist? Dann reload."""
-    result = BRIDGE.run("reload", timeout=20)
+def reload(weapon: str = "", classname: str = "") -> str:
+    """Lose Munition (Ammo_*-Stapel) in passende Magazine, interne Magazine
+    (Mosin, SKS) und Kammern (Izh18, Flinten, Einzellader) umladen. Ohne
+    Angabe: erst die Waffe in der Hand, dann jede andere Feuerwaffe im
+    Inventar, bis eine passende Munition findet. weapon="MP5K" laedt gezielt
+    diese Waffe (auch wenn eine andere in der Hand ist). SO wird aus
+    gelooteter Munition Feuerkraft: AmmoBox erst mit unpack_ammo oeffnen,
+    dann reload. Das Magazin-WECHSELN im Gefecht passiert automatisch. Das
+    Ergebnis nennt Waffe und Schusszahl - nur DAS zaehlt als geladen, nie
+    eine Annahme."""
+    target = (weapon or classname or "").strip()
+    result = BRIDGE.run("reload", text=target, timeout=20)
     return _outcome(result, "Nachgeladen:")
 
 
@@ -930,6 +1051,9 @@ def loot_area(max_items: int = 6) -> str:
         parts.append("Nichts Lohnendes in Sichtweite gefunden.")
     if result["failed"]:
         parts.append("Nicht erreichbar: " + ", ".join(result["failed"]))
+    if result.get("ignored"):
+        parts.append("Eigene Ablagen liegen gelassen (bewusst weggeworfen): "
+                     + ", ".join(result["ignored"]))
     # Aufgehobene Munitionskisten gleich aufmachen, sonst bleibt die Mun drin.
     boxes = [cn for cn in haul if cn.startswith("AmmoBox")]
     for cn in boxes:
@@ -1059,6 +1183,18 @@ def _is_for_player(text: str) -> bool:
     return any(name in t for name in PLAYER_NAMES)
 
 
+# Entwickler-Schalter "NPC radio TTS" (Arena-Menü, 29.08.): ON = ALLE
+# Äußerungen werden über ElevenLabs vertont, auch reiner NPC-zu-NPC-Funk.
+# OFF (Default) = bisheriges Verhalten, nur Spieler-gerichtetes (_is_for_player).
+# Kommt als ISU_NPC_TTS über die Prozesskette Supervisor -> run_agent ->
+# Claude Code -> dayz_mcp und wirkt damit NUR auf Ketten, die NACH dem Setzen
+# gestartet wurden (Arena: der Supervisor setzt os.environ bei jedem
+# Rundenstart; Solo: Env in der Konsole setzen, DANN run_agent starten).
+# setx erreicht laufende Prozesse nicht - deren Umgebung ist eingefroren.
+def _npc_tts() -> bool:
+    return os.environ.get("ISU_NPC_TTS", "0") == "1"
+
+
 @mcp.tool()
 def say(text: str = "", message: str = "", content: str = "") -> str:
     """Etwas laut sagen. Erscheint immer im In-Game-Chat (Spieler in 60 m).
@@ -1079,7 +1215,7 @@ def say(text: str = "", message: str = "", content: str = "") -> str:
     if screen != text:
         _radio_native(screen, text)   # andere NPCs sollen das Original lesen, nicht das Transliterat
     result = BRIDGE.run("say", text=screen, timeout=15)
-    if _discord_active() and _is_for_player(text):
+    if _discord_active() and (_npc_tts() or _is_for_player(text)):
         _outbox({"type": "tts", "text": text, "agent": AGENT_NAME,
                  "voice": AGENT_VOICE})
     return _outcome(result, "Gesagt.")
@@ -1111,7 +1247,7 @@ def _speak_tts(txt: str, note: str) -> str:
     if screen != txt:
         _radio_native(screen, txt)
     result = BRIDGE.run("say", text=screen, timeout=15)
-    if _discord_active() and _is_for_player(txt):
+    if _discord_active() and (_npc_tts() or _is_for_player(txt)):
         _outbox({"type": "tts", "text": txt, "agent": AGENT_NAME,
                  "voice": AGENT_VOICE})
     return _outcome(result, note)
@@ -1539,7 +1675,25 @@ def drop(classname: str = "", item_name: str = "", item: str = "",
     Um einem MITSPIELER etwas zu geben, nutze besser give_to (direkt, ohne
     Bodenphase). drop ist fuer Ablegen oder Platzschaffen."""
     needle = _needle(classname, item_name, item, name)
+    before = _safe_state()
     result = BRIDGE.run("drop", text=needle, timeout=30)
+    if result.get("status") == "done" and before:
+        # Ablage merken (Classname aus dem Inventar-Delta, sonst aus dem
+        # Mod-Detail "<Classname> abgelegt"), damit Auto-Loot sie liegen lässt.
+        try:
+            time.sleep(1.2)   # 1-Hz-State: Inventar-Delta erst nach dem Tick sichtbar
+            after = _safe_state()
+            gone = [cn for cn, n in tactics._inventory_counts(before).items()
+                    if tactics._inventory_counts(after).get(cn, 0) < n]
+            dropped = gone[0] if len(gone) == 1 else ""
+            if not dropped:
+                dropped = (result.get("detail") or "").strip().split(" ")[0]
+            if dropped == "Item":   # "Item aus der Hand abgelegt" (ohne Classname)
+                dropped = (before.get("npc") or {}).get("in_hands", "")
+            npc = (before.get("npc") or {})
+            tactics.remember_drop(dropped, npc.get("pos_x", 0.0), npc.get("pos_z", 0.0))
+        except (OSError, TypeError, ValueError, AttributeError):
+            pass
     return _outcome(result, "Abgelegt:", needle=needle)
 
 
@@ -1672,9 +1826,14 @@ def _sleep_interruptible(seconds: float) -> bool:
             base = os.path.getsize(inbox)
         except OSError:
             base = -1
+    # Kritische Welt-Ereignisse (Blutung/Gefahr) brechen das Warten ebenfalls ab.
+    flag = getattr(BRIDGE, "urgent_flag", None)
+    flag_base = bridge_mod._flag_mtime(flag) if flag else 0.0
     end = time.monotonic() + seconds
     while time.monotonic() < end:
         if base >= 0 and bridge_mod._inbox_should_interrupt(inbox, base):
+            return True
+        if flag and bridge_mod._urgent_event(flag, flag_base):
             return True
         time.sleep(1.0)
     return False
@@ -1749,7 +1908,7 @@ def fish() -> str:
                         f"Versuch es selbst mit move_to zum Ufer, dann fish.")
         steps.append("Am Wasser.")
 
-    _write_intent_line("angelt am Wasser")
+    _write_intent_line(_hud_text("Fishing by the water", "Angelt am Wasser"))
     interrupted = _sleep_interruptible(random.uniform(60, 120))
     if interrupted:
         return ("ABGEBROCHEN beim Angeln: Der Spieler funkt dich an. Hoer SOFORT "
@@ -1787,6 +1946,8 @@ def treat_illness() -> str:
     Gegen eine Gehirninfektion hilft kein Medikament (nur Zeit/Ruhe). Meldet
     klar, wenn dir nichts fehlt oder das noetige Medikament fehlt."""
     state = BRIDGE.read_state() or {}
+    if not survival._modern_bridge(state):
+        return "Gezielte Medikamenteneinnahme braucht Servermod 0.9.0 oder neuer."
     npc = state.get("npc", {})
     disease = npc.get("disease")
     agents = {}
@@ -1806,7 +1967,7 @@ def treat_illness() -> str:
         if med is None:
             continue  # z.B. brain - kein Medikament
         if _have_item(state, med):
-            result = BRIDGE.run("eat", text=med, timeout=30)
+            result = BRIDGE.run("take_medicine", text=med, timeout=30)
             return _outcome(result, f"Gegen {erk} eingenommen: {med}.")
         missing.append(f"{erk} braucht {med}")
 

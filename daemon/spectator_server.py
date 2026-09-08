@@ -127,7 +127,7 @@ def _last_meaningful(npc_id: str) -> dict:
     [TOOL]-Zeile. Kosten: letzte [TOKENS ZUG]-Zeile (Modell, kumulierte USD)."""
     path = _latest_journal(npc_id)
     lines = _tail_lines(path, 300)
-    thought, action, model, usd = "", "", "", None
+    thought, action, model, usd, denkt = "", "", "", None, ""
     for raw in lines:
         line = raw.rstrip("\n")
         m = SAY_RE.match(line)
@@ -136,6 +136,13 @@ def _last_meaningful(npc_id: str) -> dict:
         _, tag, rest = m.groups()
         if tag == "TOOL":
             action = rest.strip()
+        elif tag == "DENKT":
+            # Interner Denkprozess des Modells (Extended Thinking, run_agent
+            # loggt ihn als [DENKT]-Zeile). Eigenes Feld, gekürzt - die Zeilen
+            # können mehrere KB lang sein und würden die Karte sprengen.
+            denkt = rest.strip()
+            if len(denkt) > 260:
+                denkt = denkt[:257] + "..."
         elif tag not in ("WELT", "TOKENS", "TOD"):
             # z.B. [VIKTOR]/[BIRGIT]/[IGOR]/[KONRAD]/[WECKRUF]
             # ("ZUG ENDE" hat ein Leerzeichen im Tag und matcht SAY_RE eh nicht)
@@ -150,7 +157,25 @@ def _last_meaningful(npc_id: str) -> dict:
             except ValueError:
                 usd = None
     return {"thought": thought, "action": action, "model": model, "usd": usd,
-            "journal": os.path.basename(path) if path else ""}
+            "denkt": denkt, "journal": os.path.basename(path) if path else ""}
+
+
+def _orchestrator_state() -> dict:
+    """Lagezentrum-Zustand fürs Dashboard: letzter Entscheidungs-Gedanke aus
+    arena/squad_state.json (schreibt der Orchestrator pro Tick). 'on' nur,
+    wenn die Datei frisch ist - eine alte Datei von gestern zählt nicht."""
+    path = os.path.join(ARENA_DIR, "squad_state.json")
+    data = _read_json(path)
+    if not isinstance(data, dict):
+        return {"on": False, "thought": ""}
+    try:
+        # 60 s Toleranz: der Orchestrator schreibt nur alle --interval s
+        # (Default 3, frei konfigurierbar) - eine knappe Schwelle ließe das
+        # Band bei größeren Intervallen flackern (Review-Befund 29.08.).
+        fresh = (time.time() - os.path.getmtime(path)) < 60.0
+    except OSError:
+        fresh = False
+    return {"on": fresh, "thought": str(data.get("thought") or "")}
 
 
 def build_state() -> dict:
@@ -176,9 +201,10 @@ def build_state() -> dict:
             "fighting": bool(npc.get("fighting")),
             "action": extra["action"],
             "thought": intent or extra["thought"],
+            "denkt": extra["denkt"],
             "usd": extra["usd"],
         })
-    return {"t": time.time(), "agents": agents}
+    return {"t": time.time(), "agents": agents, "orch": _orchestrator_state()}
 
 
 class TrackLogger(threading.Thread):
@@ -231,7 +257,14 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   .model { font-size: 11px; color: #6b7688; margin-left: 6px; }
   .row { font-size: 12px; color: #a8b2c0; margin-top: 3px; }
   .thought { font-size: 12px; color: #e5c07b; margin-top: 5px; font-style: italic; }
+  .denkt { font-size: 11px; color: #8f9bb3; margin-top: 4px; font-style: italic;
+           border-left: 2px solid #3a4356; padding-left: 6px; }
   .action { font-size: 11px; color: #7ec699; margin-top: 3px; font-family: Consolas, monospace; }
+  #orch {
+    background: #131a2a; border: 1px solid #2e3a55; border-radius: 8px;
+    padding: 8px 12px; margin-bottom: 12px; font-size: 12px; color: #9fb4d8;
+  }
+  #orch .tag { color: #5e81ac; font-weight: 600; margin-right: 8px; }
   .hpwrap { background: #262b38; border-radius: 4px; height: 6px; margin-top: 6px; overflow: hidden; }
   .hpfill { background: #a3be8c; height: 100%; }
   .hpfill.low { background: #d08770; }
@@ -248,6 +281,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 </head>
 <body>
 <h1>ISUSURVIVOR &mdash; ZUSCHAUER-DASHBOARD</h1>
+<div id="orch" style="display:none"></div>
 <div id="layout">
   <div id="cards"></div>
   <div id="canvaswrap">
@@ -290,9 +324,22 @@ function renderCards(agents) {
       <div class="hpwrap"><div class="hpfill ${hpClass(hp)}" style="width:${Math.max(0,Math.min(100,hp))}%"></div></div>
       ${a.action ? `<div class="action">${a.action}</div>` : ""}
       ${a.thought ? `<div class="thought">&ldquo;${a.thought}&rdquo;</div>` : ""}
+      ${a.denkt ? `<div class="denkt" title="Interner Denkprozess des Modells (Extended Thinking)">${esc(a.denkt)}</div>` : ""}
     `;
     wrap.appendChild(div);
   });
+}
+
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function renderOrch(orch) {
+  const div = document.getElementById("orch");
+  if (!orch || !orch.on) { div.style.display = "none"; return; }
+  div.style.display = "block";
+  div.innerHTML = `<span class="tag">LAGEZENTRUM</span>` +
+    (orch.thought ? esc(orch.thought) : "beobachtet (keine wesentliche &Auml;nderung)");
 }
 
 function renderPlot(agents) {
@@ -357,6 +404,7 @@ async function poll() {
     const data = await res.json();
     renderCards(data.agents || []);
     renderPlot(data.agents || []);
+    renderOrch(data.orch);
     document.getElementById("ts").textContent =
       "aktualisiert " + new Date(data.t * 1000).toLocaleTimeString("de-AT");
   } catch (e) {

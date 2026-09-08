@@ -17,11 +17,107 @@ import re
 import sys
 import time
 
-from bridge import Bridge, DEFAULT_PROFILE
+from bridge import Bridge, DEFAULT_PROFILE, interrupt_reason, interrupt_text
 
 LEARNED_FILE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "agent_home", "learned_recipes.json")
+
+# Eigene Ablagen (drop): Classname + Ort + Zeit, pro Agent im agent_home.
+# Damit sammeln loot_area/explore_step/survival NICHT wieder ein, was der NPC
+# gerade bewusst weggeworfen hat (Viktor 08.09.: Mag, AmmoBox und Wellies
+# abgelegt, zwei Minuten später vom explore_step wieder aufgehoben - ein
+# Ballast-Kreisverkehr). dayz_mcp UND survival/run_agent lesen dieselbe
+# Datei; Einträge verfallen nach DROP_IGNORE_SECONDS, ein gezieltes
+# pickup(classname) des Gehirns hebt die Sperre für diesen Classname auf.
+DROP_LEDGER = os.path.join(os.path.dirname(LEARNED_FILE), "dropped_items.json")
+DROP_IGNORE_SECONDS = 3 * 3600
+DROP_RADIUS_M = 40.0
+
+
+def load_drops(path: str = "", now: float | None = None) -> list[dict]:
+    """Gültige (nicht verfallene) eigene Ablagen lesen; bei Fehlern leer."""
+    path = path or DROP_LEDGER
+    now = time.time() if now is None else now
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return []
+    if not isinstance(data, list):
+        return []
+    drops = []
+    for e in data:
+        if not isinstance(e, dict) or not e.get("classname"):
+            continue
+        try:
+            if now - float(e.get("t") or 0.0) > DROP_IGNORE_SECONDS:
+                continue
+            drops.append({"classname": str(e["classname"]), "x": float(e.get("x", 0.0)),
+                          "z": float(e.get("z", 0.0)), "t": float(e.get("t") or 0.0)})
+        except (TypeError, ValueError):
+            continue
+    return drops
+
+
+def _save_drops(path: str, drops: list[dict]) -> None:
+    drops = drops[-64:]
+    tmp = f"{path}.{os.getpid()}.tmp"
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(drops, f, ensure_ascii=False)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def remember_drop(classname: str, x: float, z: float, path: str = "",
+                  now: float | None = None) -> None:
+    """Bewusste Ablage merken (Ort = NPC-Position beim Drop)."""
+    if not classname:
+        return
+    path = path or DROP_LEDGER
+    now = time.time() if now is None else now
+    drops = load_drops(path, now)
+    drops.append({"classname": str(classname), "x": float(x or 0.0),
+                  "z": float(z or 0.0), "t": now})
+    _save_drops(path, drops)
+
+
+def forget_drop(classname: str, path: str = "", now: float | None = None) -> int:
+    """Sperre für einen Classname aufheben (das Gehirn will ihn wieder).
+    Liefert die Zahl der entfernten Einträge."""
+    path = path or DROP_LEDGER
+    drops = load_drops(path, now)
+    kept = [d for d in drops if d["classname"] != classname]
+    if len(kept) != len(drops):
+        _save_drops(path, kept)
+    return len(drops) - len(kept)
+
+
+def is_own_drop(entry: dict, drops: list[dict], npc: dict | None = None) -> bool:
+    """Ist dieses Bodenitem eine eigene Ablage? Gleicher Classname und
+    höchstens DROP_RADIUS_M vom Ablageort entfernt. Ohne Weltposition im
+    Eintrag zählt NPC-Abstand zum Ablageort minus gemeldeter Item-Distanz."""
+    cn = entry.get("classname", "")
+    if not cn or not drops:
+        return False
+    ex, ez = entry.get("x"), entry.get("z")
+    for d in drops:
+        if d["classname"] != cn:
+            continue
+        if ex is None or ez is None:
+            if npc is None:
+                return True
+            npc_dist = math.hypot(d["x"] - float(npc.get("pos_x", 0.0) or 0.0),
+                                  d["z"] - float(npc.get("pos_z", 0.0) or 0.0))
+            if npc_dist - float(entry.get("distance", 0.0) or 0.0) <= DROP_RADIUS_M:
+                return True
+            continue
+        if math.hypot(float(ex) - d["x"], float(ez) - d["z"]) <= DROP_RADIUS_M:
+            return True
+    return False
 
 # Crafting-Rezepte: Materialien sind ENTITIES im Inventar (keine Stack-Mengen).
 # Die Rezeptlogik lebt hier; die Mod kennt nur consume_item/give_item/spawn_item.
@@ -50,6 +146,10 @@ WEAPON_TIERS = [
     ("Mosin", 70), ("Winchester", 68), ("Blaze", 66), ("CZ527", 64),
     ("CZ550", 72), ("SSG82", 65), ("Vaiga", 60), ("Saiga", 60),
     ("BK43", 45), ("BK18", 35), ("Mp133", 50), ("UMP", 58), ("MP5", 56),
+    # Izh18-Familie fehlte (Score 0): loot_area meldete "Nichts Lohnendes",
+    # obwohl die Flinte 37 m entfernt lag (Viktor 08.09.). Shotgun VOR Izh18,
+    # der erste Treffer zaehlt (Substring-Match).
+    ("Izh18Shotgun", 40), ("Izh18", 30),
     ("Bizon", 54), ("CZ61", 48), ("PP19", 54),
     ("FNX", 30), ("Glock", 28), ("Mkii", 22), ("IJ70", 20), ("Makarov", 20),
     ("CZ75", 26), ("Deagle", 34), ("Magnum", 32), ("Longhorn", 24),
@@ -77,7 +177,7 @@ MELEE_PATTERNS = [
 MEDICAL_PATTERNS = ["Bandage", "Rag", "Morphine", "Epinephrine", "SalineBag",
                     "BloodBag", "TetracyclineAntibiotics", "CharcoalTablets",
                     "PainkillerTablets", "VitaminBottle", "DisinfectantSpray",
-                    "DisinfectantAlcohol", "Splint", "FirstAidKit"]
+                    "DisinfectantAlcohol", "Splint", "FirstAidKit", "ChelatingTablets"]
 
 USEFUL_PATTERNS = ["Matchbox", "Lighter", "Canteen", "WaterBottle", "CanOpener",
                    "Flashlight", "Battery9V", "Compass", "Map", "Rope",
@@ -196,7 +296,7 @@ def score_ground_item(entry: dict, inventory: list[dict]) -> int:
     return 0
 
 
-def loot_area(bridge: Bridge, max_items: int = 6, time_budget: float = 240.0,
+def loot_area(bridge: Bridge, max_items: int = 6, time_budget: float = 180.0,
               log=print) -> dict:
     """Sichtbare lohnende Bodenitems einsammeln (naechstes/bestes zuerst).
 
@@ -207,6 +307,8 @@ def loot_area(bridge: Bridge, max_items: int = 6, time_budget: float = 240.0,
     haul: list[str] = []
     failed: set[str] = set()
     aborted = ""
+    drops = load_drops()          # eigene Ablagen liegen lassen (kein Kreisverkehr)
+    ignored: set[str] = set()
 
     while len(haul) < max_items and time.monotonic() < deadline:
         state = bridge.read_state() or {}
@@ -217,7 +319,11 @@ def loot_area(bridge: Bridge, max_items: int = 6, time_budget: float = 240.0,
 
         danger = ""
         for e in state.get("nearby", []):
-            if e.get("kind") in ("infected", "animal") and e.get("distance", 99) < 40.0:
+            # Passive deer/chickens are food opportunities, not enemies.
+            predator = e.get("kind") == "animal" and any(
+                name in e.get("classname", "").lower()
+                for name in ("wolf", "bear", "canislupus", "ursus"))
+            if (e.get("kind") == "infected" or predator) and e.get("distance", 99) < 40.0:
                 danger = e.get("classname") or e.get("kind")
                 break
         if danger:
@@ -231,6 +337,9 @@ def loot_area(bridge: Bridge, max_items: int = 6, time_budget: float = 240.0,
                 continue
             cn = e.get("classname", "")
             if cn in failed:
+                continue
+            if is_own_drop(e, drops, npc):
+                ignored.add(cn)
                 continue
             score = score_ground_item(e, inventory)
             if score > 0:
@@ -252,13 +361,33 @@ def loot_area(bridge: Bridge, max_items: int = 6, time_budget: float = 240.0,
             # naechste Iteration das Item noch am Boden (Doppelzaehlung)
             time.sleep(3.0)
         elif result.get("status") == "interrupted":
-            aborted = "Spieler-Funk - Looten sofort abgebrochen, erst zuhoeren!"
+            aborted = "Looten sofort abgebrochen: " + interrupt_reason(result)
             break
         else:
             failed.add(target)
             log(f"  loot fehlgeschlagen: {target}: {result.get('detail')}")
 
-    return {"haul": haul, "failed": sorted(failed), "aborted": aborted}
+    return {"haul": haul, "failed": sorted(failed), "aborted": aborted,
+            "ignored": sorted(ignored)}
+
+
+def equip_by_classname(bridge: Bridge, classname: str) -> dict:
+    """Mod-equip mit Klon-Nachprüfung. Expansions eAI_TakeItemToHandsImpl
+    KLONT die Waffe in die Hand und löscht das Original; ältere Mod-Builds
+    verlieren damit ihren Zeiger und melden "Equip-Ziel verschwunden",
+    obwohl die Waffe schon in der Hand liegt (Igor/Konrad 08.09.). Darum bei
+    dieser Meldung kurz warten, den Handinhalt prüfen und erst dann einmal
+    neu versuchen. Liefert das (ggf. korrigierte) Bridge-Ergebnis."""
+    result = bridge.run("equip", text=classname, timeout=30)
+    if result.get("status") == "done":
+        return result
+    if "verschwunden" not in str(result.get("detail") or "").lower():
+        return result
+    time.sleep(2.0)
+    hands = (bridge.read_state() or {}).get("npc", {}).get("in_hands", "")
+    if hands == classname:
+        return {"id": result.get("id"), "status": "done", "detail": classname}
+    return bridge.run("equip", text=classname, timeout=30)
 
 
 def pick_best_weapon(inventory: list[dict]) -> str:
@@ -323,10 +452,10 @@ def equip_best(bridge: Bridge, log=print) -> str:
     if best == in_hands:
         return f"Beste Waffe ist schon in der Hand: {best}"
 
-    result = bridge.run("equip", text=best, timeout=30)
+    result = equip_by_classname(bridge, best)
     if result.get("status") == "done":
-        return f"Ausgeruestet: {best} (vorher: {in_hands or 'leer'})"
-    return f"Ausruesten fehlgeschlagen: {result.get('detail')}"
+        return f"Ausgerüstet: {best} (vorher: {in_hands or 'leer'})"
+    return f"Ausrüsten fehlgeschlagen: {result.get('detail')}"
 
 
 def pick_best_melee(inventory: list[dict]) -> str:
@@ -360,10 +489,10 @@ def equip_melee(bridge: Bridge, log=print) -> str:
     if melee == in_hands:
         return f"Nahkampfwaffe ist schon in der Hand: {melee}"
 
-    result = bridge.run("equip", text=melee, timeout=30)
+    result = equip_by_classname(bridge, melee)
     if result.get("status") == "done":
         return f"Nahkampfwaffe gezogen: {melee} (vorher: {in_hands or 'leer'})"
-    return f"Ausruesten fehlgeschlagen: {result.get('detail')}"
+    return f"Ausrüsten fehlgeschlagen: {result.get('detail')}"
 
 
 # Materialien, deren quantity = Stueckzahl ist (Piles)
@@ -542,6 +671,8 @@ def _has_raw_food(state: dict) -> bool:
     """Rohes Fleisch/Fisch im Inventar (Classname-Heuristik, s. RAW_FOOD_PATTERNS)."""
     for item in state.get("inventory", []):
         cn = item.get("classname", "")
+        if item.get("food_stage") in (2, 3, 4, 5, 6):
+            continue  # cooked/ruined food must not trigger an endless cook loop
         if any(p.lower() in cn.lower() for p in RAW_FOOD_PATTERNS):
             return True
     return False
@@ -594,8 +725,7 @@ def hunt(bridge: Bridge, animal: str = "", log=print) -> str:
     status = result.get("status")
     detail = result.get("detail") or ""
     if status == "interrupted":
-        return ("ABGEBROCHEN bei der Jagd: Der Spieler funkt dich an. "
-                "Hoer SOFORT zu und reagiere.")
+        return "ABGEBROCHEN bei der Jagd: " + interrupt_reason(result)
     if status != "done":
         steps.append(f"Jagd fehlgeschlagen: {detail}")
         return "\n".join(steps)
@@ -629,7 +759,7 @@ def process_food(bridge: Bridge, log=print) -> str:
         result = bridge.run("harvest", timeout=90, interruptible=True)
         status = result.get("status")
         if status == "interrupted":
-            steps.append("ABGEBROCHEN: Spieler-Funk - erst zuhoeren.")
+            steps.append(interrupt_text(result))
             return "\n".join(steps)
         if status != "done":
             steps.append(f"Zerlegen: {result.get('detail')}")
@@ -662,6 +792,35 @@ def _clothing_score(item: dict, freezing: bool) -> float:
     if freezing:
         return warmth * 1000.0 + cargo
     return cargo * 100.0 + warmth * 10.0
+
+
+def rescue_wear_leftovers(bridge: Bridge, detail: str, old_classname: str = "") -> str:
+    """Nach einem Kleidungstausch alles zurückholen, was die Mod als am Boden
+    liegend meldet. Die Mod (CmdWear seit 08.09.2026) hängt ans Ergebnis
+    "AM BODEN: a, b" (einzeln abgelegte Items) und/oder "ACHTUNG: X liegt
+    mit N Item(s) am Boden" (altes Stück samt Inhalt). Vorher lag Viktors
+    Sanitätskram im Wald, bis das Modell es zufällig bemerkte. Liefert eine
+    Kurzbeschreibung des Nachgesammelten oder ""."""
+    if not detail:
+        return ""
+    got: list[str] = []
+    m = re.search(r"ACHTUNG: (\S+) liegt mit (\d+) Item", detail)
+    if m:
+        garment = m.group(1)
+        r = bridge.run("loot_container", text=garment, timeout=25)
+        if r.get("status") == "done":
+            got.append(f"Inhalt von {garment} ({r.get('detail') or ''})")
+        else:
+            got.append(f"{garment} NICHT ausgeräumt ({r.get('detail') or ''})")
+    m2 = re.search(r"AM BODEN: (.+)$", detail)
+    if m2:
+        for cn in [c.strip() for c in m2.group(1).split(",") if c.strip()]:
+            r = bridge.run("pickup", text=cn, timeout=20)
+            if r.get("status") == "done":
+                got.append(cn)
+            else:
+                got.append(f"{cn} NICHT aufgehoben")
+    return ", ".join(got)
 
 
 def dress_best(bridge: Bridge, log=print) -> str:
@@ -735,6 +894,10 @@ def dress_best(bridge: Bridge, log=print) -> str:
             changes.append(f"{slot}: {best.get('classname')} (vorher {was})")
             swaps += 1
             time.sleep(1.5)
+            rescued = rescue_wear_leftovers(bridge, result.get("detail") or "",
+                                            was if cur is not None else "")
+            if rescued:
+                changes.append("nachgesammelt: " + rescued)
         else:
             changes.append(f"{slot}: {best.get('classname')} fehlgeschlagen "
                            f"({result.get('detail') or ''})")
@@ -806,7 +969,7 @@ def water_run(bridge: Bridge, log=print) -> str:
         result = bridge.run("move_to", x=well.get("x"), z=well.get("z"), timeout=90,
                             interruptible=True)
         if result.get("status") == "interrupted":
-            return "ABGEBROCHEN: Spieler-Funk - erst zuhoeren, dann weiter."
+            return interrupt_text(result)
         if result.get("status") != "done":
             return f"Komme nicht zum Brunnen: {result.get('detail')}"
         steps.append("Am Brunnen.")
@@ -856,13 +1019,20 @@ def explore_step(bridge: Bridge, log=print) -> str:
 
     result = bridge.run("move_to", x=tx, z=tz, timeout=90, interruptible=True)
     if result.get("status") == "interrupted":
-        return "ABGEBROCHEN: Spieler-Funk - erst zuhoeren, dann weiter."
+        return interrupt_text(result)
     move_note = "Angekommen" if result.get("status") == "done" \
         else f"Bewegung: {result.get('detail')}"
 
     loot = loot_area(bridge, max_items=4, time_budget=60, log=log)
     haul = ", ".join(loot["haul"]) if loot["haul"] else "nichts Lohnendes"
-    return f"{move_note} bei x={tx:.0f} z={tz:.0f}. Eingesammelt: {haul}."
+    text = f"{move_note} bei x={tx:.0f} z={tz:.0f}. Eingesammelt: {haul}."
+    if loot.get("ignored"):
+        text += " Eigene Ablagen liegen gelassen: " + ", ".join(loot["ignored"]) + "."
+    if loot.get("aborted"):
+        # Früher ging der Loot-Abbruch (Gefahr/Funk/kritisches Ereignis)
+        # hier verloren - das Gehirn sah nur "nichts Lohnendes".
+        text += " ABGEBROCHEN: " + loot["aborted"]
+    return text
 
 
 def main() -> int:

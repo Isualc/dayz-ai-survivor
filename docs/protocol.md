@@ -1,5 +1,23 @@
 # IsuSurvivor File-Bridge — Protokoll v0.2 (Phase 2)
 
+**Erweiterung v0.9.0 (08.09.2026):** `inventory` enthaelt zusaetzlich
+`food_stage` (Vanilla 0..6), `food_safe`, `liquid_type`, `liquid_safe`, `frozen`
+und `temperature`. `food_safe`/`liquid_safe` beruecksichtigen Garzustand,
+Kontamination und gefaehrliche Temperatur; sie ersetzen nicht Verfuegbarkeit,
+Menge oder Reichweitenpruefung. Medikamente werden `kind=medical`.
+`nearby.kind=garden` meldet `harvestable`. Neue Befehle:
+
+- `harvest_crops`: erntet eine reife Pflanze in einem vorhandenen Garten in 3 m.
+  Der Ertrag liegt danach am Boden und muss aufgehoben werden.
+- `take_medicine`: `text` = exakte Klasse (`TetracyclineAntibiotics`,
+  `CharcoalTablets`, `VitaminBottle`, `PainkillerTablets`, `ChelatingTablets`);
+  verbraucht genau eine Dosis ueber die Vanilla-Consume-Methode.
+
+`eat`/`drink`/`drink_well` sind portions- und magenbegrenzt. Unsichere Nahrung,
+unsichere Getraenke und Selbstversorgung bei Bewusstlosigkeit werden abgelehnt.
+Die Python-Routinen pruefen bei neuen Aktionen die Bridge-Version. Bestehende
+Felder und Kommandos bleiben erhalten. [Upgrade-Details](survival_upgrade_2026-09-08.md).
+
 Zwei JSON-Dateien im Server-Profilordner verbinden Mod und Daemon:
 
 ```
@@ -105,7 +123,7 @@ Alle Felder immer mitschicken (der EnforceScript-JsonFileLoader mag keine Überr
 | `follow` | (`text` = Spielername) | Gruppenbeitritt beim Spieler (näheste bei leerem Filter), eAI-Formation folgt automatisch. Endet bei eigener Bewegung (move_to/flee/engage/stop) | `done` / `failed` |
 | `unfollow` | — | Zurück in die eigene Gruppe, stehenbleiben | `done` |
 
-Seit v0.3 trägt `state.npc` zusätzlich `name` (Chat-Absendername, via `spawn.text` setzbar, Default "Viktor") und `following` (bool). `spawn.text` = Anzeigename des Survivors. Seit v0.4: `unconscious`, `in_vehicle` plus Befehle `unstick`, `vehicle_exit`, `give_item`, `drop`. Seit v0.5 (Survival-Tiefe): `drink_well`, `fill_container` (Brunnen in 4 m nötig, kind=water), `consume_item` (text+y, pile-bewusst über stackedUnit=pcs), `light_fire`, `cook` (brennendes Feuer in 4 m, gart alles Rohe), `build_fence_frame` (2x WoodenLog aus Inventar oder Boden in 5 m, experimentell); neue nearby-Kinds `water`, `fire`, `fire_burning`. Die Rezept-/Ketten-Logik (craft, cook_meal, drink_at_well, find_item, explore_step) lebt in `daemon/tactics.py`.
+Seit v0.3 trägt `state.npc` zusätzlich `name` (Chat-Absendername, via `spawn.text` setzbar, Default "Viktor") und `following` (bool). `spawn.text` = Anzeigename des Survivors. Seit v0.4: `unconscious`, `in_vehicle` plus Befehle `unstick`, `vehicle_exit`, `give_item`, `drop`. Seit v0.5 (Survival-Tiefe): `drink_well`, `fill_container` (Brunnen in 4 m nötig, kind=water), `consume_item` (text+y, pile-bewusst über stackedUnit=pcs), `light_fire`, `cook` (brennendes Feuer in 4 m, gart alles Rohe), `build_fence_frame` (2x WoodenLog aus Inventar oder Boden in 5 m, experimentell); neue nearby-Kinds `water`, `fire`, `fire_burning`. Die Rezept-/Ketten-Logik (craft, cook_meal, drink_at_well, find_item, explore_step) lebt in `daemon/tactics.py`. Seit 08.09.2026 meldet `state.npc.auto_bandages` (int) die Selbstverbände des Blutungs-Reflexes der Mod (siehe `docs/behavior_fixes_20260908.md`); `equip`/`equip_best` finden ihr Ziel nach dem Expansion-Klon per Classname wieder statt "Equip-Ziel verschwunden" zu melden.
 
 ### Seit v0.8 (Welt & Medizin)
 

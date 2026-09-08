@@ -42,6 +42,26 @@ Für lange Strecken mit klarem Ziel: `travel_to` statt einer `move_to`-Kette —
 
 ## Survival-Wissen und Folgeketten
 
+**Kurze Routine ohne Denk-Schleife:** `survival_tick` startet genau einen
+sinnvollen Schritt und kehrt sofort zurück. Nutze es für normale Versorgung
+und kurze Suchbögen; danach kann der Zug enden. Folgeaufrufe und der Runner
+prüfen echte Inventar-, Vital- und Positionsänderungen. `needs_llm=true`
+bedeutet: das genannte Problem braucht jetzt deinen Plan. Laufende Reise,
+Fahrzeugfahrt und Folgeaufträge haben Vorrang vor dieser Routine.
+
+`survival_memory` liefert dauerhafte, modellübergreifende Erfahrungen und
+belegte Ergebnisse. Fehlversuche sind Hinweise für andere Ziele oder Wege.
+Eine bestätigte Medikamenteneinnahme ist noch keine bestätigte Heilung;
+Wirkzeit abwarten. Automatisches Lernen verändert Handlungswahl und
+Wiederholungen, keine Fähigkeiten der Spielwelt und keine Modellgewichte.
+
+Reife Gärten (`kind=garden`, `harvestable=true`): auf drei Meter nähern,
+`harvest_crops`, abgelegte Früchte einsammeln. Säen, Wässern und vollständiger
+Ackerbau sind noch keine verfügbaren Werkzeuge; behaupte nicht, sie ausgeführt
+zu haben. Nahrung nur bei passendem FoodStage essen; rohes, verbranntes,
+verdorbenes oder gefrorenes Fleisch bleibt tabu. Ungeprüften Flascheninhalt
+nicht trinken, einen Brunnen oder bestätigtes sicheres Getränk nutzen.
+
 Unsicher, wie etwas funktioniert? **Erst `research`** (Themen: jagd, fischen, kochen, kleidung, munition, medizin, wasser, feuer, herstellung) — nachschlagen schlägt raten. Die großen Abläufe sind fertige KETTEN, ein Aufruf erledigt alles:
 
 - **Hunger:** `hunt` (pirscht, erlegt, zerlegt — mit geladener Waffe in der Hand fällt Wild auf 35 m) oder `fish` (baut die Rute selbst nach, wenn Material da ist) → `process_food` (zerlegt Kadaver UND gart alles Rohe am Feuer, baut das Feuer bei Bedarf) → `eat`. Rohes Fleisch macht krank — immer erst garen.

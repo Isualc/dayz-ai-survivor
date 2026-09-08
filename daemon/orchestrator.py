@@ -78,6 +78,12 @@ THREAT_STEP_CLOSER = 35.0
 ROUTINE_RELEVANCE_DIST = 800.0
 
 
+# Debug-Modus ($env:ISU_ORCH_DEBUG=1): loggt JEDEN Tick den aktuellen
+# Entscheidungs-Gedanken (auch "alles ruhig"), nicht nur jede 10. Lage-Zeile.
+# Default aus, sonst flutet der 3-s-Takt das Log.
+DEBUG = os.environ.get("ISU_ORCH_DEBUG", "") not in ("", "0")
+
+
 def log(msg: str) -> None:
     stamp = time.strftime("%H:%M:%S")
     line = f"[{stamp}] [orchestrator] {msg}"
@@ -416,6 +422,11 @@ def main() -> int:
     threat_latch: dict = {}
     last_broadcast = 0.0
     ticks = 0
+    # Aktueller Entscheidungs-Gedanke des Lagezentrums (Debug-Wunsch 29.08.):
+    # WARUM wurde gefunkt / geschwiegen / gefiltert. Wandert pro Tick in
+    # squad_state.json ("thought", zeigt das Spectator-Dashboard) und im
+    # Debug-Modus zusätzlich in jede Log-Zeile.
+    thought = "gestartet, warte auf die Grundlinie"
     try:
         while True:
             time.sleep(args.interval)
@@ -435,7 +446,8 @@ def main() -> int:
             # Lagebild rausschreiben (Benchmark-Mitschnitt, nicht-invasiv)
             try:
                 payload = {"t": time.time(), "camp": camp,
-                           "agents": snaps, "summary": summary}
+                           "agents": snaps, "summary": summary,
+                           "thought": thought}
                 tmp = SQUAD_STATE_FILE + ".tmp"
                 os.makedirs(os.path.dirname(SQUAD_STATE_FILE), exist_ok=True)
                 with open(tmp, "w", encoding="utf-8") as f:
@@ -456,6 +468,8 @@ def main() -> int:
             if not prev_snaps:
                 prev_snaps = cur
                 prev_rally = set(summary["at_rally"])
+                thought = ("Grundlinie gesetzt - funke nur bei ECHTER "
+                           "Änderung, nicht für die Startlage")
                 log("Grundlinie gesetzt (erster Tick, kein Funk).")
                 continue
 
@@ -501,11 +515,14 @@ def main() -> int:
                         foreign = [(sub, t) for sub, t in reasons
                                    if sub != aid]
                         if not foreign:
-                            skipped.append(aid)
+                            # Alle Gruende betreffen NUR ihn selbst - die kennt
+                            # er laengst aus dem eigenen GEFAHR-/REISE-Weckruf.
+                            skipped.append(f"{aid} (nur Eigenbetroffenheit)")
                             continue
                         subs = [sub for sub, _t in foreign]
                         if not routine_relevant(cur[aid], subs, cur):
-                            skipped.append(aid)
+                            skipped.append(f"{aid} (>{ROUTINE_RELEVANCE_DIST:.0f}m "
+                                           "vom Auslöser, selbst ok)")
                             continue
                         sitrep = build_sitrep(
                             snaps, [t for _sub, t in foreign])
@@ -515,10 +532,31 @@ def main() -> int:
                         + (f" (gefiltert: {skipped})" if skipped else ""))
                 if sent:
                     last_broadcast = now
+                tag = "[PRIO] " if (reasons and prio) else ""
+                thought = (f"{tag}Funk an {sent or 'niemanden'}: "
+                           + "; ".join(why[:3] if why else ["Heartbeat"])
+                           + (f" | gefiltert: {', '.join(skipped)}"
+                              if (reasons and not prio and skipped) else ""))
             elif reasons and not args.no_broadcast:
                 # Aenderung erkannt, aber Funk noch in der Sperrzeit - das ist
                 # gewollt (Token-Disziplin), nur fuers Log vermerken.
+                wait_s = args.min_broadcast - (now - last_broadcast)
+                thought = ("Änderung gesehen, Funk gedrosselt (Sperrzeit noch "
+                           f"{max(0, wait_s):.0f}s): " + "; ".join(why[:3]))
                 log(f"Aenderung gesehen (Funk gedrosselt): {why[:3]}")
+            elif reasons:
+                thought = ("Beobachter-Modus (kein Funk), Änderung notiert: "
+                           + "; ".join(why[:3]))
+            else:
+                thought = (f"alles ruhig - {len(summary['alive'])} am Leben"
+                           + (f", verletzt: {summary['hurt']}"
+                              if summary['hurt'] else "")
+                           + (f", bedroht: {summary['under_threat']}"
+                              if summary['under_threat'] else "")
+                           + (f", am Treffpunkt: {summary['at_rally']}"
+                              if summary['at_rally'] else ""))
+            if DEBUG:
+                log("denkt: " + thought)
 
             prev_snaps = cur
             prev_rally = set(summary["at_rally"])

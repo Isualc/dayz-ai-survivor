@@ -1,0 +1,174 @@
+{
+  "Subtitle": [
+    "Your survivors. Their models. One fight to stay alive.",
+    "Deine Überlebenden. Ihre Modelle. Ein gemeinsamer Überlebenskampf."
+  ],
+  "StatusText": [
+    "Ready",
+    "Bereit"
+  ],
+  "GrpRoster": [
+    "01 / YOUR SURVIVORS",
+    "01 / DEINE GRUPPE"
+  ],
+  "RosterNote": [
+    "Every field belongs to its survivor. Scroll to see the rest of your group.",
+    "Alle Einstellungen direkt beim Überlebenden. Für weitere Mitglieder nach unten scrollen."
+  ],
+  "BtnAddNpc": [
+    "+ ADD SURVIVOR",
+    "+ HINZUFÜGEN"
+  ],
+  "GrpRound": [
+    "02 / SESSION",
+    "02 / SPIELRUNDE"
+  ],
+  "GrpBehavior": [
+    "03 / BEHAVIOUR",
+    "03 / VERHALTEN"
+  ],
+  "GrpControls": [
+    "04 / CONTROLS",
+    "04 / STEUERUNG"
+  ],
+  "GrpAudio": [
+    "05 / AUDIO & DISPLAY",
+    "05 / AUDIO & ANZEIGE"
+  ],
+  "LblMode": [
+    "Game mode",
+    "Spielmodus"
+  ],
+  "LblSpawn": [
+    "Starting position",
+    "Startposition"
+  ],
+  "LblCamp": [
+    "Camp / click to use your position",
+    "Lager / Klick: aktuelle Position"
+  ],
+  "LblMission": [
+    "Mission",
+    "Mission"
+  ],
+  "LblIdle": [
+    "Time between model decisions",
+    "Pause zwischen Modellentscheidungen"
+  ],
+  "LblTurns": [
+    "Decisions per round",
+    "Entscheidungen pro Runde"
+  ],
+  "LblPatrol": [
+    "Ambient patrols / applies after server restart",
+    "Umgebungspatrouillen / ab Serverneustart"
+  ],
+  "LblOrch": [
+    "Group coordination",
+    "Gruppenkoordination"
+  ],
+  "LblTarget": [
+    "Send commands to",
+    "Befehle richten an"
+  ],
+  "LblKeyStop": [
+    "Hold position",
+    "Anhalten"
+  ],
+  "LblKeyGoto": [
+    "Move to target",
+    "Zum Zielpunkt"
+  ],
+  "LblKeyRadial": [
+    "Command wheel",
+    "Befehlsrad"
+  ],
+  "LblMic": [
+    "Microphone",
+    "Mikrofon"
+  ],
+  "LblComic": [
+    "Speech bubbles",
+    "Sprechblasen"
+  ],
+  "LblHud": [
+    "Squad display (HUD)",
+    "Gruppenanzeige (HUD)"
+  ],
+  "LblNpcTts": [
+    "Developer mode / NPC radio voices",
+    "Entwicklermodus / NPC-Funkstimmen"
+  ],
+  "ModeNote": [
+    "Work together and survive as a team.",
+    "Zusammenarbeiten und als Team überleben."
+  ],
+  "OrchNote": [
+    "Shared goals, independent decisions.",
+    "Gemeinsame Ziele, eigenständige Entscheidungen."
+  ],
+  "ControlsNote": [
+    "Click a key to change its assignment.",
+    "Klicke auf eine Taste, um sie neu zuzuweisen."
+  ],
+  "NpcTtsNote": [
+    "Only available in developer mode.",
+    "Nur im Entwicklermodus verfügbar."
+  ],
+  "CostLabel": [
+    "SESSION COST",
+    "RUNDENKOSTEN"
+  ],
+  "CostText": [
+    "No cost recorded yet",
+    "Noch keine Kosten erfasst"
+  ],
+  "BtnStop": [
+    "STOP",
+    "STOPP"
+  ],
+  "HintLine1": [
+    "Insert: close menu     /     Right-click camp: reset position     /     Your choices stay selected during this game session.",
+    "Einfg: Menü schließen     /     Rechtsklick auf Lager: Position zurücksetzen     /     Die Auswahl bleibt in dieser Spielsitzung erhalten."
+  ],
+  "RowLblActive": [
+    "AI",
+    "KI"
+  ],
+  "RowLblName": [
+    "NAME",
+    "NAME"
+  ],
+  "RowLblProvider": [
+    "PROVIDER",
+    "ANBIETER"
+  ],
+  "RowLblModel": [
+    "MODEL",
+    "MODELL"
+  ],
+  "RowLblRole": [
+    "ROLE",
+    "ROLLE"
+  ],
+  "RowLblLoadout": [
+    "LOADOUT",
+    "AUSRÜSTUNG"
+  ],
+  "RowLblVoice": [
+    "VOICE",
+    "STIMME"
+  ],
+  "RowLblLang": [
+    "SPEECH LANGUAGE",
+    "AUSGABESPRACHE"
+  ],
+  "RowLblLive": [
+    "STATUS",
+    "ZUSTAND"
+  ],
+  "LiveText": [
+    "Ready",
+    "Bereit"
+  ]
+}

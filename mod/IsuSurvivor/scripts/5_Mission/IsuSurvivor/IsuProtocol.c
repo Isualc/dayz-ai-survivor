@@ -49,7 +49,8 @@ class IsuNpcState
 	bool following;        // folgt gerade einem Spieler (Gruppenbeitritt)
 	bool unconscious;      // bewusstlos (Schock) - liegt und kann nicht handeln
 	bool in_vehicle;       // sitzt in einem Fahrzeug (Bewegungsbefehle gesperrt)
-	bool bleeding;         // aktive Blutungsquelle(n) - unbehandelt toedlich
+	bool bleeding;         // aktive Blutungsquelle(n) - unbehandelt tödlich
+	int auto_bandages;     // Reflex-Selbstverbände seit Start (run_agent meldet den Verbrauch)
 	ref IsuDiseaseInfo disease;
 
 	void IsuNpcState()
@@ -64,6 +65,12 @@ class IsuItemInfo
 	string kind;       // "food" | "drink" | "firearm" | "ammo" | "clothing" | "other"
 	float quantity;
 	float health;
+	int food_stage;    // FoodStageType: 0 unknown, 1 raw, 2 baked, 3 boiled, 4 dried, 5 burned, 6 rotten
+	int liquid_type;   // Vanilla LIQUID_* (0 for non-liquid items)
+	bool liquid_safe;  // Known potable liquid, no infection agents, not frozen
+	bool frozen;
+	float temperature; // Item temperature in Celsius
+	bool food_safe;   // Safe food according to current stage, agents and temperature
 	bool in_hands;
 	string parent;     // Classname des Tragers, wenn das Item an etwas steckt
 	                   // (z.B. Magazin IN der Waffe) - sonst leer
@@ -102,6 +109,7 @@ class IsuEntityInfo
 	float warmth;       // nur item_kind=="clothing": heatIsolation (0..1)
 	int cargo_size;     // nur item_kind=="clothing": Stauraum in Slots
 	string slot;        // nur item_kind=="clothing": Koerper-Slot
+	bool harvestable;   // only kind=="garden": at least one mature crop
 }
 
 class IsuChatMsg

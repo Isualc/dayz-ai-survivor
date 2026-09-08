@@ -1,685 +1,1153 @@
 FrameWidgetClass IsuArenaRoot {
- clipchildren 0
  position 0 0
- size 1600 792
- halign center_ref
- valign center_ref
+ size 1760 900
  hexactpos 1
  vexactpos 1
  hexactsize 1
  vexactsize 1
+ clipchildren 0
+ halign center_ref
+ valign center_ref
  {
   ImageWidgetClass Background {
-   ignorepointer 0
-   color 0.04 0.05 0.07 0.97
    position 0 0
-   size 1600 792
+   size 1760 900
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
+   ignorepointer 0
+   color 0.067 0.094 0.082 0.99
+   mode blend
+  }
+  ImageWidgetClass TopRule {
+   position 32 20
+   size 44 3
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.714 0.835 0.604 1
    mode blend
   }
   TextWidgetClass Title {
-   ignorepointer 1
-   position 24 16
-   size 560 32
+   position 32 31
+   size 600 34
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "ISU SURVIVOR  -  ARENA SETUP"
+   ignorepointer 1
+   userID 28
+   text "ISU / SURVIVOR"
    font "gui/fonts/sdf_MetronBook24"
-   color 0.55 0.86 0.47 1
+   "exact text" 1
+   "exact text size" 28
+   "text valign" center
+   color 0.922 0.937 0.894 1
+  }
+  TextWidgetClass Subtitle {
+   position 32 71
+   size 1080 20
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 14
+   text "Your survivors. Their models. One fight to stay alive."
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 14
+   "text valign" center
+   color 0.612 0.682 0.627 1
   }
   ImageWidgetClass StatusPill {
-   ignorepointer 1
-   color 0.09 0.11 0.14 0.95
-   position 1100 12
-   size 480 36
+   position 1304 31
+   size 364 36
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
    mode blend
   }
   ImageWidgetClass StatusDot {
-   ignorepointer 1
-   color 0.45 0.45 0.48 1
-   position 1114 24
-   size 12 12
+   position 1318 45
+   size 8 8
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
+   ignorepointer 1
+   color 0.714 0.835 0.604 1
    mode blend
   }
   TextWidgetClass StatusText {
+   position 1338 31
+   size 314 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
    ignorepointer 1
-   position 1136 12
-   size 444 36
+   userID 14
+   text "Ready"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 14
+   "text valign" center
+   color 0.922 0.937 0.894 1
+  }
+  ImageWidgetClass BtnCloseBg {
+   position 1688 29
+   size 40 40
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "Status: unknown"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.85 0.88 0.90 1
-  }
-
-  TextWidgetClass HdrName {
    ignorepointer 1
-   position 84 64
-   size 140 20
+   color 0.125 0.165 0.145 1
+   mode blend
+  }
+  ButtonWidgetClass BtnClose {
+   position 1688 29
+   size 40 40
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "NAME"
+   style Empty
+   text "X"
    font "gui/fonts/sdf_MetronBook24"
-   color 0.5 0.52 0.56 1
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
   }
-  TextWidgetClass HdrProvider {
+  ImageWidgetClass HeaderRule {
+   position 32 102
+   size 1696 1
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
    ignorepointer 1
-   position 238 64
-   size 188 20
+   color 0.235 0.290 0.255 1
+   mode blend
+  }
+  TextWidgetClass GrpRoster {
+   position 32 117
+   size 254 28
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "PROVIDER"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.5 0.52 0.56 1
-  }
-  TextWidgetClass HdrModel {
    ignorepointer 1
-   position 434 64
-   size 228 20
+   userID 16
+   text "01 / YOUR SURVIVORS"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 16
+   "text valign" center
+   color 0.714 0.835 0.604 1
+  }
+  TextWidgetClass RosterNote {
+   position 300 120
+   size 1120 24
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "MODEL"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.5 0.52 0.56 1
-  }
-  TextWidgetClass HdrRole {
    ignorepointer 1
-   position 670 64
-   size 158 20
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "ROLE"
+   userID 14
+   text "Every field belongs to its survivor. Scroll to see the rest of your group."
    font "gui/fonts/sdf_MetronBook24"
-   color 0.5 0.52 0.56 1
-  }
-  TextWidgetClass HdrLoadout {
-   ignorepointer 1
-   position 836 64
-   size 158 20
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "LOADOUT"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.5 0.52 0.56 1
-  }
-  TextWidgetClass HdrVoice {
-   ignorepointer 1
-   position 1002 64
-   size 158 20
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "VOICE"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.5 0.52 0.56 1
-  }
-  TextWidgetClass HdrLang {
-   ignorepointer 1
-   position 1168 64
-   size 148 20
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "LANG"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.5 0.52 0.56 1
-  }
-  TextWidgetClass HdrStatus {
-   ignorepointer 1
-   position 1324 64
-   size 200 20
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "STATUS"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.5 0.52 0.56 1
-  }
-
-  ButtonWidgetClass BtnAddNpc {
-   position 600 12
-   size 110 36
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "+ NPC"
-   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 14
+   "text valign" center
+   color 0.612 0.682 0.627 1
   }
   TextWidgetClass RowCountText {
-   ignorepointer 1
-   position 724 18
-   size 160 26
+   position 1450 117
+   size 96 28
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
+   ignorepointer 1
+   userID 14
    text "1 / 10"
    font "gui/fonts/sdf_MetronBook24"
-   color 0.91 0.639 0.2 1
+   "exact text" 1
+   "exact text size" 14
+   "text valign" center
+   color 0.612 0.682 0.627 1
   }
-
+  ImageWidgetClass BtnAddNpcBg {
+   position 1560 113
+   size 168 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
+  }
+  ButtonWidgetClass BtnAddNpc {
+   position 1560 113
+   size 168 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text "+ ADD SURVIVOR"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
+  }
   ScrollWidgetClass ArenaScroll {
-   position 8 90
-   size 1584 208
+   position 32 164
+   size 1720 264
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
    clipchildren 1
+   ignorepointer 0
+   style blank
+   "Scrollbar V" 1
    {
-    PanelWidgetClass RowsHost {
+    FrameWidgetClass RowsHost {
      position 0 0
-     size 1584 208
+     size 1696 264
      hexactpos 1
      vexactpos 1
      hexactsize 1
      vexactsize 1
      clipchildren 0
+     ignorepointer 1
     }
    }
   }
-
-  TextWidgetClass GrpRound {
-   ignorepointer 1
-   position 20 300
-   size 200 22
+  ImageWidgetClass SettingsRule {
+   position 32 446
+   size 1696 1
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "ROUND"
+   ignorepointer 1
+   color 0.235 0.290 0.255 1
+   mode blend
+  }
+  TextWidgetClass GrpRound {
+   position 32 458
+   size 412 24
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 14
+   text "02 / SESSION"
    font "gui/fonts/sdf_MetronBook24"
-   color 0.91 0.639 0.2 1
+   "exact text" 1
+   "exact text size" 14
+   "text valign" center
+   color 0.714 0.835 0.604 1
+  }
+  TextWidgetClass GrpBehavior {
+   position 460 458
+   size 412 24
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 14
+   text "03 / BEHAVIOUR"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 14
+   "text valign" center
+   color 0.714 0.835 0.604 1
   }
   TextWidgetClass GrpControls {
-   ignorepointer 1
-   position 600 300
-   size 200 22
+   position 888 458
+   size 412 24
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "CONTROLS"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.91 0.639 0.2 1
-  }
-
-  TextWidgetClass LblMode {
    ignorepointer 1
-   position 20 330
-   size 160 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Mode"
+   userID 14
+   text "04 / CONTROLS"
    font "gui/fonts/sdf_MetronBook24"
-   color 0.78 0.80 0.84 1
+   "exact text" 1
+   "exact text size" 14
    "text valign" center
+   color 0.714 0.835 0.604 1
+  }
+  TextWidgetClass GrpAudio {
+   position 1316 458
+   size 412 24
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 14
+   text "05 / AUDIO & DISPLAY"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 14
+   "text valign" center
+   color 0.714 0.835 0.604 1
+  }
+  TextWidgetClass LblMode {
+   position 32 494
+   size 412 18
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Game mode"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass BtnModeBg {
+   position 32 514
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
   }
   ButtonWidgetClass BtnMode {
-   position 188 330
-   size 360 32
+   position 32 514
+   size 412 36
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "Neutral"
+   style Empty
+   text "Cooperative"
    font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
   }
-  TextWidgetClass ModeNote {
-   ignorepointer 1
-   position 188 362
-   size 360 16
+  TextWidgetClass LblSpawn {
+   position 32 554
+   size 412 18
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "(co-op)"
+   ignorepointer 1
+   userID 13
+   text "Starting position"
    font "gui/fonts/sdf_MetronBook24"
-   color 0.55 0.57 0.60 1
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass BtnSpawnBg {
+   position 32 574
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
+  }
+  ButtonWidgetClass BtnSpawn {
+   position 32 574
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text "Separate"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
+  }
+  TextWidgetClass LblCamp {
+   position 32 614
+   size 412 18
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Camp / click to use your position"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass BtnCampBg {
+   position 32 634
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
+  }
+  ButtonWidgetClass BtnCamp {
+   position 32 634
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text "4234 / 8512"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
+  }
+  TextWidgetClass LblMission {
+   position 32 674
+   size 412 18
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Mission"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass MissionHeadBg {
+   position 32 694
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
+  }
+  ButtonWidgetClass MissionHead {
+   position 32 694
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text "No mission"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
    "text valign" center
   }
   TextWidgetClass LblIdle {
-   ignorepointer 1
-   position 20 380
-   size 160 38
+   position 460 494
+   size 412 18
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "Idle"
+   ignorepointer 1
+   userID 13
+   text "Time between model decisions"
    font "gui/fonts/sdf_MetronBook24"
-   color 0.78 0.80 0.84 1
+   "exact text" 1
+   "exact text size" 13
    "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass IdleHeadBg {
+   position 460 514
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
   }
   ButtonWidgetClass IdleHead {
-   position 188 380
-   size 360 38
+   position 460 514
+   size 412 36
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "120s"
+   style Empty
+   text "120 s"
    font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
   }
   TextWidgetClass LblTurns {
-   ignorepointer 1
-   position 20 430
-   size 160 38
+   position 460 554
+   size 412 18
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "Turns"
+   ignorepointer 1
+   userID 13
+   text "Decisions per round"
    font "gui/fonts/sdf_MetronBook24"
-   color 0.78 0.80 0.84 1
+   "exact text" 1
+   "exact text size" 13
    "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass TurnsHeadBg {
+   position 460 574
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
   }
   ButtonWidgetClass TurnsHead {
-   position 188 430
-   size 360 38
+   position 460 574
+   size 412 36
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "10 turns"
+   style Empty
+   text "10 decisions"
    font "gui/fonts/sdf_MetronBook24"
-  }
-  TextWidgetClass LblSpawn {
-   ignorepointer 1
-   position 20 480
-   size 160 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Spawn"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.78 0.80 0.84 1
-   "text valign" center
-  }
-  ButtonWidgetClass BtnSpawn {
-   position 188 480
-   size 360 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Separate"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  TextWidgetClass LblCamp {
-   ignorepointer 1
-   position 20 530
-   size 160 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Camp"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.78 0.80 0.84 1
-   "text valign" center
-  }
-  ButtonWidgetClass BtnCamp {
-   position 188 530
-   size 360 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "4234 / 8512"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-
-  TextWidgetClass LblKeyStop {
-   ignorepointer 1
-   position 600 330
-   size 160 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Stop"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.78 0.80 0.84 1
-   "text valign" center
-  }
-  ButtonWidgetClass KeyStopHead {
-   position 768 330
-   size 360 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Num 5"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  TextWidgetClass LblKeyGoto {
-   ignorepointer 1
-   position 600 380
-   size 160 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Go-to"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.78 0.80 0.84 1
-   "text valign" center
-  }
-  ButtonWidgetClass KeyGotoHead {
-   position 768 380
-   size 360 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Num 0"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  TextWidgetClass LblKeyRadial {
-   ignorepointer 1
-   position 600 430
-   size 160 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Radial"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.78 0.80 0.84 1
-   "text valign" center
-  }
-  ButtonWidgetClass KeyRadialHead {
-   position 768 430
-   size 360 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Num ,"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  TextWidgetClass LblTarget {
-   ignorepointer 1
-   position 600 480
-   size 160 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Target"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.78 0.80 0.84 1
-   "text valign" center
-  }
-  ButtonWidgetClass BtnTarget {
-   position 768 480
-   size 360 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Aimed NPC"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  TextWidgetClass LblMic {
-   ignorepointer 1
-   position 600 530
-   size 120 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Mic"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.78 0.80 0.84 1
-   "text valign" center
-  }
-  ButtonWidgetClass BtnMic {
-   position 728 530
-   size 116 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "ON"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  TextWidgetClass LblComic {
-   ignorepointer 1
-   position 864 530
-   size 124 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Comic"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.78 0.80 0.84 1
-   "text valign" center
-  }
-  ButtonWidgetClass BtnComic {
-   position 996 530
-   size 132 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "ON"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  TextWidgetClass LblHud {
-   ignorepointer 1
-   position 958 578
-   size 124 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "HUD"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.78 0.80 0.84 1
-   "text valign" center
-  }
-  ButtonWidgetClass BtnHud {
-   position 1090 578
-   size 132 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "ON"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-
-  TextWidgetClass LblOrch {
-   ignorepointer 1
-   position 20 578
-   size 160 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Orchestr."
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.78 0.80 0.84 1
-   "text valign" center
-  }
-  ButtonWidgetClass BtnOrch {
-   position 188 578
-   size 360 38
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "OFF"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  TextWidgetClass OrchNote {
-   ignorepointer 1
-   position 188 610
-   size 360 16
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "(squad observer - no commands)"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.55 0.57 0.60 1
+   color 0.922 0.937 0.894 1
+   "text halign" center
    "text valign" center
   }
   TextWidgetClass LblPatrol {
-   ignorepointer 1
-   position 600 578
-   size 160 38
+   position 460 614
+   size 412 18
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "Patrols"
+   ignorepointer 1
+   userID 13
+   text "Ambient patrols / applies after server restart"
    font "gui/fonts/sdf_MetronBook24"
-   color 0.78 0.80 0.84 1
+   "exact text" 1
+   "exact text size" 13
    "text valign" center
+   color 0.612 0.682 0.627 1
   }
-  ButtonWidgetClass BtnPatrol {
-   position 768 578
-   size 170 38
+  ImageWidgetClass BtnPatrolBg {
+   position 460 634
+   size 412 36
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "OFF"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  TextWidgetClass CostText {
    ignorepointer 1
-   position 20 632
-   size 1140 24
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Round cost: -  (shown once supervisor reports)"
-   font "gui/fonts/sdf_MetronBook24"
-   color 0.55 0.57 0.60 1
-  }
-  ImageWidgetClass StartAccent {
-   ignorepointer 1
-   color 0.30 0.62 0.18 1
-   position 20 664
-   size 560 4
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
+   color 0.125 0.165 0.145 1
    mode blend
   }
-  ButtonWidgetClass BtnStart {
-   position 20 670
-   size 368 46
+  ButtonWidgetClass BtnPatrol {
+   position 460 634
+   size 412 36
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "START (neutral)"
+   style Empty
+   text "OFF"
    font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
   }
-  ButtonWidgetClass MissionHead {
-   position 406 670
-   size 368 46
+  TextWidgetClass LblOrch {
+   position 460 674
+   size 412 18
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "No mission"
-   font "gui/fonts/sdf_MetronBook24"
-  }
-  ImageWidgetClass StopAccent {
    ignorepointer 1
-   color 0.70 0.22 0.20 1
-   position 792 664
-   size 368 4
+   userID 13
+   text "Group coordination"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass BtnOrchBg {
+   position 460 694
+   size 412 36
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
+  }
+  ButtonWidgetClass BtnOrch {
+   position 460 694
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text "OFF"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
+  }
+  TextWidgetClass LblTarget {
+   position 888 494
+   size 412 18
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Send commands to"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass BtnTargetBg {
+   position 888 514
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
+  }
+  ButtonWidgetClass BtnTarget {
+   position 888 514
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text "Targeted NPC"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
+  }
+  TextWidgetClass LblKeyStop {
+   position 888 554
+   size 412 18
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Hold position"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass KeyStopHeadBg {
+   position 888 574
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
+  }
+  ButtonWidgetClass KeyStopHead {
+   position 888 574
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text "Num 5"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
+  }
+  TextWidgetClass LblKeyGoto {
+   position 888 614
+   size 412 18
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Move to target"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass KeyGotoHeadBg {
+   position 888 634
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
+  }
+  ButtonWidgetClass KeyGotoHead {
+   position 888 634
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text "Num 0"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
+  }
+  TextWidgetClass LblKeyRadial {
+   position 888 674
+   size 412 18
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Command wheel"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass KeyRadialHeadBg {
+   position 888 694
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
+  }
+  ButtonWidgetClass KeyRadialHead {
+   position 888 694
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text "Num ,"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
+  }
+  TextWidgetClass LblMic {
+   position 1316 494
+   size 412 18
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Microphone"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass BtnMicBg {
+   position 1316 514
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
+  }
+  ButtonWidgetClass BtnMic {
+   position 1316 514
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text "ON"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
+  }
+  TextWidgetClass LblComic {
+   position 1316 554
+   size 412 18
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Speech bubbles"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass BtnComicBg {
+   position 1316 574
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
+  }
+  ButtonWidgetClass BtnComic {
+   position 1316 574
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text "ON"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
+  }
+  TextWidgetClass LblHud {
+   position 1316 614
+   size 412 18
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Squad display (HUD)"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass BtnHudBg {
+   position 1316 634
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
+  }
+  ButtonWidgetClass BtnHud {
+   position 1316 634
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text "RIGHT"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
+  }
+  TextWidgetClass LblNpcTts {
+   position 1316 674
+   size 412 18
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Developer mode / NPC radio voices"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass BtnNpcTtsBg {
+   position 1316 694
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
+  }
+  ButtonWidgetClass BtnNpcTts {
+   position 1316 694
+   size 412 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text "OFF"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
+  }
+  TextWidgetClass ModeNote {
+   position 32 738
+   size 412 20
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Work together and survive as a team."
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  TextWidgetClass OrchNote {
+   position 460 738
+   size 412 20
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Shared goals, independent decisions."
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  TextWidgetClass ControlsNote {
+   position 888 738
+   size 412 20
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Click a key to change its assignment."
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  TextWidgetClass NpcTtsNote {
+   position 1316 738
+   size 412 20
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Only available in developer mode."
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass FooterRule {
+   position 32 778
+   size 1696 1
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.235 0.290 0.255 1
+   mode blend
+  }
+  TextWidgetClass CostLabel {
+   position 32 792
+   size 1040 18
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "SESSION COST"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
+  }
+  TextWidgetClass CostText {
+   position 32 813
+   size 1040 26
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 16
+   text "No cost recorded yet"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 16
+   "text valign" center
+   color 0.922 0.937 0.894 1
+  }
+  ImageWidgetClass BtnStopBg {
+   position 1216 796
+   size 168 44
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.220 0.125 0.114 1
    mode blend
   }
   ButtonWidgetClass BtnStop {
-   position 792 670
-   size 368 46
+   position 1216 796
+   size 168 44
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
+   style Empty
    text "STOP"
    font "gui/fonts/sdf_MetronBook24"
+   color 0.941 0.694 0.627 1
+   "text halign" center
+   "text valign" center
   }
-  ButtonWidgetClass BtnClose {
-   position 20 726
-   size 1140 34
+  ImageWidgetClass BtnStartBg {
+   position 1408 796
+   size 320 44
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
-   text "Close  (key: Ins)"
+   ignorepointer 1
+   color 0.714 0.835 0.604 1
+   mode blend
+  }
+  ButtonWidgetClass BtnStart {
+   position 1408 796
+   size 320 44
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text "START CO-OP"
    font "gui/fonts/sdf_MetronBook24"
+   color 0.067 0.106 0.063 1
+   "text halign" center
+   "text valign" center
   }
   TextWidgetClass HintLine1 {
+   position 32 861
+   size 1696 20
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
    ignorepointer 1
-   position 20 768
-   size 1300 22
-   hexactpos 1
-   vexactpos 1
-   hexactsize 1
-   vexactsize 1
-   text "Click a field (Provider/Model/Role/Loadout/Voice/Lang) to open its list. Right-click Camp resets it. Stop/Go/Radial act on the targeted NPC."
+   userID 13
+   text "Insert: close menu     /     Right-click camp: reset position     /     Your choices stay selected during this game session."
    font "gui/fonts/sdf_MetronBook24"
-   color 0.5 0.5 0.52 1
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   color 0.612 0.682 0.627 1
   }
-
-  PanelWidgetClass DdPopup {
-   visible 0
-   clipchildren 0
+  FrameWidgetClass DdPopup {
    position 0 0
-   size 200 200
+   size 320 36
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
+   visible 0
    priority 200
+   clipchildren 0
   }
  }
 }

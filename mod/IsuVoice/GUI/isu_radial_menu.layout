@@ -1,202 +1,566 @@
-PanelWidgetClass IsuRadialRoot {
- size 1 1
- halign center_ref
- valign center_ref
- hexactpos 0
- vexactpos 0
- hexactsize 0
- vexactsize 0
- style blank
+FrameWidgetClass IsuRadialRoot {
+ position 0 0
+ size 820 620
+ hexactpos 1
+ vexactpos 1
+ hexactsize 1
+ vexactsize 1
+ clipchildren 0
  {
-  PanelWidgetClass Dim {
-   ignorepointer 1
-   color 0 0 0 0.6
-   size 1 1
-   hexactpos 0
-   vexactpos 0
-   hexactsize 0
-   vexactsize 0
-  }
-  FrameWidgetClass Wheel {
-   clipchildren 0
+  ImageWidgetClass RadialBackground {
    position 0 0
-   size 640 640
-   halign center_ref
-   valign center_ref
+   size 820 620
    hexactpos 1
    vexactpos 1
    hexactsize 1
    vexactsize 1
+   ignorepointer 1
+   color 0.047 0.063 0.055 0.99
+   mode blend
+  }
+  ImageWidgetClass RadialTopRule {
+   position 32 20
+   size 40 3
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.714 0.835 0.604 1
+   mode blend
+  }
+  TextWidgetClass RadialTitle {
+   position 32 31
+   size 650 28
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 22
+   text "SURVIVOR / COMMANDS"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 22
+   "text valign" center
+   "text halign" left
+   color 0.922 0.937 0.894 1
+  }
+  TextWidgetClass RadialSubtitle {
+   position 32 62
+   size 680 18
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Direct your group. Stay alive together."
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   "text halign" left
+   color 0.612 0.682 0.627 1
+  }
+  ImageWidgetClass RadialHeaderRule {
+   position 32 89
+   size 756 1
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.227 0.290 0.243 1
+   mode blend
+  }
+  ImageWidgetClass RadialCloseBg {
+   position 748 31
+   size 40 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.125 0.165 0.145 1
+   mode blend
+  }
+  ButtonWidgetClass BtnRadialClose {
+   position 748 31
+   size 40 36
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text "X"
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   "text halign" center
+   "text valign" center
+  }
+  ImageWidgetClass RadialCenterEdge {
+   position 270 276
+   size 280 124
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.227 0.290 0.243 1
+   mode blend
+  }
+  ImageWidgetClass RadialCenterBg {
+   position 271 277
+   size 278 122
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.067 0.094 0.082 1
+   mode blend
+  }
+  TextWidgetClass RadialTargetLabel {
+   position 286 289
+   size 248 18
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 12
+   text "COMMAND TARGET"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 12
+   "text valign" center
+   "text halign" center
+   color 0.714 0.835 0.604 1
+  }
+  TextWidgetClass RadialCenter {
+   position 282 314
+   size 256 28
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 20
+   text "Nearest survivor"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 20
+   "text valign" center
+   "text halign" center
+   color 0.922 0.937 0.894 1
+  }
+  TextWidgetClass RadialTargetDetail {
+   position 282 355
+   size 256 26
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "One command. One clear objective."
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   "text halign" center
+   color 0.612 0.682 0.627 1
+  }
+  ButtonWidgetClass BtnAct0 {
+   position 300 108
+   size 220 68
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text ""
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   clipchildren 1
    {
-    ImageWidgetClass RingEdge {
-     ignorepointer 1
-     color 0.55 0.86 0.47 0.30
+    ImageWidgetClass ActBg0 {
      position 0 0
-     size 612 612
-     halign center_ref
-     valign center_ref
+     size 220 68
      hexactpos 1
      vexactpos 1
      hexactsize 1
      vexactsize 1
-     imageTexture "{F150456F37AF9CA2}gui/textures/radial8.edds"
+     ignorepointer 1
+     color 0.125 0.165 0.145 1
      mode blend
-     "src alpha" 1
-     "clamp mode" clamp
-     "stretch mode" stretch_w_h
-     filter 1
     }
-    ImageWidgetClass Ring {
+    TextWidgetClass ActLabel0 {
+     position 12 11
+     size 196 24
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
      ignorepointer 1
-     color 0.07 0.09 0.13 0.97
-     position 0 0
-     size 580 580
-     halign center_ref
-     valign center_ref
+     userID 18
+     text "Follow me"
+     font "gui/fonts/sdf_MetronBook24"
+     "exact text" 1
+     "exact text size" 18
+     "text valign" center
+     "text halign" center
+     color 0.922 0.937 0.894 1
+    }
+    TextWidgetClass ActNote0 {
+     position 8 40
+     size 204 17
      hexactpos 1
      vexactpos 1
      hexactsize 1
      vexactsize 1
-     imageTexture "{F150456F37AF9CA2}gui/textures/radial8.edds"
-     mode blend
-     "src alpha" 1
-     "clamp mode" clamp
-     "stretch mode" stretch_w_h
-     filter 1
-    }
-    FrameWidgetClass Selector {
-     visible 0
      ignorepointer 1
-     clipchildren 0
-     position 0 0
-     size 580 580
-     halign center_ref
-     valign center_ref
-     hexactpos 1
-     vexactpos 1
-     hexactsize 1
-     vexactsize 1
-     {
-      ImageWidgetClass SelectorSlice {
-       ignorepointer 1
-       color 0.55 0.86 0.47 0.85
-       position 0 14
-       size 290 145
-       halign center_ref
-       hexactpos 1
-       vexactpos 1
-       hexactsize 1
-       vexactsize 1
-       image0 "set:dayz_gui image:radial_selector"
-       mode blend
-       "src alpha" 1
-       "clamp mode" clamp
-       "stretch mode" stretch_w_h
-       filter 1
-      }
-     }
-    }
-    ButtonWidgetClass BtnAct0 {
-     position 220 65
-     size 200 50
-     hexactpos 1
-     vexactpos 1
-     hexactsize 1
-     vexactsize 1
-     text "Follow"
+     userID 12
+     text "Stay close to you"
      font "gui/fonts/sdf_MetronBook24"
-     "text halign" center
+     "exact text" 1
+     "exact text size" 12
      "text valign" center
-    }
-    ButtonWidgetClass BtnAct1 {
-     position 402 170
-     size 200 50
-     hexactpos 1
-     vexactpos 1
-     hexactsize 1
-     vexactsize 1
-     text "Hold"
-     font "gui/fonts/sdf_MetronBook24"
      "text halign" center
-     "text valign" center
-    }
-    ButtonWidgetClass BtnAct2 {
-     position 402 380
-     size 200 50
-     hexactpos 1
-     vexactpos 1
-     hexactsize 1
-     vexactsize 1
-     text "Regroup"
-     font "gui/fonts/sdf_MetronBook24"
-     "text halign" center
-     "text valign" center
-    }
-    ButtonWidgetClass BtnAct3 {
-     position 220 485
-     size 200 50
-     hexactpos 1
-     vexactpos 1
-     hexactsize 1
-     vexactsize 1
-     text "Loot"
-     font "gui/fonts/sdf_MetronBook24"
-     "text halign" center
-     "text valign" center
-    }
-    ButtonWidgetClass BtnAct4 {
-     position 38 380
-     size 200 50
-     hexactpos 1
-     vexactpos 1
-     hexactsize 1
-     vexactsize 1
-     text "Attack"
-     font "gui/fonts/sdf_MetronBook24"
-     "text halign" center
-     "text valign" center
-    }
-    ButtonWidgetClass BtnAct5 {
-     position 38 170
-     size 200 50
-     hexactpos 1
-     vexactpos 1
-     hexactsize 1
-     vexactsize 1
-     text "Go to"
-     font "gui/fonts/sdf_MetronBook24"
-     "text halign" center
-     "text valign" center
-    }
-    TextWidgetClass RadialCenter {
-     ignorepointer 1
-     position 110 290
-     size 420 40
-     hexactpos 1
-     vexactpos 1
-     hexactsize 1
-     vexactsize 1
-     text "Target: -"
-     font "gui/fonts/sdf_MetronBook24"
-     color 0.65 0.92 0.55 1
-     "text halign" center
-     "text valign" center
-    }
-    TextWidgetClass RadialHint {
-     ignorepointer 1
-     position 120 332
-     size 400 26
-     hexactpos 1
-     vexactpos 1
-     hexactsize 1
-     vexactsize 1
-     text "Choose a command  -  ESC closes"
-     font "gui/fonts/sdf_MetronBook24"
-     color 0.70 0.73 0.78 1
-     "text halign" center
-     "text valign" center
+     color 0.612 0.682 0.627 1
     }
    }
+  }
+  ButtonWidgetClass BtnAct1 {
+   position 564 210
+   size 220 68
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text ""
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   clipchildren 1
+   {
+    ImageWidgetClass ActBg1 {
+     position 0 0
+     size 220 68
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     ignorepointer 1
+     color 0.125 0.165 0.145 1
+     mode blend
+    }
+    TextWidgetClass ActLabel1 {
+     position 12 11
+     size 196 24
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     ignorepointer 1
+     userID 18
+     text "Hold position"
+     font "gui/fonts/sdf_MetronBook24"
+     "exact text" 1
+     "exact text size" 18
+     "text valign" center
+     "text halign" center
+     color 0.922 0.937 0.894 1
+    }
+    TextWidgetClass ActNote1 {
+     position 8 40
+     size 204 17
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     ignorepointer 1
+     userID 12
+     text "Stop and wait"
+     font "gui/fonts/sdf_MetronBook24"
+     "exact text" 1
+     "exact text size" 12
+     "text valign" center
+     "text halign" center
+     color 0.612 0.682 0.627 1
+    }
+   }
+  }
+  ButtonWidgetClass BtnAct2 {
+   position 564 408
+   size 220 68
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text ""
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   clipchildren 1
+   {
+    ImageWidgetClass ActBg2 {
+     position 0 0
+     size 220 68
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     ignorepointer 1
+     color 0.125 0.165 0.145 1
+     mode blend
+    }
+    TextWidgetClass ActLabel2 {
+     position 12 11
+     size 196 24
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     ignorepointer 1
+     userID 18
+     text "Regroup"
+     font "gui/fonts/sdf_MetronBook24"
+     "exact text" 1
+     "exact text size" 18
+     "text valign" center
+     "text halign" center
+     color 0.922 0.937 0.894 1
+    }
+    TextWidgetClass ActNote2 {
+     position 8 40
+     size 204 17
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     ignorepointer 1
+     userID 12
+     text "Move to your location"
+     font "gui/fonts/sdf_MetronBook24"
+     "exact text" 1
+     "exact text size" 12
+     "text valign" center
+     "text halign" center
+     color 0.612 0.682 0.627 1
+    }
+   }
+  }
+  ButtonWidgetClass BtnAct3 {
+   position 300 504
+   size 220 68
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text ""
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   clipchildren 1
+   {
+    ImageWidgetClass ActBg3 {
+     position 0 0
+     size 220 68
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     ignorepointer 1
+     color 0.125 0.165 0.145 1
+     mode blend
+    }
+    TextWidgetClass ActLabel3 {
+     position 12 11
+     size 196 24
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     ignorepointer 1
+     userID 18
+     text "Find supplies"
+     font "gui/fonts/sdf_MetronBook24"
+     "exact text" 1
+     "exact text size" 18
+     "text valign" center
+     "text halign" center
+     color 0.922 0.937 0.894 1
+    }
+    TextWidgetClass ActNote3 {
+     position 8 40
+     size 204 17
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     ignorepointer 1
+     userID 12
+     text "Search nearby loot"
+     font "gui/fonts/sdf_MetronBook24"
+     "exact text" 1
+     "exact text size" 12
+     "text valign" center
+     "text halign" center
+     color 0.612 0.682 0.627 1
+    }
+   }
+  }
+  ButtonWidgetClass BtnAct4 {
+   position 36 408
+   size 220 68
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text ""
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   clipchildren 1
+   {
+    ImageWidgetClass ActBg4 {
+     position 0 0
+     size 220 68
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     ignorepointer 1
+     color 0.188 0.125 0.114 1
+     mode blend
+    }
+    TextWidgetClass ActLabel4 {
+     position 12 11
+     size 196 24
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     ignorepointer 1
+     userID 18
+     text "Engage"
+     font "gui/fonts/sdf_MetronBook24"
+     "exact text" 1
+     "exact text size" 18
+     "text valign" center
+     "text halign" center
+     color 0.925 0.694 0.620 1
+    }
+    TextWidgetClass ActNote4 {
+     position 8 40
+     size 204 17
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     ignorepointer 1
+     userID 12
+     text "Attack nearby threats"
+     font "gui/fonts/sdf_MetronBook24"
+     "exact text" 1
+     "exact text size" 12
+     "text valign" center
+     "text halign" center
+     color 0.612 0.682 0.627 1
+    }
+   }
+  }
+  ButtonWidgetClass BtnAct5 {
+   position 36 210
+   size 220 68
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   style Empty
+   text ""
+   font "gui/fonts/sdf_MetronBook24"
+   color 0.922 0.937 0.894 1
+   clipchildren 1
+   {
+    ImageWidgetClass ActBg5 {
+     position 0 0
+     size 220 68
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     ignorepointer 1
+     color 0.125 0.165 0.145 1
+     mode blend
+    }
+    TextWidgetClass ActLabel5 {
+     position 12 11
+     size 196 24
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     ignorepointer 1
+     userID 18
+     text "Go there"
+     font "gui/fonts/sdf_MetronBook24"
+     "exact text" 1
+     "exact text size" 18
+     "text valign" center
+     "text halign" center
+     color 0.922 0.937 0.894 1
+    }
+    TextWidgetClass ActNote5 {
+     position 8 40
+     size 204 17
+     hexactpos 1
+     vexactpos 1
+     hexactsize 1
+     vexactsize 1
+     ignorepointer 1
+     userID 12
+     text "The point you aimed at"
+     font "gui/fonts/sdf_MetronBook24"
+     "exact text" 1
+     "exact text size" 12
+     "text valign" center
+     "text halign" center
+     color 0.612 0.682 0.627 1
+    }
+   }
+  }
+  ImageWidgetClass Selector {
+   position 0 0
+   size 3 68
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   color 0.714 0.835 0.604 1
+   mode blend
+   visible 0
+   priority 100
+  }
+  TextWidgetClass RadialHint {
+   position 32 590
+   size 756 18
+   hexactpos 1
+   vexactpos 1
+   hexactsize 1
+   vexactsize 1
+   ignorepointer 1
+   userID 13
+   text "Click a command   /   Esc to close"
+   font "gui/fonts/sdf_MetronBook24"
+   "exact text" 1
+   "exact text size" 13
+   "text valign" center
+   "text halign" center
+   color 0.612 0.682 0.627 1
   }
  }
 }

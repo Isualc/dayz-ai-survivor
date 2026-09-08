@@ -15,11 +15,13 @@ const int ISU_RPC_ARENA_STATUS = 0x49535553; // "ISUS" - Supervisor-Status -> Me
 const int ISU_RPC_NPC_CMD = 0x49535543;      // "ISUC" - Spieler-Direktbefehl -> Server
 const int ISU_RPC_INTENT = 0x4953554E;       // "ISUN" - Gedanke/Absicht -> Client (Nameplate)
 const int ISU_RPC_SAY = 0x4953554F;          // "ISUO" - gesagter Text -> Client (Comic-Sprechblase)
+const int ISU_RPC_UI_LANGUAGE_REQUEST = 0x4953554C; // "ISUL" - client asks for server UI language
+const int ISU_RPC_UI_LANGUAGE = 0x49535555;         // "ISUU" - server replies only to requesting client
 
 // Letzter vom Server gefunkter Supervisor-Status (Anzeige im Arena-Menue)
 class IsuArenaStatusStore
 {
-	static string s_Text = "unbekannt (Server meldet sich gleich)";
+	static string s_Text = "";   // Empty = menu's localized initial state.
 }
 
 // Spieler-Direktbefehle an die NPCs (Stopp / geh dorthin). Loest das Ziel per
@@ -311,6 +313,19 @@ modded class PlayerBase
 		// Nur auf Clients verarbeiten
 		if (GetGame().IsDedicatedServer())
 			return;
+
+		if (rpc_type == ISU_RPC_UI_LANGUAGE)
+		{
+			// Native RPC transport routes client calls to the server and server
+			// replies to clients. Accept only our local player as the target;
+			// no assumption about an undocumented sender-null convention.
+			if (!GetGame().IsClient() || GetGame().GetPlayer() != this)
+				return;
+			Param1<string> uiLanguage = new Param1<string>("");
+			if (ctx.Read(uiLanguage))
+				IsuUiText.AcceptServerLanguage(uiLanguage.param1);
+			return;
+		}
 
 		if (rpc_type == ISU_RPC_PLAY_VOICE)
 		{

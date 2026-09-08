@@ -10,6 +10,34 @@
 const int ISUSRV_RPC_ARENA_CMD = 0x49535541;
 const int ISUSRV_RPC_ARENA_STATUS = 0x49535553;
 const int ISUSRV_RPC_NPC_CMD = 0x49535543;   // Befehlsrad/Direkttasten -> Server
+const int ISUSRV_RPC_UI_LANGUAGE_REQUEST = 0x4953554C;
+const int ISUSRV_RPC_UI_LANGUAGE = 0x49535555;
+
+// The launcher persists one language code. Read only this dedicated setting;
+// client requests cannot change it or access another client's preferences.
+class IsuServerUiLanguage
+{
+	static string GetLanguage()
+	{
+		FileHandle fh = OpenFile("$profile:IsuSurvivor/ui_language.txt", FileMode.READ);
+		if (fh == 0)
+			return "en";
+		string language;
+		FGets(fh, language);
+		CloseFile(fh);
+		language = language.Trim();
+		language.ToLower();
+		if (language == "de")
+			return "de";
+		return "en";
+	}
+
+	static void Reply(PlayerBase player, PlayerIdentity recipient)
+	{
+		Param1<string> language = new Param1<string>(GetLanguage());
+		GetGame().RPCSingleParam(player, ISUSRV_RPC_UI_LANGUAGE, language, true, recipient);
+	}
+}
 
 // Basislager der Agenten: Position kommt aus $profile:IsuSurvivor/camp.txt
 // (zwei Zeilen: x, z), Default 4233.7/8512.2. Idempotentes Spawnen,
@@ -224,6 +252,8 @@ class IsuArenaControl
 
 modded class PlayerBase
 {
+	protected int m_IsuUiLanguageReplyAt = -2000;
+
 	override void OnRPC(PlayerIdentity sender, int rpc_type, ParamsReadContext ctx)
 	{
 		super.OnRPC(sender, rpc_type, ctx);
@@ -231,6 +261,23 @@ modded class PlayerBase
 		// Nur auf dem Server verarbeiten
 		if (!GetGame().IsDedicatedServer())
 			return;
+
+		if (rpc_type == ISUSRV_RPC_UI_LANGUAGE_REQUEST)
+		{
+			// Reply to the owning player only; a request is not an admin write.
+			PlayerIdentity owner = GetIdentity();
+			if (!sender || !owner || sender.GetId() != owner.GetId())
+				return;
+			Param1<int> languageRequest = new Param1<int>(0);
+			if (!ctx.Read(languageRequest) || languageRequest.param1 != 1)
+				return;
+			int now = GetGame().GetTime();
+			if (now - m_IsuUiLanguageReplyAt < 1000)
+				return;
+			m_IsuUiLanguageReplyAt = now;
+			IsuServerUiLanguage.Reply(this, sender);
+			return;
+		}
 
 		if (rpc_type == ISUSRV_RPC_ARENA_CMD)
 		{

@@ -79,10 +79,19 @@ class IsuBridge
 	private bool m_Following;
 	private bool m_TriedUnstick;
 	private ItemBase m_WearPendingItem;   // wear: Anziehen nach Slot-Tausch
+	private string m_WearGroundList = ""; // wear: Classnames, die beim Tausch am Boden landeten
 	private int m_WearPendingTries;
 	private string m_WearDiag;            // wear: Slot-Diagnose fuer Fehler
-	private ItemBase m_EquipPendingItem;  // equip_best: Waffe-in-Hand-Retry ueber Ticks
+	private ItemBase m_EquipPendingItem;  // equip_best: Waffe-in-Hand-Retry über Ticks
 	private int m_EquipPendingTries;
+	// Classname des Equip-Ziels: Expansions eAI_TakeItemToHandsImpl KLONT das
+	// Item in die Hand (Expansion_CloneItemToLocation -> ObjectDelete(src)),
+	// der Zeiger oben wird dadurch null - der Retry findet den Klon per Typ.
+	private string m_EquipPendingType;
+	// Blutungs-Reflex (Selbstverband ohne Gehirn-Zug, siehe AutoBandageReflex)
+	private int m_BleedTicks;            // Ticks in Folge mit aktiver Blutung
+	private int m_LastAutoBandageMs;     // GetGame().GetTime() des letzten Reflex-Verbands
+	private int m_AutoBandages;          // Zähler Reflex-Verbände (State: auto_bandages)
 
 	static IsuBridge GetInstance(string id = "viktor")
 	{
@@ -190,7 +199,75 @@ class IsuBridge
 			EnforceFaction();
 		}
 		UpdateRunningCommand();
+		AutoBandageReflex();
 		WriteState();
+	}
+
+	// Blutungs-Reflex (modellunabhängig, 1 Hz): blutet der Survivor zwei
+	// Ticks in Folge und trägt Verbandsmaterial, verbindet er sich SELBST -
+	// wie ein Spieler, der sofort die Bandage zieht. Vorher hing das an einem
+	// Gehirn-Zug, der bei laufendem explore_step erst nach 60-90 s kam
+	// (Viktor 08.09. 20:54). Der Zwei-Tick-Vorlauf lässt einen gerade
+	// laufenden bandage()/treat_other-Befehl zuerst zum Zug kommen (kein
+	// Doppelverbrauch); zwischen zwei Reflex-Verbänden liegen mindestens
+	// 4 s (eine Quelle pro Verband, wie Vanilla ApplyBandage). run_agent
+	// sieht den Verbrauch über state.npc.auto_bandages.
+	private void AutoBandageReflex()
+	{
+		if (!m_Npc || !m_Npc.IsAlive() || !m_Npc.IsBleeding())
+		{
+			m_BleedTicks = 0;
+			return;
+		}
+		m_BleedTicks++;
+		if (m_BleedTicks < 2)
+			return;
+		int nowMs = GetGame().GetTime();
+		if (nowMs - m_LastAutoBandageMs < 4000)
+			return;
+		ItemBase med = FindDressing();
+		if (!med)
+			return;
+		string medType = med.GetType();
+		ApplyDressing(m_Npc, med);
+		m_LastAutoBandageMs = nowMs;
+		m_AutoBandages++;
+		Print("[IsuSurvivor] " + m_NpcName + ": Blutungs-Reflex - selbst verbunden (" + medType + ")");
+	}
+
+	// Verbandsmaterial im eigenen Inventar (nicht ruiniert, Vorrat > 0):
+	// BandageDressing vor Rag, wie bandage() in dayz_mcp wählt.
+	private ItemBase FindDressing()
+	{
+		ItemBase rag = null;
+		array<EntityAI> items = new array<EntityAI>();
+		m_Npc.GetInventory().EnumerateInventory(InventoryTraversalType.PREORDER, items);
+		foreach (EntityAI ent : items)
+		{
+			ItemBase it = ItemBase.Cast(ent);
+			if (!it || it.IsRuined())
+				continue;
+			if (it.HasQuantity() && it.GetQuantity() <= 0)
+				continue;
+			if (it.GetType() == "BandageDressing")
+				return it;
+			if (it.GetType() == "Rag" && !rag)
+				rag = it;
+		}
+		return rag;
+	}
+
+	// Wie Vanilla ApplyBandage: stärkste Blutungsquelle schliessen, 1 Einheit
+	// verbrauchen (Rag-Stack) bzw. Item löschen. Gemeinsamer Pfad für
+	// treat_other (Kamerad oder Selbst per Befehl) und den Blutungs-Reflex.
+	private void ApplyDressing(PlayerBase patient, ItemBase med)
+	{
+		if (patient.GetBleedingManagerServer())
+			patient.GetBleedingManagerServer().RemoveMostSignificantBleedingSourceEx(med);
+		if (med.HasQuantity())
+			med.AddQuantity(-1, true);
+		else
+			med.Delete();
 	}
 
 	// Gedanken-HUD: aktuelle Absicht aus intent_<id>.txt lesen (vom MCP-Tool
@@ -351,6 +428,7 @@ class IsuBridge
 		m_WearPendingTries = 0;
 		m_EquipPendingItem = null;
 		m_EquipPendingTries = 0;
+		m_EquipPendingType = "";
 		m_StoreFilter = "";
 
 		switch (cmd.action)
@@ -385,6 +463,10 @@ class IsuBridge
 
 			case "harvest":
 				CmdHarvest(cmd);
+				break;
+
+			case "harvest_crops":
+				CmdHarvestCrops();
 				break;
 
 			case "hunt":
@@ -475,6 +557,10 @@ class IsuBridge
 				CmdGiveItem(cmd);
 				break;
 
+			case "give_wear":
+				CmdGiveWear(cmd);
+				break;
+
 			case "hand_over":
 				CmdHandOver(cmd);
 				break;
@@ -511,6 +597,10 @@ class IsuBridge
 				CmdConsumeItem(cmd);
 				break;
 
+			case "take_medicine":
+				CmdTakeMedicine(cmd);
+				break;
+
 			case "light_fire":
 				CmdLightFire();
 				break;
@@ -532,7 +622,7 @@ class IsuBridge
 				break;
 
 			case "reload":
-				CmdReload();
+				CmdReload(cmd);
 				break;
 
 			case "find_water":
@@ -1137,10 +1227,33 @@ class IsuBridge
 		}
 
 		string type = m_PickupItem.GetType();
-		// Hand frei machen - ein Hand-Item blockiert sonst das stille
-		// Rausfallen von Loot (eAI-Loot-Pfad braucht die freie Hand)
-		EnsureHandsFree(null);
-		if (m_Npc.eAI_TakeItemToInventory(m_PickupItem, true))
+		// Nach dem Anlaufen erneut die echte 3D-Reichweite pruefen; ein Item
+		// im Stockwerk darueber oder inzwischen weggerolltes Loot bleibt liegen.
+		if (vector.Distance(m_Npc.GetPosition(), m_PickupItem.GetPosition()) > 2.0)
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "Bodenitem ausser Reichweite (max. 2 m): " + type;
+			m_PickupItem = null;
+			m_PickupWalking = false;
+			ReleaseClaim();
+			return;
+		}
+
+		// Pickup darf vorhandene Ausruestung nicht ablegen oder ersetzen.
+		// EnsureHandsFree droppte bei vollem Cargo die getragene Frucht und
+		// erzeugte so endlose Apple/Pear-Wechsel. Der Expansion-Loot-Impl-Pfad
+		// kann zudem Kleidung tauschen. Hier nur einen wirklich FREIEN Platz
+		// nehmen: zuerst Cargo/Attachment, danach eine bereits freie Hand.
+		InventoryLocation pickupLocation;
+		bool pickupSpace = m_Npc.eAI_FindFreeInventoryLocationFor(m_PickupItem, 0, pickupLocation);
+		if (!pickupSpace && !m_Npc.GetHumanInventory().GetEntityInHands())
+			pickupSpace = m_Npc.eAI_FindFreeInventoryLocationFor(m_PickupItem, FindInventoryLocationType.HANDS, pickupLocation);
+		bool pickupTaken = false;
+		if (pickupSpace && m_PickupItem.IsTakeable() && !m_PickupItem.Expansion_IsInventoryLocked())
+			pickupTaken = m_Npc.eAI_TakeItemToLocation(m_PickupItem, pickupLocation);
+		// TakeItem(..., true) bestaetigt nur den Aktionsstart. Erst eine
+		// synchrone Uebergabe UND die echte Inventar-Hierarchie sind Erfolg.
+		if (pickupTaken && m_PickupItem.GetHierarchyRoot() == m_Npc)
 		{
 			m_PickupItem = null;
 			m_PickupWalking = false;
@@ -1166,7 +1279,10 @@ class IsuBridge
 		}
 
 		m_CmdStatus = "failed";
-		m_CmdDetail = "Inventar voll - kein Platz fuer " + type + " (erst etwas droppen/anziehen)";
+		if (!pickupSpace)
+			m_CmdDetail = "Inventar und Haende voll - kein Platz fuer " + type + " (erst bewusst Platz schaffen)";
+		else
+			m_CmdDetail = "Aufnahme fehlgeschlagen oder Item gesperrt: " + type;
 		m_PickupItem = null;
 		m_PickupWalking = false;
 		ReleaseClaim();
@@ -1207,6 +1323,38 @@ class IsuBridge
 			return false;
 		}
 		return (owner != this);
+	}
+
+	// Reife Feldfruechte: dieselbe Harvest-Methode wie ActionHarvestCrops.
+	// Kein kuenstliches Wachstum oder Item-Spawning; nur reife Pflanzen in
+	// Reichweite. Anlaufen erledigt der Daemon als separaten Handlungsschritt.
+	private void CmdHarvestCrops()
+	{
+		if (!NpcReadyOnFoot())
+			return;
+		array<Object> cropObjects = new array<Object>();
+		array<CargoBase> cropCargos = new array<CargoBase>();
+		GetGame().GetObjectsAtPosition3D(m_Npc.GetPosition(), 3.0, cropObjects, cropCargos);
+		foreach (Object cropObj : cropObjects)
+		{
+			GardenBase cropGarden = GardenBase.Cast(cropObj);
+			if (!cropGarden)
+				continue;
+			array<ref Slot> cropSlots = cropGarden.GetSlots();
+			for (int cropIndex = 0; cropIndex < cropSlots.Count(); cropIndex++)
+			{
+				PlantBase cropPlant = cropSlots.Get(cropIndex).GetPlant();
+				if (!cropPlant || !cropPlant.IsHarvestable())
+					continue;
+				string cropType = cropPlant.GetCropsType();
+				cropPlant.Harvest(m_Npc);
+				m_CmdStatus = "done";
+				m_CmdDetail = cropType + " geerntet, liegt am Boden zum Aufnehmen";
+				return;
+			}
+		}
+		m_CmdStatus = "failed";
+		m_CmdDetail = "keine reifen Feldfruechte in 3 m; Garten aufsuchen oder Wachstum abwarten";
 	}
 
 	// Tierkadaver verwerten (Jagd): braucht ein Schneidwerkzeug, laeuft zum
@@ -1782,6 +1930,45 @@ class IsuBridge
 		return edible.IsKindOf("SodaCan_ColorBase");
 	}
 
+	private bool IsMedicalItem(ItemBase item)
+	{
+		string medType = item.GetType();
+		return medType == "VitaminBottle" || medType == "TetracyclineAntibiotics" || medType == "CharcoalTablets" || medType == "PainkillerTablets" || medType == "PurificationTablets" || medType == "DisinfectantAlcohol" || medType == "DisinfectantSpray" || medType == "BandageDressing" || medType == "IodineTincture" || medType == "ChelatingTablets";
+	}
+
+	private bool IsSafeDrink(Edible_Base edible)
+	{
+		if (edible.IsRuined() || edible.GetIsFrozen() || edible.GetAgents() != 0)
+			return false;
+		if (edible.GetTemperature() > PlayerConstants.CONSUMPTION_DAMAGE_TEMP_THRESHOLD)
+			return false;
+		if (edible.IsKindOf("SodaCan_ColorBase"))
+			return true;
+		int drinkType = edible.GetLiquidType();
+		return drinkType == LIQUID_WATER || drinkType == LIQUID_CLEANWATER;
+	}
+
+	private bool IsSafeFood(Edible_Base edible)
+	{
+		if (IsMedicalItem(edible) || edible.IsRuined() || edible.GetIsFrozen())
+			return false;
+		if (edible.FilterAgents(edible.GetAgents()) != 0 || edible.GetTemperature() > PlayerConstants.CONSUMPTION_DAMAGE_TEMP_THRESHOLD)
+			return false;
+		if (edible.IsKindOf("HumanSteakMeat") || edible.IsKindOf("Guts"))
+			return false;
+		if (edible.GetFoodStage())
+		{
+			int foodStage = edible.GetFoodStageType();
+			if (foodStage == FoodStageType.ROTTEN || foodStage == FoodStageType.BURNED)
+				return false;
+			if (edible.IsMeat() && foodStage != FoodStageType.BAKED && foodStage != FoodStageType.BOILED && foodStage != FoodStageType.DRIED)
+				return false;
+		}
+		else if (edible.IsMeat())
+			return false;
+		return true;
+	}
+
 	// Verschlossen-Erkennung. Vanilla ist da uneinheitlich: manche Konserven
 	// ueberschreiben IsOpen() (DogFoodCan), andere nicht (BakedBeansCan) -
 	// die verlaessliche Konvention ist das "<Classname>_Opened"-Klassenpaar,
@@ -1813,6 +2000,12 @@ class IsuBridge
 			if (!edible)
 				continue;
 			if (IsDrinkItem(edible) != liquid)
+				continue;
+			if (edible.GetQuantity() <= 0)
+				continue;
+			if (liquid && !IsSafeDrink(edible))
+				continue;
+			if (!liquid && !IsSafeFood(edible))
 				continue;
 			if (IsSealedCan(edible))
 			{
@@ -1884,6 +2077,17 @@ class IsuBridge
 	{
 		if (!NpcReady())
 			return;
+		if (!CanSelfConsume())
+			return;
+		float stomachRoom = 1200.0;
+		if (m_Npc.GetStomach())
+			stomachRoom -= m_Npc.GetStomach().GetStomachVolume();
+		if (stomachRoom < 50.0)
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "Magen voll - erst verdauen, nicht weiter essen oder trinken";
+			return;
+		}
 
 		string opened = "";
 		bool sealedSeen = false;
@@ -1928,7 +2132,12 @@ class IsuBridge
 
 		float amount = best.GetQuantity();
 		if (amount <= 0)
-			amount = 1.0;
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "Behaelter ist leer";
+			return;
+		}
+		amount = Math.Min(amount, Math.Min(150.0, stomachRoom));
 
 		string type = best.GetType();
 		if (m_Npc.Consume(best, amount, EConsumeType.ITEM_SINGLE_TIME))
@@ -2018,6 +2227,7 @@ class IsuBridge
 		// UpdateEquipRetry verifiziert per Tick GetEntityInHands und meldet erst
 		// dann "done" - oder "failed", wenn die Waffe nicht in die Hand kommt.
 		m_EquipPendingItem = best;
+		m_EquipPendingType = type;
 		m_EquipPendingTries = 0;
 		m_CmdDetail = type;
 		m_CmdStatus = "running";
@@ -2177,34 +2387,56 @@ class IsuBridge
 	// WECHSEL im Gefecht macht die eAI selbst, sobald ein gefuelltes Magazin
 	// im Inventar liegt. Vereinfachtes Server-Umladen ohne Animation - bewusst
 	// (wie die Infusion): Frust vermeiden statt Realismus zelebrieren.
-	private void CmdReload()
+	private void CmdReload(IsuCommand cmd)
 	{
 		if (!NpcReady())
 			return;
 
-		// Zielwaffe: in der Hand bevorzugt, sonst erste brauchbare Feuerwaffe
 		array<EntityAI> items = new array<EntityAI>();
 		m_Npc.GetInventory().EnumerateInventory(InventoryTraversalType.PREORDER, items);
-		Weapon_Base wpn = Weapon_Base.Cast(m_Npc.GetHumanInventory().GetEntityInHands());
-		if (!wpn)
+
+		// Kandidaten: Wunschwaffe (cmd.text), sonst Hand zuerst und danach
+		// jede andere Feuerwaffe im Inventar. Bis 08.09.2026 wurde NUR die
+		// Handwaffe probiert (Igor: MP5K aufgehoben, Mosin in der Hand, reload
+		// scheiterte mit "Munition passt nicht zur Mosin9130").
+		array<Weapon_Base> cands = new array<Weapon_Base>();
+		Weapon_Base hand = Weapon_Base.Cast(m_Npc.GetHumanInventory().GetEntityInHands());
+		string want = cmd.text;
+		if (want != "")
 		{
-			foreach (EntityAI went : items)
+			foreach (EntityAI wantEnt : items)
 			{
-				Weapon_Base cand = Weapon_Base.Cast(went);
-				if (cand && !cand.IsRuined())
+				Weapon_Base wantWpn = Weapon_Base.Cast(wantEnt);
+				if (wantWpn && wantWpn.GetType() == want)
 				{
-					wpn = cand;
+					cands.Insert(wantWpn);
 					break;
 				}
 			}
+			if (cands.Count() == 0)
+			{
+				m_CmdStatus = "failed";
+				m_CmdDetail = "Feuerwaffe nicht im Inventar: " + want;
+				return;
+			}
 		}
-		if (!wpn)
+		else
+		{
+			if (hand && !hand.IsRuined())
+				cands.Insert(hand);
+			foreach (EntityAI went : items)
+			{
+				Weapon_Base cand = Weapon_Base.Cast(went);
+				if (cand && !cand.IsRuined() && cand != hand)
+					cands.Insert(cand);
+			}
+		}
+		if (cands.Count() == 0)
 		{
 			m_CmdStatus = "failed";
 			m_CmdDetail = "keine Feuerwaffe (Hand/Inventar) zum Nachladen";
 			return;
 		}
-		string wtype = wpn.GetType();
 
 		// Lose Munitionsstapel (Ammo_*; AmmoBox erst per unpack_ammo oeffnen)
 		array<Magazine> piles = new array<Magazine>();
@@ -2222,6 +2454,42 @@ class IsuBridge
 				continue;
 			piles.Insert(pmag);
 		}
+		if (piles.Count() == 0)
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "keine lose Munition im Inventar (AmmoBox erst mit unpack_ammo oeffnen; Magazine wechselt der Kampf selbst)";
+			return;
+		}
+
+		string tried = "";
+		foreach (Weapon_Base w : cands)
+		{
+			string note = "";
+			int loaded = ReloadWeaponFromPiles(w, items, piles, note);
+			if (loaded > 0)
+			{
+				m_CmdStatus = "done";
+				m_CmdDetail = note;
+				return;
+			}
+			if (tried != "")
+				tried = tried + ", ";
+			tried = tried + w.GetType();
+		}
+		m_CmdStatus = "failed";
+		m_CmdDetail = "nichts umgeladen: lose Munition passt zu keiner Waffe (" + tried + ") oder alles ist schon voll";
+	}
+
+	// EINE Waffe aus losen Stapeln befuellen. Phase A: Magazine (lose und
+	// gesteckte), Phase B: internes Magazin (Mosin/SKS/Repetierflinten),
+	// Phase C: Kammer(n) direkt. Phase C fehlte bis 08.09.2026 - Einzellader
+	// (Izh18, Izh18Shotgun, Flaregun: RifleSingleShot_Base, KEIN internes
+	// Magazin) wurden nie geladen, obwohl 12ga im Rucksack lag; Viktor lief
+	// eine ganze Session mit einem Schuss. Liefert die Zahl geladener Schuss.
+	private int ReloadWeaponFromPiles(Weapon_Base wpn, array<EntityAI> items, array<Magazine> piles, out string note)
+	{
+		string wtype = wpn.GetType();
+		note = "";
 
 		// Phase A: kompatible Magazine der Waffe fuellen (loses UND gestecktes)
 		TStringArray wmags = new TStringArray();
@@ -2328,32 +2596,73 @@ class IsuBridge
 			}
 		}
 
-		if (loadedMag == 0 && loadedInt == 0)
+		// Phase C: Kammer(n) direkt befuellen (Einzellader / Doppelflinten).
+		// Abgefeuerte Huelse zuerst auswerfen, sonst bleibt die Kammer "voll".
+		int loadedCh = 0;
+		TStringArray chAmmo2 = new TStringArray();
+		GetGame().ConfigGetTextArray("CfgWeapons " + wtype + " chamberableFrom", chAmmo2);
+		int muzzles = wpn.GetMuzzleCount();
+		for (int mi = 0; mi < muzzles; mi++)
 		{
-			m_CmdStatus = "failed";
-			if (piles.Count() == 0)
-				m_CmdDetail = "keine lose Munition im Inventar (AmmoBox erst mit unpack_ammo oeffnen; Magazine wechselt der Kampf selbst)";
-			else
-				m_CmdDetail = "nichts umgeladen: Munition passt nicht zur " + wtype + " oder Magazine sind schon voll";
-			return;
+			if (wpn.IsChamberFiredOut(mi))
+			{
+				float spentDmg;
+				string spentType;
+				wpn.EjectCartridge(mi, spentDmg, spentType);
+			}
+			if (!wpn.IsChamberEmpty(mi))
+				continue;
+			foreach (Magazine pile3 : piles)
+			{
+				if (!pile3 || pile3.GetAmmoCount() <= 0)
+					continue;
+				string pt4 = pile3.GetType();
+				bool okc2 = false;
+				foreach (string ca2 : chAmmo2)
+				{
+					if (ca2 == pt4)
+						okc2 = true;
+				}
+				if (!okc2)
+					continue;
+				string bullet2 = "";
+				if (!AmmoTypesAPI.MagazineTypeToAmmoType(pt4, bullet2))
+					continue;
+				if (!wpn.PushCartridgeToChamber(mi, 0.0, bullet2))
+					continue;
+				pile3.ServerSetAmmoCount(pile3.GetAmmoCount() - 1);
+				loadedCh++;
+				if (pile3.GetAmmoCount() <= 0)
+					GetGame().ObjectDelete(pile3);
+				break;
+			}
 		}
+
+		int total = loadedMag + loadedInt + loadedCh;
+		if (total == 0)
+			return 0;
 
 		// FSM/Netz-Zustand an den neuen Munitionsstand angleichen (Muster
 		// SpawnAttachedMagazine), sonst glitcht die Waffe beim Feuern.
 		wpn.RandomizeFSMState();
 		wpn.Synchronize();
 
-		m_CmdStatus = "done";
-		string note = "";
 		if (loadedMag > 0)
 			note = loadedMag.ToString() + " Schuss in " + magName;
 		if (loadedInt > 0)
 		{
 			if (note != "")
 				note = note + ", ";
-			note = note + loadedInt.ToString() + " Schuss direkt in die " + wtype;
+			note = note + loadedInt.ToString() + " Schuss ins interne Magazin";
 		}
-		m_CmdDetail = note;
+		if (loadedCh > 0)
+		{
+			if (note != "")
+				note = note + ", ";
+			note = note + loadedCh.ToString() + " Schuss in die Kammer";
+		}
+		note = wtype + ": " + note;
+		return total;
 	}
 
 	// Hand freiraeumen, bevor eine Waffe gezogen wird: eAI_TakeItemToHands
@@ -2487,12 +2796,64 @@ class IsuBridge
 		return best;
 	}
 
-	// Inhalt eines (getragenen) Kleidungsstuecks sicher ausraeumen, damit es
+	// Getragene Behaelter (Rucksack, Weste, Hose, Jacke ...) ausser den
+	// beiden genannten Stücken - Ziel für Inhalt, der beim Kleidungstausch
+	// umziehen muss.
+	private void CollectOwnCargoHolders(EntityAI skipA, EntityAI skipB, array<EntityAI> holders)
+	{
+		int ac = m_Npc.GetInventory().AttachmentCount();
+		for (int a = 0; a < ac; a++)
+		{
+			EntityAI att = m_Npc.GetInventory().GetAttachmentFromIndex(a);
+			if (!att || att == skipA || att == skipB)
+				continue;
+			if (!att.GetInventory() || !att.GetInventory().GetCargo())
+				continue;
+			holders.Insert(att);
+		}
+	}
+
+	// Inhalt eines getragenen Kleidungsstücks in ANDERE getragene Behälter
+	// umziehen (nie ins Stück selbst zurück). Liefert die Anzahl bewegter
+	// Items; was nicht passt, bleibt drin. Rückwärts iterieren, weil
+	// Entfernen die Indizes schiebt.
+	private int MoveGarmentCargoToSelf(EntityAI garment, EntityAI exclude)
+	{
+		if (!garment || !garment.GetInventory())
+			return 0;
+		CargoBase cargo = garment.GetInventory().GetCargo();
+		if (!cargo)
+			return 0;
+		array<EntityAI> holders = new array<EntityAI>();
+		CollectOwnCargoHolders(garment, exclude, holders);
+		if (holders.Count() == 0)
+			return 0;
+		int moved = 0;
+		for (int i = cargo.GetItemCount() - 1; i >= 0; i--)
+		{
+			EntityAI inner = cargo.GetItem(i);
+			if (!inner || inner == exclude)
+				continue;
+			foreach (EntityAI holder : holders)
+			{
+				if (holder.GetInventory().TakeEntityToInventory(InventoryMode.SERVER, FindInventoryLocationType.CARGO, inner))
+				{
+					moved++;
+					break;
+				}
+			}
+		}
+		return moved;
+	}
+
+	// Inhalt eines (getragenen) Kleidungsstücks sicher ausräumen, damit es
 	// danach LEER abgelegt werden kann - ohne Inhaltsverlust (der alte
-	// Kleidungswechsel-Bug). Reihenfolge: erst in einen nahen Container, sonst
-	// einzeln auf den Boden (dort wieder aufhebbar). Liefert die Anzahl
-	// geretteter Items. Rueckwaerts iterieren, weil Entfernen die Indizes schiebt.
-	private int EmptyGarmentCargo(EntityAI garment)
+	// Kleidungswechsel-Bug). Reihenfolge seit 08.09.2026: erst die eigenen
+	// anderen Behälter, dann ein naher Container, zuletzt einzeln auf den
+	// Boden (dort wieder aufhebbar). Bodenreste landen in m_WearGroundList,
+	// damit der Daemon sie nachsammelt (Viktors Sanitätskram lag sonst im
+	// Wald). Liefert die Anzahl geretteter Items.
+	private int EmptyGarmentCargo(EntityAI garment, EntityAI exclude)
 	{
 		if (!garment || !garment.GetInventory())
 			return 0;
@@ -2500,6 +2861,8 @@ class IsuBridge
 		if (!cargo)
 			return 0;
 
+		array<EntityAI> holders = new array<EntityAI>();
+		CollectOwnCargoHolders(garment, exclude, holders);
 		EntityAI container = FindNearbyContainer(30.0);
 		int moved = 0;
 		for (int i = cargo.GetItemCount() - 1; i >= 0; i--)
@@ -2508,14 +2871,48 @@ class IsuBridge
 			if (!inner)
 				continue;
 			bool ok = false;
-			if (container && container.GetInventory())
+			foreach (EntityAI holder : holders)
+			{
+				if (holder.GetInventory().TakeEntityToInventory(InventoryMode.SERVER, FindInventoryLocationType.CARGO, inner))
+				{
+					ok = true;
+					break;
+				}
+			}
+			if (!ok && container && container.GetInventory())
 				ok = container.GetInventory().TakeEntityToInventory(InventoryMode.SERVER, FindInventoryLocationType.CARGO, inner);
 			if (!ok)
+			{
+				string innerType = inner.GetType();
 				ok = m_Npc.eAI_DropItem(inner, true);
+				if (ok)
+				{
+					if (m_WearGroundList != "")
+						m_WearGroundList = m_WearGroundList + ", ";
+					m_WearGroundList = m_WearGroundList + innerType;
+				}
+			}
 			if (ok)
 				moved++;
 		}
 		return moved;
+	}
+
+	// Hinweistext für das wear-Ergebnis: umgeräumter Inhalt und alles, was
+	// am Boden liegt (der Daemon parst "AM BODEN:" und sammelt nach).
+	private string WearLeftoverNote(EntityAI oldGarment, int preSaved)
+	{
+		string note = "";
+		if (preSaved > 0)
+			note = note + ", " + preSaved.ToString() + " Item(s) aus dem alten Stueck umgeraeumt";
+		if (oldGarment && !oldGarment.GetHierarchyParent() && !CargoIsEmpty(oldGarment))
+		{
+			int left = oldGarment.GetInventory().GetCargo().GetItemCount();
+			note = note + ", ACHTUNG: " + oldGarment.GetType() + " liegt mit " + left.ToString() + " Item(s) am Boden - loot_container(" + oldGarment.GetType() + ")";
+		}
+		if (m_WearGroundList != "")
+			note = note + ", AM BODEN: " + m_WearGroundList;
+		return note;
 	}
 
 	private void CmdWear(IsuCommand cmd)
@@ -2554,10 +2951,21 @@ class IsuBridge
 			return;
 		}
 
+		// 08.09.2026: Inhalt des bisher getragenen Stuecks VOR dem Tausch in
+		// die eigenen anderen Behälter umziehen. TakeToBodySlot kann sofort
+		// gelingen (die eAI tauscht selbst) - dann lag das alte Stück MIT
+		// Inhalt am Boden (Viktor: TShirt mit 4 Items im Wald). Was nicht
+		// passt, behandelt der Blocker-Zweig unten.
+		m_WearGroundList = "";
+		ItemBase preBlocker = FindBlockingAttachment(wanted);
+		int preSaved = 0;
+		if (preBlocker && !CargoIsEmpty(preBlocker))
+			preSaved = MoveGarmentCargoToSelf(preBlocker, wanted);
+
 		if (TakeToBodySlot(wanted))
 		{
 			m_CmdStatus = "done";
-			m_CmdDetail = cmd.text + " angezogen";
+			m_CmdDetail = cmd.text + " angezogen" + WearLeftoverNote(preBlocker, preSaved);
 			return;
 		}
 
@@ -2609,7 +3017,7 @@ class IsuBridge
 				// (store_container erfasst ihn nur teilweise, das Zelt war oft voll).
 				// JETZT: Inhalt selbst ausraeumen (naher Container, sonst Boden -
 				// nie im Stueck lassen), dann das geleerte Stueck ablegen und tauschen.
-				int emptied = EmptyGarmentCargo(blocker);
+				int emptied = EmptyGarmentCargo(blocker, wanted);
 				if (!CargoIsEmpty(blocker))
 				{
 					m_CmdStatus = "failed";
@@ -2628,7 +3036,7 @@ class IsuBridge
 			if (TakeToBodySlot(wanted))
 			{
 				m_CmdStatus = "done";
-				m_CmdDetail = cmd.text + " angezogen, " + disposal;
+				m_CmdDetail = cmd.text + " angezogen, " + disposal + WearLeftoverNote(null, preSaved);
 				return;
 			}
 
@@ -2698,6 +3106,7 @@ class IsuBridge
 		EnsureHandsFree(wanted);
 		m_Npc.eAI_TakeItemToHands(wanted, true);
 		m_EquipPendingItem = wanted;
+		m_EquipPendingType = cmd.text;
 		m_EquipPendingTries = 0;
 		m_CmdDetail = cmd.text;
 		m_CmdStatus = "running";
@@ -3404,6 +3813,51 @@ class IsuBridge
 		m_CmdDetail = cmd.text;
 	}
 
+	// Restore-Pfad fuer Kleidung: Stueck vor den Fuessen erzeugen und sofort
+	// per CmdWear anziehen (Slot-Tausch samt Inhaltssicherung). give_item
+	// legte Kleidung per CreateInInventory ins Cargo - beim Spawn-Restore
+	// füllte sie damit den Platz, den sie schaffen sollte (Viktor 08.09.:
+	// 16 von 40 Items "kein Platz", darunter Bandagen). Passt das Stück an
+	// keinen Körperslot, wandert es wie bei give_item ins Cargo.
+	private void CmdGiveWear(IsuCommand cmd)
+	{
+		if (!NpcReady())
+			return;
+
+		if (cmd.text == "")
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "give_wear braucht text=Classname";
+			return;
+		}
+
+		Object obj = GetGame().CreateObjectEx(cmd.text, m_Npc.GetPosition(), ECE_PLACE_ON_SURFACE);
+		ItemBase created = ItemBase.Cast(obj);
+		if (!created)
+		{
+			if (obj)
+				GetGame().ObjectDelete(obj);
+			m_CmdStatus = "failed";
+			m_CmdDetail = "unbekannt oder kein Item: " + cmd.text;
+			return;
+		}
+
+		CmdWear(cmd);
+		if (m_CmdStatus != "failed")
+			return;
+
+		string wearDetail = m_CmdDetail;
+		if (m_Npc.GetInventory().TakeEntityToInventory(InventoryMode.SERVER, FindInventoryLocationType.CARGO, created))
+		{
+			m_CmdStatus = "done";
+			m_CmdDetail = cmd.text + " ins Cargo gelegt (nicht anziehbar: " + wearDetail + ")";
+			return;
+		}
+		GetGame().ObjectDelete(created);
+		m_CmdStatus = "failed";
+		m_CmdDetail = "kein Platz: " + cmd.text + " (" + wearDetail + ")";
+	}
+
 	// Item direkt an einen anderen Survivor uebergeben (Inventar-zu-Inventar,
 	// ohne Boden-Zwischenstation - viel zuverlaessiger als drop+pickup).
 	// cmd.text = "Zielname|Classname".
@@ -3721,6 +4175,8 @@ class IsuBridge
 	{
 		if (!NpcReadyOnFoot())
 			return;
+		if (!CanSelfConsume())
+			return;
 
 		if (!FindNearestWell(4.0))
 		{
@@ -3729,16 +4185,25 @@ class IsuBridge
 			return;
 		}
 
+		float wellRoom = 1200.0;
+		if (m_Npc.GetStomach())
+			wellRoom -= m_Npc.GetStomach().GetStomachVolume();
+		if (wellRoom < 50.0)
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "Magen voll - erst verdauen";
+			return;
+		}
 		PlayerConsumeData data = new PlayerConsumeData();
 		data.m_Type = EConsumeType.ENVIRO_WELL;
-		data.m_Amount = 900;
+		data.m_Amount = Math.Min(150.0, wellRoom);
 		data.m_LiquidType = LIQUID_WATER;
 		data.m_Agents = 0;
 
 		if (m_Npc.Consume(data))
 		{
 			m_CmdStatus = "done";
-			m_CmdDetail = "am Brunnen getrunken (+900)";
+			m_CmdDetail = "am Brunnen getrunken (+" + data.m_Amount.ToString() + ")";
 		}
 		else
 		{
@@ -3781,6 +4246,48 @@ class IsuBridge
 
 		m_CmdStatus = "done";
 		m_CmdDetail = bottle.GetType() + " mit Wasser gefuellt";
+	}
+
+	private bool CanSelfConsume()
+	{
+		if (m_Npc.IsUnconscious() || !m_Npc.CanEatAndDrink())
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "kann gerade nicht selbst essen/trinken (bewusstlos oder Mund bedeckt)";
+			return false;
+		}
+		return true;
+	}
+
+	// Eine orale Medikamentendosis; niemals eine ganze Packung als Nahrung.
+	private void CmdTakeMedicine(IsuCommand cmd)
+	{
+		if (!NpcReady())
+			return;
+		if (!CanSelfConsume())
+			return;
+		if (cmd.text != "VitaminBottle" && cmd.text != "TetracyclineAntibiotics" && cmd.text != "CharcoalTablets" && cmd.text != "PainkillerTablets" && cmd.text != "ChelatingTablets")
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "kein unterstuetztes orales Medikament";
+			return;
+		}
+		array<EntityAI> medItems = new array<EntityAI>();
+		m_Npc.GetInventory().EnumerateInventory(InventoryTraversalType.PREORDER, medItems);
+		foreach (EntityAI medEntity : medItems)
+		{
+			Edible_Base medItem = Edible_Base.Cast(medEntity);
+			if (!medItem || medItem.GetType() != cmd.text || medItem.IsRuined() || medItem.GetQuantity() < 1)
+				continue;
+			if (m_Npc.Consume(medItem, 1.0, EConsumeType.ITEM_SINGLE_TIME))
+			{
+				m_CmdStatus = "done";
+				m_CmdDetail = "eine Dosis " + cmd.text + " eingenommen; Wirkung abwarten";
+				return;
+			}
+		}
+		m_CmdStatus = "failed";
+		m_CmdDetail = "Medikament fehlt oder konnte nicht eingenommen werden";
 	}
 
 	// Material verbrauchen (Crafting-Grundbaustein; Rezeptlogik im Daemon).
@@ -4414,14 +4921,8 @@ class IsuBridge
 				m_CmdDetail = cmd.target + " blutet nicht";
 				return;
 			}
-			// Wie Vanilla ApplyBandage: staerkste Blutungsquelle schliessen,
-			// 1 Einheit verbrauchen (Rag-Stack) bzw. Item loeschen.
-			if (patient.GetBleedingManagerServer())
-				patient.GetBleedingManagerServer().RemoveMostSignificantBleedingSourceEx(med);
-			if (med.HasQuantity())
-				med.AddQuantity(-1, true);
-			else
-				med.Delete();
+			// Wie Vanilla ApplyBandage (gemeinsamer Pfad mit dem Blutungs-Reflex).
+			ApplyDressing(patient, med);
 			m_CmdStatus = "done";
 			m_CmdDetail = cmd.target + " verbunden (" + medType + ")";
 			return;
@@ -4495,13 +4996,23 @@ class IsuBridge
 	// Waffe-in-die-Hand-Versuch wiederholen, statt sofort aufzugeben.
 	private void UpdateEquipRetry()
 	{
-		// Item WIRKLICH weg (verloren/zerstoert) -> sofort sauber abbrechen.
-		if (!m_EquipPendingItem)
+		// Zeiger weg heisst NICHT Waffe weg: Expansions eAI_TakeItemToHandsImpl
+		// KLONT das Item in die Hand (Expansion_CloneItemToLocation) und
+		// löscht das Original per ObjectDelete - der EnforceScript-Zeiger
+		// wird null, während der Klon längst in der Hand liegt. Genau das
+		// meldete equip/equip_best als "Equip-Ziel verschwunden" (Igor/Konrad
+		// 08.09.; observe zeigte die Waffe danach in der Hand). Darum über
+		// den Classname neu auflösen: Klon in der Hand = done, Klon im
+		// Inventar = Retry läuft weiter, sonst ist er wirklich weg.
+		if (!m_EquipPendingItem && !ReacquireEquipTarget())
 		{
 			m_CmdStatus = "failed";
-			m_CmdDetail = "Equip-Ziel verschwunden";
+			m_CmdDetail = "Equip-Ziel verschwunden: " + m_EquipPendingType + " weder in der Hand noch im Inventar";
+			m_EquipPendingType = "";
 			return;
 		}
+		if (m_CmdStatus != "running")
+			return;   // ReacquireEquipTarget hat den Klon in der Hand gefunden (done)
 		// NPC nur KURZ nicht bereit (frisch gespawnt/animiert direkt nach loot):
 		// NICHT faelschlich als "verschwunden" abbrechen, sondern ein paar Ticks
 		// warten - genau das liess Konrads vorhandene CZ527 (Logs 20:28) als
@@ -4522,12 +5033,13 @@ class IsuBridge
 		// nicht nur, dass eAI_TakeItemToHands die Aktion angenommen hat. Erst dann
 		// "done", sonst meldet equip_best Erfolg mit dem Holzstab in der Hand.
 		ItemBase inHands = ItemBase.Cast(m_Npc.GetHumanInventory().GetEntityInHands());
-		if (inHands && inHands == m_EquipPendingItem)
+		if (inHands && (inHands == m_EquipPendingItem || inHands.GetType() == m_EquipPendingType))
 		{
-			SlingSecondaryWeapons(m_EquipPendingItem);
+			SlingSecondaryWeapons(inHands);
 			m_CmdStatus = "done";
-			m_CmdDetail = m_EquipPendingItem.GetType();
+			m_CmdDetail = inHands.GetType();
 			m_EquipPendingItem = null;
+			m_EquipPendingType = "";
 			return;
 		}
 
@@ -4551,7 +5063,40 @@ class IsuBridge
 		}
 	}
 
-	// wear: nach dem Ausziehen wird der Koerper-Slot oft erst im naechsten
+	// Equip-Ziel über den Classname neu finden (Klon nach Take-to-Hands).
+	// true = weitermachen (Item wieder referenziert ODER Klon liegt schon in
+	// der Hand, dann ist das Kommando hier abgeschlossen), false = wirklich weg.
+	private bool ReacquireEquipTarget()
+	{
+		if (!m_Npc || m_EquipPendingType == "")
+			return false;
+		ItemBase inHands = ItemBase.Cast(m_Npc.GetHumanInventory().GetEntityInHands());
+		if (inHands && inHands.GetType() == m_EquipPendingType)
+		{
+			SlingSecondaryWeapons(inHands);
+			m_CmdStatus = "done";
+			m_CmdDetail = m_EquipPendingType;
+			m_EquipPendingItem = null;
+			m_EquipPendingType = "";
+			return true;
+		}
+		array<EntityAI> items = new array<EntityAI>();
+		m_Npc.GetInventory().EnumerateInventory(InventoryTraversalType.PREORDER, items);
+		foreach (EntityAI ent : items)
+		{
+			ItemBase it = ItemBase.Cast(ent);
+			if (!it || it.IsRuined())
+				continue;
+			if (it.GetType() == m_EquipPendingType)
+			{
+				m_EquipPendingItem = it;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// wear: nach dem Ausziehen wird der Körper-Slot oft erst im nächsten
 	// Frame frei - hier (1 Hz) den Anzieh-Versuch wiederholen
 	private void UpdateWearRetry()
 	{
@@ -4565,7 +5110,7 @@ class IsuBridge
 		if (TakeToBodySlot(m_WearPendingItem))
 		{
 			m_CmdStatus = "done";
-			m_CmdDetail = m_WearPendingItem.GetType() + " angezogen (Slot getauscht)";
+			m_CmdDetail = m_WearPendingItem.GetType() + " angezogen (Slot getauscht)" + WearLeftoverNote(null, 0);
 			m_WearPendingItem = null;
 			return;
 		}
@@ -4736,7 +5281,7 @@ class IsuBridge
 		IsuState state = new IsuState();
 		state.seq = m_Seq;
 		state.uptime = GetGame().GetTickTime();
-		state.bridge_version = "0.8.0";
+		state.bridge_version = "0.9.0";
 
 		if (m_Npc)
 		{
@@ -4767,6 +5312,7 @@ class IsuBridge
 			// Blutung sichtbar machen: ohne das Feld wusste der NPC nie, DASS
 			// er blutet (run_agent macht daraus den DU-BLUTEST-Weckruf).
 			state.npc.bleeding = m_Npc.IsBleeding();
+			state.npc.auto_bandages = m_AutoBandages;
 
 			EntityAI inHands = m_Npc.GetHumanInventory().GetEntityInHands();
 			if (inHands)
@@ -4814,6 +5360,20 @@ class IsuBridge
 			info.health = item.GetHealth("", "");
 			info.in_hands = (ent == inHands);
 			info.kind = ClassifyItem(item);
+			info.frozen = item.GetIsFrozen();
+			info.temperature = item.GetTemperature();
+			Edible_Base foodInfo = Edible_Base.Cast(item);
+			if (foodInfo)
+			{
+				info.food_safe = !IsDrinkItem(foodInfo) && IsSafeFood(foodInfo);
+				if (foodInfo.GetFoodStage())
+					info.food_stage = foodInfo.GetFoodStageType();
+				if (IsDrinkItem(foodInfo))
+				{
+					info.liquid_type = foodInfo.GetLiquidType();
+					info.liquid_safe = IsSafeDrink(foodInfo);
+				}
+			}
 
 			// Steckt das Item IN EINER WAFFE (Magazin/Optik)? Dann den Traeger
 			// melden - sonst sieht ein gestecktes Magazin wie ein freies Item
@@ -4872,10 +5432,12 @@ class IsuBridge
 
 	private string ClassifyItem(ItemBase item)
 	{
+		if (IsMedicalItem(item))
+			return "medical";
 		Edible_Base edible = Edible_Base.Cast(item);
 		if (edible)
 		{
-			if (edible.IsLiquidContainer())
+			if (IsDrinkItem(edible))
 				return "drink";
 			return "food";
 		}
@@ -4971,6 +5533,7 @@ class IsuBridge
 			AnimalBase animal;
 			CarScript car;
 			FireplaceBase fireplace;
+			GardenBase garden;
 			ItemBase item;
 
 			if (obj.GetType().Contains("Well_Pump"))
@@ -4983,6 +5546,19 @@ class IsuBridge
 					info.kind = "fire_burning";
 				else
 					info.kind = "fire";
+			}
+			else if (Class.CastTo(garden, obj))
+			{
+				if (info.distance > 40)
+					continue;
+				info.kind = "garden";
+				array<ref Slot> gardenSlots = garden.GetSlots();
+				for (int gardenIndex = 0; gardenIndex < gardenSlots.Count(); gardenIndex++)
+				{
+					PlantBase gardenPlant = gardenSlots.Get(gardenIndex).GetPlant();
+					if (gardenPlant && gardenPlant.IsHarvestable())
+						info.harvestable = true;
+				}
 			}
 			else if (Class.CastTo(otherAi, obj) && otherAi.IsAlive())
 			{

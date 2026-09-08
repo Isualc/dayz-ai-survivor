@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""IsuSurvivor Agent-Runner — startet Claude Code headless als Survivor-Gehirn.
+"""IsuSurvivor Agent-Runner — lokale Survival-Routinen und waehlbares LLM.
 
 Architektur (Phase 3):
   run_agent.py  -> spawnt Claude Code (node + cli.js, stream-json, persistent)
@@ -29,17 +29,26 @@ import time
 from datetime import datetime
 
 from bridge import Bridge, DEFAULT_PROFILE
+from agent_paths import agent_home_dir
 import transliterate
+from llm_backends import BackendError, is_native_backend, spawn_provider, validate_backend
+from survival import survival_tick, travel_active
 
-NODE = r"C:\Program Files\nodejs\node.exe"
-CLI = r"C:\Users\isual\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\cli.js"
+NODE = os.environ.get("ISU_NODE_BIN") or r"C:\Program Files\nodejs\node.exe"
+CLI = os.path.expandvars(r"%APPDATA%\npm\node_modules\@anthropic-ai\claude-code\cli.js")
 # Ab claude-code ~2.1.19x liefert das npm-Paket KEINE cli.js mehr, sondern eine
 # native bin/claude.exe (Anthropic-Standalone-Umstellung). Aeltere Versionen
 # haben cli.js. Beide Startarten akzeptieren dieselben Flags; nur das Argv-
 # Praefix unterscheidet sich: [node, cli.js, ...] (alt) vs [claude.exe, ...] (neu).
 # Automatisch erkennen, damit sowohl Update als auch Rollback ohne Code-Edit laeuft.
-CLI_EXE = r"C:\Users\isual\AppData\Roaming\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe"
-if os.path.exists(CLI):
+CLI_EXE = os.environ.get("ISU_CLAUDE_CLI") or os.path.expandvars(r"%APPDATA%\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe")
+PROJECT_CLI_EXE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    ".runtime", "claude-code", "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe")
+# Project-pinned runtime supports Fable 5.1 without replacing a running global
+# installation. npm install --prefix .runtime/claude-code restores this runtime.
+if os.path.isfile(PROJECT_CLI_EXE):
+    CLI_LAUNCH = [PROJECT_CLI_EXE]
+elif os.path.exists(CLI):
     CLI_LAUNCH = [NODE, CLI]
 elif os.path.exists(CLI_EXE):
     CLI_LAUNCH = [CLI_EXE]
@@ -63,6 +72,8 @@ ANTHROPIC_API_ALIASES = {
     "sonnet": "claude-sonnet-5",
     "opus": "claude-opus-5",
     "fable": "claude-fable-5",
+    "fable-5.1": "claude-fable-5-1",
+    "fable-5-1": "claude-fable-5-1",
 }
 
 
@@ -82,7 +93,12 @@ def resolve_backend(model: str) -> tuple[str, dict, str]:
       jeder Zug den KV-Cache.
     - ohne Praefix: Anthropic wie bisher (Max-Plan, CLI-Login).
     """
+    if is_native_backend(model):
+        provider, _, name = model.partition("/")
+        return name, {}, f"native/{provider.lower()}"
     if "/" not in model:
+        if model in ("fable-5.1", "fable-5-1"):
+            model = "claude-fable-5-1"
         return model, {}, "anthropic"
     provider, _, name = model.partition("/")
     provider = provider.lower()
@@ -108,7 +124,7 @@ def resolve_backend(model: str) -> tuple[str, dict, str]:
                "ANTHROPIC_AUTH_TOKEN": "test",
                "MAX_THINKING_TOKENS": "0"}
         return f"{ccr_provider},{name}", env, f"claude-code-router ({CCR_URL})"
-    return model, {}, "anthropic"
+    raise ValueError(f"Unbekannter Modellanbieter: {provider}")
 
 DAEMON_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.dirname(DAEMON_DIR)
@@ -266,6 +282,19 @@ AGENT_BR = 0  # 1 = Battle-Royale (Free-for-all, 1 Leben); vom --br-Flag gesetzt
 AGENT_FREE = 0  # 1 = Freier Survival-Modus (1 Leben, Persona gelockert); vom --free-Flag gesetzt
 AGENT_LANG = "de"  # Ausgabe-Sprache der NPC (Funk/Logbuch); vom --language gesetzt
 INTENT_FILE = ""  # intent_<id>.txt im Bridge-Profil (Nameplate-Gedankenzeile), in main gesetzt
+# Sichtbares Modell-Denken (Extended Thinking) für Debugging: >0 = an, 0 = aus.
+# Wirkt NUR auf Anthropic-Backends (Max-Plan-Login und api/): dort schaltet
+# spawn_claude alwaysThinkingEnabled (--settings) UND --effort max ein - erst
+# die Kombination liefert verlässlich thinking-Blöcke im stream-json ([DENKT]
+# im Journal). Befund 30.08. (CC 2.1.227): alwaysThinkingEnabled allein lässt
+# das Denken nur zu, die adaptiven 5er-Modelle überspringen es bei kurzen
+# Spiel-Zügen dann fast immer (Live-Runde 29.08.: 0 Blöcke ganze Sessions).
+# Effort-Stufe übersteuerbar per $env:ISU_THINKING_EFFORT (unter max denkt
+# Sonnet nur sporadisch). CCR-Backends MÜSSEN bei MAX_THINKING_TOKENS=0
+# bleiben (OpenAI-400 "Unrecognized argument: reasoning", s. resolve_backend);
+# Grok-Denkspur kommt trotzdem an, weil der grokfix-Transformer sie liefert.
+# Überschreibbar per --thinking bzw. $env:ISU_THINKING_TOKENS.
+AGENT_THINKING = 0  # Kostenbewusster Einzelstart; explizite Arena-Auswahl bleibt vorrangig.
 
 
 class InboxReader:
@@ -422,6 +451,11 @@ STILL_WARN_SEC = 150.0
 STILL_REPEAT_SEC = 300.0
 STILL_MOVE_M = 15.0
 
+# Blutungs-Reflex der Mod: so lange darf er die Blutung selbst schliessen,
+# bevor der DU-BLUTEST-Weckruf das Gehirn weckt (Reflex greift nach ~2 s,
+# State 1 Hz, Watcher-Poll 2 s).
+BLEED_REFLEX_GRACE_SEC = 6.0
+
 # Info-Digest (Audit 03.07.: 37% der Zuege waren reine Lagebestaetigungen -
 # Sitrep rein, 1 Kommentar raus, kein Tool, 3,15 USD): Ereignisse mit diesen
 # Prefixen sind reine Kenntnisnahme und loesen KEINEN eigenen Zug mehr aus.
@@ -461,11 +495,36 @@ def _is_player_priority(ev: str, roster_names) -> bool:
 
 
 def _is_immediate(ev: str) -> bool:
-    """REISE-Ereignisse (angekommen/stecken geblieben) ueberspringen das
+    """REISE-Ereignisse (angekommen/stecken geblieben) überspringen das
     15-s-Sammelfenster wie Spieler-Ereignisse: die Ankunft ist genau der
     Moment, in dem der Plan weitergehen soll - sonst steht der NPC bis zu
-    15 s sichtbar untaetig am Ziel herum."""
+    15 s sichtbar untätig am Ziel herum."""
     return ev.startswith("REISE:")
+
+
+def _is_abortable(ev: str) -> bool:
+    """Ereignisse, die eine LAUFENDE Langaktion (explore_step, loot_area,
+    move_to, hunt, wait ...) sofort abbrechen sollen. Mechanik: run_agent
+    schreibt urgent_event.json ins agent_home, bridge.wait_status wertet die
+    Datei wie Spieler-Funk aus (status interrupted, detail "kritisch: ...").
+    Viktor 08.09.: DU-BLUTEST um 20:54:09, der laufende explore_step hielt
+    das Gehirn aber bis 20:55:06 fest - erst dann kam bandage(). Schaden
+    allein bricht NICHT ab: im Kampf kommt er jede Sekunde, engage soll
+    durchlaufen; Blutung, Gefahr, Bewusstlosigkeit und Tod schon."""
+    return ev.startswith(("DU BLUTEST", "GEFAHR:", "DU BIST UMGEKIPPT",
+                          "DU BIST GESTORBEN"))
+
+
+def write_urgent_event(path: str, ev: str) -> bool:
+    """urgent_event.json atomar schreiben (mtime = Auslöser für die Bridge)."""
+    try:
+        tmp = f"{path}.{os.getpid()}.tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"event": ev[:300], "t": time.time()}, f, ensure_ascii=False)
+        os.replace(tmp, path)
+        return True
+    except OSError:
+        return False
 
 
 class Journal:
@@ -674,6 +733,10 @@ def spawn_claude(mcp_cfg: str, model: str, character_file: str = "",
     # Akkumulator (gemessen ~64% des Conversation-Kontexts). Kostet selbst ~80 Token.
     persona += "\n\n" + TERSE_BLOCK
 
+    if is_native_backend(model):
+        return spawn_provider(mcp_cfg, model, persona, AGENT_HOME,
+                              turn_limit=turn_limit)
+
     cli_model, backend_env, backend = resolve_backend(model)
 
     cmd = [
@@ -732,6 +795,34 @@ def spawn_claude(mcp_cfg: str, model: str, character_file: str = "",
                     "CLAUDE_CODE_USE_VERTEX"):
             env.pop(key, None)
     env.update(backend_env)
+
+    # Sichtbares Denken (Debug-Wunsch 29.08.): nur auf Anthropic-Backends -
+    # CCR erzwingt oben bereits MAX_THINKING_TOKENS=0 (OpenAI-400-Falle),
+    # llama-server kennt den Parameter nicht.
+    # Befund-Update 30.08. (Bisektion gegen den vollen Live-Spawn, CC 2.1.227):
+    # alwaysThinkingEnabled LÄSST das Denken nur zu, erzwingt es aber nicht -
+    # die adaptiven 5er-Modelle entscheiden pro Zug selbst und überspringen
+    # das Denken bei kurzen Spiel-Zügen fast immer (Live-Runde 29.08.: 0
+    # [DENKT] über ganze Sessions auf sonnet/opus/fable). Zuverlässig denken
+    # sie erst mit --effort max (fable 3/3, sonnet 3/3; xhigh reicht bei
+    # sonnet NICHT: 0/3, high ebenso 0). MAX_THINKING_TOKENS bei Thinking AN
+    # weiterhin aktiv aus der Umgebung entfernen; "0" bleibt der Aus-Schalter.
+    # ISU_THINKING_EFFORT (low|medium|high|xhigh|max) übersteuert die Stufe,
+    # falls max zu teuer/langsam wird - unterhalb von max denkt Sonnet dann
+    # aber nur noch sporadisch.
+    if backend in ("anthropic", "anthropic-api"):
+        if cli_model == "claude-fable-5-1":
+            # 5.1 has always-on adaptive thinking. Never send the old disabled
+            # setting or MAX_THINKING_TOKENS=0; use effort to limit work instead.
+            env.pop("MAX_THINKING_TOKENS", None)
+            cmd += ["--settings", '{"alwaysThinkingEnabled": true}',
+                    "--effort", os.environ.get("ISU_THINKING_EFFORT", "low")]
+        elif AGENT_THINKING > 0:
+            env.pop("MAX_THINKING_TOKENS", None)
+            cmd += ["--settings", '{"alwaysThinkingEnabled": true}',
+                    "--effort", os.environ.get("ISU_THINKING_EFFORT", "max")]
+        else:
+            env["MAX_THINKING_TOKENS"] = "0"
 
     return subprocess.Popen(
         cmd,
@@ -886,7 +977,7 @@ class BrainReader(threading.Thread):
         while True:
             line = self.proc.stdout.readline()
             if line == "":
-                self.journal.log("!! Claude-Prozess hat stdout geschlossen.")
+                self.journal.log("!! Gehirn-Prozess hat stdout geschlossen.")
                 self.dead = True
                 self.results.put(None)
                 return
@@ -904,8 +995,23 @@ class BrainReader(threading.Thread):
             if etype == "assistant":
                 msg_text = ""
                 msg_action = ""
+                msg_think = ""
                 for block in event.get("message", {}).get("content", []):
-                    if block.get("type") == "text" and block.get("text", "").strip():
+                    if block.get("type") == "thinking" and block.get("thinking", "").strip():
+                        # Extended-Thinking-Block: der interne Denkprozess des
+                        # Modells (nur Anthropic-Backends, s. AGENT_THINKING).
+                        # Fürs Journal auf EINE Zeile glätten - mehrzeilige
+                        # Einträge brächen das [HH:MM:SS]-Zeilenformat, auf dem
+                        # Spectator/league_report-Parser aufsetzen.
+                        think = " ".join(block["thinking"].split())
+                        if len(think) > 4000:
+                            think = think[:3997] + "..."
+                        self.journal.log("[DENKT]  " + think)
+                        msg_think = think
+                    elif block.get("type") == "redacted_thinking":
+                        self.journal.log("[DENKT]  (verschlüsselter Denkblock - "
+                                         "von der API redigiert)")
+                    elif block.get("type") == "text" and block.get("text", "").strip():
                         self.journal.log(f"[{AGENT_NAME.upper()}] " + block["text"].strip())
                         msg_text = block["text"].strip()
                     elif block.get("type") == "tool_use":
@@ -925,7 +1031,12 @@ class BrainReader(threading.Thread):
                 # Nameplate-Gedankenzeile live halten: Gehirn-Kommentar bevorzugt
                 # (reicher), sonst die abgeleitete Aktion. Reine observe/Read-Zuege
                 # liefern beides leer -> Zeile bleibt unveraendert (nicht leer).
-                _set_nameplate_intent(msg_text or msg_action)
+                # Neu: liefert der Schritt NUR einen Thinking-Block (typisch: das
+                # Denken kommt als eigenes Event VOR Text/Tool), zeigt die Zeile
+                # den Denkanfang - so ist der NPC schon "sichtbar am Überlegen",
+                # bevor er spricht oder handelt (Debug-Wunsch 29.08.).
+                _set_nameplate_intent(msg_text or msg_action
+                                      or (("denkt: " + msg_think[:110]) if msg_think else ""))
                 if msg_text:
                     self.recent.append(msg_text)
                     if len(self.recent) > 4:
@@ -954,6 +1065,7 @@ class BrainReader(threading.Thread):
 
             elif etype == "result":
                 cost = event.get("total_cost_usd")
+                cost_known = cost is not None
                 if cost is None:
                     cost = self.tracker.last_cost
                 dur = event.get("duration_ms", 0) / 1000.0
@@ -968,21 +1080,24 @@ class BrainReader(threading.Thread):
                 note = ""
                 if event.get("subtype") == "error_max_turns":
                     note = ", ZUG AM AKTIONSLIMIT GEKAPPT"
-                self.journal.log(f"[ZUG ENDE] {dur:.0f}s, +{turn_cost:.4f} USD "
-                                 f"(Session {cost:.4f} USD), "
+                elif event.get("is_error"):
+                    note = ", FEHLER: " + str(event.get("result") or event.get("subtype"))[:180]
+                cost_text = (f"+{turn_cost:.4f} USD (Session {cost:.4f} USD)"
+                             if cost_known else "Kosten nicht gemeldet; Tokenverbrauch siehe Journal")
+                self.journal.log(f"[ZUG ENDE] {dur:.0f}s, {cost_text}, "
                                  f"turns={event.get('num_turns', '?')}{note}")
                 for line2 in self.tracker.turn_summary(event):
                     self.journal.log(line2)
                 self.results.put(event)
 
 
-def _write_round_cost(total: float):
+def _write_round_cost(total: float | None):
     """Kumulierte Kosten dieses Runners (ueber alle Sessions der Runde) in
     <agent_home>/round_cost.txt exportieren. Der Supervisor summiert die
     Dateien aller laufenden Agenten und haengt sie an die Statuszeile an."""
     try:
         with open(os.path.join(AGENT_HOME, "round_cost.txt"), "w", encoding="utf-8") as f:
-            f.write(f"{total:.4f}")
+            f.write("unknown\n" if total is None else f"{total:.4f}")
     except OSError:
         pass
 
@@ -1060,6 +1175,11 @@ class EventWatcher:
         self.was_alive = bool((state.get("npc") or {}).get("alive"))
         self.uncon_warned = False
         self.bleed_warned = False
+        # Blutungs-Reflex der Mod (Selbstverband, state.npc.auto_bandages):
+        # Zählerstand merken, damit ein Verbrauch als Info gemeldet wird,
+        # und den Beginn der Blutung, um dem Reflex kurz Vorrang zu lassen.
+        self.auto_bandages = int(npc.get("auto_bandages") or 0)
+        self.bleed_since = 0.0
         self.in_vehicle = bool((state.get("npc") or {}).get("in_vehicle"))
         # Peer-Smalltalk (NPC-Geplauder, das mich nicht anspricht): nur als
         # Digest sammeln, NICHT pro Nachricht einen Zug ausloesen
@@ -1277,15 +1397,47 @@ class EventWatcher:
         if predator_min > PREDATOR_NEAR + 15:
             self.predator_warned = False
 
-        # Blutung (gelatcht): unbehandelt toedlich, darum kritischer Weckruf.
+        # Blutung (gelatcht): unbehandelt tödlich, darum kritischer Weckruf.
         # Das bleeding-Feld liefert die Mod seit 23.08. (IsBleeding im State).
+        # Seit 08.09. verbindet die Mod sich per Reflex SELBST (1 Hz, ab dem
+        # zweiten Blutungs-Tick, wenn Verbandsmaterial da ist) - der Weckruf
+        # lässt dem Reflex BLEED_REFLEX_GRACE_SEC Vorsprung und feuert nur,
+        # wenn die Blutung danach noch steht oder kein Verband da ist. Der
+        # Text nennt den Vorrat, damit das Gehirn nicht ins Leere bandagiert.
         bleeding = bool(npc.get("bleeding"))
-        if bleeding and not self.bleed_warned:
-            self.bleed_warned = True
-            events.append("DU BLUTEST! Verbinde dich SOFORT mit bandage() - "
-                          "unbehandelt verblutest du.")
+        now_b = time.monotonic()
+        auto_b = int(npc.get("auto_bandages") or 0)
+        if auto_b > self.auto_bandages:
+            used = auto_b - self.auto_bandages
+            self.auto_bandages = auto_b
+            self.info_lines.append(f"REFLEX: Blutung selbst verbunden ({used}x "
+                                   f"Verbandsmaterial verbraucht) - Vorrat prüfen.")
+            if len(self.info_lines) > 3:
+                self.info_lines.pop(0)
         if not bleeding:
             self.bleed_warned = False
+            self.bleed_since = 0.0
+        else:
+            if not self.bleed_since:
+                self.bleed_since = now_b
+            if not self.bleed_warned:
+                dressings = sum(1 for i in state.get("inventory", [])
+                                if i.get("classname") in ("BandageDressing", "Rag")
+                                and float(i.get("health", 100) or 0) > 5)
+                reflex = "auto_bandages" in npc
+                if dressings and reflex and (now_b - self.bleed_since) < BLEED_REFLEX_GRACE_SEC:
+                    pass   # Mod-Reflex verbindet selbst; nur weiter beobachten
+                elif dressings:
+                    self.bleed_warned = True
+                    events.append(f"DU BLUTEST! Verbinde dich SOFORT mit bandage() "
+                                  f"({dressings}x Verbandsmaterial im Inventar) - "
+                                  f"unbehandelt verblutest du.")
+                else:
+                    self.bleed_warned = True
+                    events.append("DU BLUTEST und hast KEIN Verbandsmaterial! Sofort "
+                                  "BandageDressing/Rag beschaffen: loot_area oder "
+                                  "pickup in der Nähe, sonst Kameraden per Funk um "
+                                  "give_to bitten - unbehandelt verblutest du.")
 
         # Einzelner Infizierter nah (gelatcht)
         if infected_min < INFECTED_NEAR and not self.infected_warned:
@@ -1641,52 +1793,65 @@ def load_inventory_snapshot() -> dict | None:
 
 
 def restore_inventory(bridge: Bridge, journal: Journal, snapshot: dict) -> None:
-    raw = snapshot.get("items", [])[:40]
+    raw = snapshot.get("items", [])[:80]
     # Altes Format (reine Classnames) tolerieren
     items = [i if isinstance(i, dict) else {"classname": i, "kind": "other"}
              for i in raw]
 
-    # Reihenfolge entscheidet ueber UEBERLEBEN. Medizin/Bandagen ZUERST: winzig,
-    # passen immer in die Default-Cargo des frischen Koerpers, und sie duerfen
-    # NIEMALS dem Platzmangel zum Opfer fallen - sonst respawnt der NPC
-    # unbandagiert und verblutet sofort wieder (Todesspirale). Frueher stand
-    # Kleidung an Rang 0 ("schafft erst Kapazitaet/Rucksack"), aber give_item
-    # traegt Kleidung nicht zwingend und in den Logs (20:28/20:33) verlor die
-    # Sanitaeterin trotzdem 5 Bandagen. Reihenfolge jetzt: Medizin -> Waffen ->
-    # Kleidung -> Munition -> Rest. Feuerwaffen VOR Kleidung (dedizierte Waffenslots,
-    # kein Cargo noetig) - standen sie dahinter, gingen sie bei Platzmangel verloren
-    # und der Waffen-NPC respawnte unbewaffnet (Viktors "Gewehre weg"-Symptom).
-    # Verloren geht so hoechstens redundante Kleidung/Munition, nie Medizin/Waffe.
-    # Der Mod klassifiziert Medizin als kind=="other" (ClassifyItem kennt
-    # nur food/firearm/ammo/clothing), darum hier zusaetzlich per Classname.
+    # Reihenfolge entscheidet über das ÜBERLEBEN.
+    # Seit 08.09.2026: KLEIDUNG ZUERST, und zwar per give_wear (Mod erzeugt das
+    # Stück vor den Füßen und zieht es sofort an, Slot-Tausch samt
+    # Inhaltssicherung). Vorher lief Kleidung über give_item/CreateInInventory
+    # ins CARGO des Spawn-Outfits und fraß den Platz, den sie schaffen sollte:
+    # Viktor verlor 16 von 40 Items ("kein Platz"), darunter Bandagen und
+    # Tetracycline, obwohl Medizin auf Rang 0 stand. Angezogen belegt Kleidung
+    # keinen Cargo-Platz, sondern liefert welchen (Rucksack, Weste, Hose).
+    # Danach Medizin (winzig, lebenswichtig), Feuerwaffen (eigene Slots),
+    # Munition, Rest. Innerhalb der Kleidung Behälter zuerst (Rucksack/Weste).
     _MEDICAL = ("bandage", "rag", "bloodbag", "saline", "morphine",
                 "epinephrine", "tetracycline", "charcoal", "vitamin",
                 "disinfectant", "alcoholtincture", "splint", "sewingkit",
                 "defibrillator", "painkiller", "iodine")
+    _CONTAINER_CLOTHING = ("bag", "backpack", "vest", "pack", "pouch", "rig",
+                           "pants", "jacket", "coat", "hoodie", "shirt", "sweater")
 
     def _restore_rank(i):
         cn = i.get("classname", "").lower()
-        if any(m in cn for m in _MEDICAL):
-            return 0          # zuerst: lebenswichtig, winzig, passt immer
-        if i.get("kind") == "firearm":
-            return 1          # Waffe VOR Kleidung: belegt dedizierte Waffenslots
-                              # (Schulter/Ruecken/Hand), braucht keinen Cargo - ging
-                              # sonst bei Platzmangel verloren (unbewaffneter NPC).
         if i.get("kind") == "clothing":
-            return 2          # danach Kleidung (Rucksack/Vest = Kapazitaet fuer den Rest)
-        return {"ammo": 3}.get(i.get("kind", "other"), 4)
+            if any(c in cn for c in _CONTAINER_CLOTHING):
+                return 0      # Stauraum zuerst: Rucksack, Weste, Hose, Jacke
+            return 1          # Mützen, Schuhe, Handschuhe, Masken
+        if any(m in cn for m in _MEDICAL):
+            return 2          # lebenswichtig, winzig, passt jetzt
+        if i.get("kind") == "firearm":
+            return 3          # Waffe belegt dedizierte Waffenslots
+        return {"ammo": 4}.get(i.get("kind", "other"), 5)
 
     items.sort(key=_restore_rank)
 
     journal.log(f"Stelle Inventar wieder her ({len(items)} Items)...")
     ok = 0
+    worn = 0
     failed: list[str] = []
     for item in items:
-        result = bridge.run("give_item", text=item["classname"], timeout=6)
+        cn = item["classname"]
+        if item.get("kind") == "clothing":
+            # Tragen statt stauen. Zieht die Mod das Stück an keinen Slot
+            # (zweite Mütze, dritte Hose), legt sie es selbst ins Cargo.
+            result = bridge.run("give_wear", text=cn, timeout=12)
+            if result.get("status") == "done":
+                ok += 1
+                if "angezogen" in (result.get("detail") or ""):
+                    worn += 1
+                continue
+            # Ältere Mod ohne give_wear oder echter Fehlschlag: alter Weg
+            result = bridge.run("give_item", text=cn, timeout=6)
+        else:
+            result = bridge.run("give_item", text=cn, timeout=6)
         if result.get("status") == "done":
             ok += 1
         else:
-            failed.append(item["classname"])
+            failed.append(cn)
 
     hands = snapshot.get("hands", "")
     if hands:
@@ -1701,7 +1866,7 @@ def restore_inventory(bridge: Bridge, journal: Journal, snapshot: dict) -> None:
         else:
             still_failed.append(classname)
 
-    msg = f"Inventar wiederhergestellt: {ok} ok"
+    msg = f"Inventar wiederhergestellt: {ok} ok ({worn} Kleidungsstuecke angezogen)"
     if still_failed:
         msg += f", verloren: {', '.join(still_failed)} (kein Platz - DayZ-Slot-Physik)"
     journal.log(msg)
@@ -1800,8 +1965,30 @@ def world_generation(profile: str) -> str:
         return ""
 
 
+def _log_startup_validation_error(model: str, npc_id: str, home: str,
+                                  error: Exception) -> None:
+    """Keep pre-journal validation failures visible after a console closes.
+
+    Only validation messages are recorded, never CLI stderr or environment
+    values. JSON string quoting keeps each failure on one UTF-8 log line.
+    """
+    try:
+        effective_home = os.path.abspath(home) if home else agent_home_dir(npc_id)
+        journal_dir = os.path.join(effective_home, "journal")
+        os.makedirs(journal_dir, exist_ok=True)
+        stamp = datetime.now().astimezone().isoformat(timespec="seconds")
+        entry = (f"{stamp} model={json.dumps(model, ensure_ascii=False)} "
+                 f"error={json.dumps(str(error), ensure_ascii=False)}\n")
+        with open(os.path.join(journal_dir, "startup_errors.log"), "a",
+                  encoding="utf-8", errors="replace") as log_file:
+            log_file.write(entry)
+    except (OSError, ValueError):
+        # An unwritable/invalid home must not replace the original CLI error.
+        pass
+
+
 def main() -> int:
-    global AGENT_HOME, SNAPSHOT_FILE, VOICE_INBOX, STOP_FLAG, SPAWN_POS, AGENT_NAME, AGENT_FACTION, AGENT_BR, AGENT_FREE, AGENT_LANG, INTENT_FILE
+    global AGENT_HOME, SNAPSHOT_FILE, VOICE_INBOX, STOP_FLAG, SPAWN_POS, AGENT_NAME, AGENT_FACTION, AGENT_BR, AGENT_FREE, AGENT_LANG, INTENT_FILE, AGENT_THINKING
 
     # Konsole gegen Encoding-Abstuerze haerten (Viktor schreibt deutsch)
     try:
@@ -1824,6 +2011,10 @@ def main() -> int:
     parser.add_argument("--model", default="sonnet")
     parser.add_argument("--idle", type=int, default=180,
                         help="Routine-Tick-Intervall in Sekunden (Default 180)")
+    parser.add_argument("--no-autonomy", action="store_true",
+                        help="Lokale Survival-Schritte zwischen Modell-Zuegen abschalten")
+    parser.add_argument("--survival-interval", type=float, default=5.0,
+                        help="Abstand lokaler Survival-Schritte ohne LLM (mindestens 2s)")
     parser.add_argument("--max-turns", type=int, default=0,
                         help="Nach N Zuegen beenden, 0 = unbegrenzt")
     parser.add_argument("--turn-limit", type=int, default=10,
@@ -1868,6 +2059,14 @@ def main() -> int:
     parser.add_argument("--language", default="de",
                         help="Ausgabe-Sprache der NPC (Funk/Logbuch), z.B. de, "
                              "en, fr ... (Codes siehe LANG_NAMES). Default de.")
+    parser.add_argument("--thinking", type=int, default=None,
+                        help="Sichtbares Modell-Denken: >0 = an (Anthropic: "
+                             "alwaysThinkingEnabled + --effort max, Stufe per "
+                             "ISU_THINKING_EFFORT; der Zahlenwert ist nur "
+                             "an/aus), 0 = aus (MAX_THINKING_TOKENS=0). Landet "
+                             "als [DENKT] im Journal und auf der Nameplate. "
+                             "Default: ISU_THINKING_TOKENS, sonst aus. "
+                             "Fable 5.1 denkt immer adaptiv (effort statt aus).")
     parser.add_argument("--loadout", default="",
                         help="Expansion-Loadout fuer den ERSTEN Spawn ohne "
                              "Inventar-Snapshot (z.B. IsuViktorLoadout.json); "
@@ -1892,6 +2091,26 @@ def main() -> int:
                              "--no-respawn), keine Rally-/Treffpunkt-Auftraege. "
                              "Kein BR: Funk bleibt an, niemand ist automatisch Feind.")
     args = parser.parse_args()
+    # Gemini CLI ist seit 18.06.2026 ohne persoenlichen Google-Zugang (jeder
+    # Zug UNSUPPORTED_CLIENT). Direktstarts ohne Supervisor auch umleiten;
+    # ISU_GEMINI_CLI_ALLOWED=1 laesst die Wahl durch (Code-Assist-Lizenz).
+    _gemini_ok = os.environ.get("ISU_GEMINI_CLI_ALLOWED", "").strip().lower() in ("1", "true", "yes", "on")
+    if args.model.lower().startswith("gemini-cli/") and not _gemini_ok:
+        _gemini_choice = args.model
+        args.model = "antigravity/default"
+        print(f"[run_agent] Modell '{_gemini_choice}' -> 'antigravity/default' "
+              f"(Gemini CLI ohne persoenlichen Zugang; ISU_GEMINI_CLI_ALLOWED=1 erzwingt).",
+              flush=True)
+    # Modellfehler vor jeglichem Spawn/Despawn melden.
+    try:
+        resolve_backend(args.model)
+        if is_native_backend(args.model):
+            validate_backend(args.model)
+    except (ValueError, BackendError) as exc:
+        _log_startup_validation_error(args.model, args.npc_id, args.home, exc)
+        parser.error(str(exc))
+    args.idle = max(10, args.idle)
+    args.survival_interval = max(2.0, args.survival_interval)
 
     # Per-Agent-Pfade setzen (Arena: eigenes Home pro Agent)
     if args.home:
@@ -1904,6 +2123,9 @@ def main() -> int:
     STOP_FLAG = os.path.join(AGENT_HOME, "stop.flag")
     if os.path.exists(STOP_FLAG):
         os.remove(STOP_FLAG)  # Altlast vom letzten Stop
+    # Kritische Ereignisse brechen laufende Langaktionen des MCP ab (bridge
+    # vergleicht die mtime mit dem Aktionsstart - Altlast ist damit harmlos).
+    URGENT_FLAG = os.path.join(AGENT_HOME, "urgent_event.json")
     SPAWN_POS = (args.spawn_x, args.spawn_z)
     AGENT_NAME = args.name or args.npc_id.capitalize()
     AGENT_FACTION = args.faction
@@ -1914,6 +2136,16 @@ def main() -> int:
     if args.free:
         args.no_respawn = True
     AGENT_LANG = (args.language or "de").lower()
+    # Denk-Budget: CLI-Flag > Umgebung (ISU_THINKING_TOKENS, erbt der Runner
+    # vom Arena-Supervisor) > Modul-Default. 0 schaltet das sichtbare Denken ab.
+    if args.thinking is not None:
+        AGENT_THINKING = max(0, args.thinking)
+    else:
+        try:
+            AGENT_THINKING = max(0, int(os.environ.get("ISU_THINKING_TOKENS", "")
+                                        or AGENT_THINKING))
+        except ValueError:
+            pass
 
     # Stimme aus dem Roster nachschlagen, wenn keine uebergeben wurde -
     # der Einzelstart soll im Funk genauso klingen wie die Arena
@@ -2000,7 +2232,7 @@ def main() -> int:
     os.makedirs(AGENT_HOME, exist_ok=True)
     # Rundenkosten-Export zuruecksetzen - sonst summiert der Supervisor die
     # Restwerte der letzten Runde mit.
-    _write_round_cost(0.0)
+    _write_round_cost(None if is_native_backend(args.model) else 0.0)
 
     # Voice-Datei-Hygiene VOR dem Claude-Start, sonst frisst das Loeschen
     # die ersten Aeusserungen (Arena-Modus: der Supervisor uebernimmt das)
@@ -2022,6 +2254,11 @@ def main() -> int:
             journal.log(f"Backend: {args.model} -> {_cli_model} ueber die "
                         f"Anthropic-API (eigener API-Key, Kosten pro Token, "
                         f"NICHT ueber den Max-Plan).")
+    elif is_native_backend(args.model):
+        journal.log(f"Backend: {backend}; gemeinsame DayZ-Werkzeuge und Gedaechtnis. "
+                    "Codex/Gemini/Antigravity CLI nutzen den vorhandenen Login mit dessen Limits; "
+                    "Mistral/Moonshot werden ueber den eigenen API-Key abgerechnet. "
+                    "Kein automatischer Anbieterwechsel.")
     elif backend != "anthropic":
         journal.log(f"Fremd-Backend: {args.model} -> {backend} - der Dienst "
                     f"muss laufen (Arena-Menue startet ihn automatisch, "
@@ -2030,8 +2267,26 @@ def main() -> int:
                     f"ueber den Max-Plan; USD-Anzeige im Journal gilt nur "
                     f"fuer Claude-Modelle.")
     proc = spawn_claude(mcp_cfg, args.model, args.character, args.turn_limit)
-    journal.log(f"Claude Code gestartet (PID {proc.pid}, Modell {args.model}, "
-                f"Backend {backend}, Zug-Limit {args.turn_limit or 'aus'}).")
+    if _cli_model == "claude-fable-5-1":
+        think_note = ("Adaptives Denken immer aktiv; effort="
+                      + os.environ.get("ISU_THINKING_EFFORT", "low"))
+    elif AGENT_THINKING > 0 and backend in ("anthropic", "anthropic-api"):
+        think_note = ("Denken sichtbar (alwaysThinkingEnabled + --effort "
+                      + os.environ.get("ISU_THINKING_EFFORT", "max")
+                      + ", [DENKT])")
+    elif AGENT_THINKING > 0 and args.model.lower().startswith("xai/"):
+        # Grok denkt von selbst; der reasoning-Transformer in der Router-Config
+        # (~/.claude-code-router/config.json, xai-Provider) übersetzt die
+        # Denkspur in thinking-Blöcke. Live verifiziert 29.08.2026 (2 Turns
+        # inkl. Historie-Rückweg, kein 400).
+        think_note = "Denken sichtbar via Router-reasoning-Transformer ([DENKT])"
+    elif AGENT_THINKING > 0:
+        think_note = "Denken nicht verfügbar (Backend liefert keine Thinking-Blöcke)"
+    else:
+        think_note = "Denken aus"
+    journal.log(f"Gehirn gestartet (PID {proc.pid}, Modell {args.model}, "
+                f"Backend {backend}, Zug-Limit {args.turn_limit or 'aus'}, "
+                f"{think_note}).")
 
     # Discord-Voice-Bruecke: startet mit, wenn ein Bot-Token gesetzt ist
     discord_proc = None
@@ -2222,6 +2477,14 @@ def main() -> int:
         # ist (watcher.known_players). Im BR-Modus fest 1 - dort zaehlt Tempo.
         idle_backoff = 1
         event_since_tick = True   # echtes Ereignis seit dem letzten Routine-Tick?
+        survival_deadline = time.monotonic() + args.survival_interval
+        survival_memory = os.path.join(AGENT_HOME, "survival_learning.json")
+        survival_handoff_at = 0.0
+        survival_handoff = ""
+        survival_busy = False
+        last_brain_failed = False
+        backend_retry_at = 0.0
+        backend_failures = 0
 
         def dispatch(msg: str, routine: bool = False):
             nonlocal pending, interrupted, idle_deadline, idle_backoff, \
@@ -2266,6 +2529,16 @@ def main() -> int:
                     turns += 1
                     turns_since_rotate += 1
                     interrupted = result.get("subtype") == "error_max_turns"
+                    last_brain_failed = bool(result.get("is_error"))
+                    if result.get("subtype") == "error_backend":
+                        backend_failures += 1
+                        retry_delay = min(300, 15 * 2 ** min(backend_failures - 1, 5))
+                        backend_retry_at = time.monotonic() + retry_delay
+                        journal.log(f"[BACKEND] {retry_delay}s Pause vor neuem Modellaufruf; "
+                                    "lokale Survival-Routinen bleiben aktiv.")
+                    elif not result.get("is_error"):
+                        backend_failures = 0
+                        backend_retry_at = 0.0
                     idle_deadline = time.monotonic() + args.idle
                     # Kontextgroesse = LETZTER einzelner API-Schritt (BrainReader),
                     # NICHT die Zug-Summe aus result.usage: die addiert cache_read
@@ -2275,10 +2548,10 @@ def main() -> int:
                     last_ctx = reader.last_step_ctx
                     if args.once:
                         journal.log("=== --once erledigt ===")
-                        return 0
+                        return 1 if last_brain_failed else 0
                     if args.max_turns and turns >= args.max_turns:
                         journal.log(f"=== max-turns ({args.max_turns}) erreicht ===")
-                        return 0
+                        return 1 if last_brain_failed else 0
             except queue.Empty:
                 pass
             if reader.dead:
@@ -2376,6 +2649,12 @@ def main() -> int:
                 else:
                     kept.append(e)
             buffered += kept
+            for ev in kept:
+                if _is_abortable(ev):
+                    if write_urgent_event(URGENT_FLAG, ev):
+                        journal.log("[DRINGEND] " + ev[:110].replace("\n", " ")
+                                    + " - Abbruch-Flag für laufende Langaktion gesetzt")
+                    break
             if (tp_pending or tp_requested) and try_tp():
                 journal.log("Spieler zum NPC teleportiert.")
                 tp_pending = False
@@ -2387,6 +2666,11 @@ def main() -> int:
 
             # Tod hat Vorrang: neuen Koerper besorgen, Meldung sofort senden
             if "DU BIST GESTORBEN." in buffered:
+                # Den letzten lokalen Versuch vor Respawn/Exit abschliessen;
+                # ein toter Snapshot kann keine neue Spielaktion starten.
+                if not args.no_autonomy:
+                    survival_tick(bridge, agent_name=AGENT_NAME,
+                                  memory_path=survival_memory, allow_explore=False)
                 # Battle-Royale: nur 1 Leben. Kein Respawn - der Agent scheidet
                 # aus, die Leiche bleibt als Loot liegen, der Runner endet sauber
                 # (finally raeumt Voice/Mic auf, despawnt aber nicht).
@@ -2554,6 +2838,7 @@ def main() -> int:
             # Watchdog genau dann nie greifen (Deadlock, NPC dauerhaft stumm).
             # Die lange Stille allein ist Beweis genug, dass kein Zug mehr laeuft.
             if (pending > 0
+                    and not is_native_backend(args.model)
                     and (time.monotonic() - reader.last_activity) >= STUCK_QUIET_SEC):
                 journal.log(f"[WATCHDOG] pending={pending} trotz "
                             f"{time.monotonic() - reader.last_activity:.0f}s Stille - "
@@ -2571,11 +2856,50 @@ def main() -> int:
                 journal.log(f"[IDLE] zurueck auf {args.idle}s "
                             f"(Spieler in Sichtweite)")
 
+            # Ein lokaler, nichtblockierender Handlungsschritt zwischen Zuegen.
+            # Kein zweiter LLM und keine konkurrierende Tool-Schleife: der
+            # Controller respektiert Mailbox, Reise, Follow und frische Snapshots.
+            # Spielerereignisse und BR behalten ihre bisherige Prioritaet.
+            survival_busy = False
+            if (not args.no_autonomy and not args.once and not AGENT_BR
+                    and pending == 0 and not rotate_pending
+                    and (not buffered or time.monotonic() < backend_retry_at)
+                    and time.monotonic() >= survival_deadline):
+                survival_deadline = time.monotonic() + args.survival_interval
+                try:
+                    step = survival_tick(bridge, agent_name=AGENT_NAME,
+                                         memory_path=survival_memory,
+                                         allow_explore=bool(args.free and not human_near))
+                    survival_busy = step.get("status") in ("issued", "started", "running", "pending", "busy")
+                    if step.get("action") and step.get("status") in ("issued", "started"):
+                        reason = str(step.get("reason") or step["action"])
+                        journal.log(f"[SURVIVAL] {step['action']}: {reason}")
+                        _set_nameplate_intent(reason)
+                    if step.get("needs_llm"):
+                        reason = str(step.get("reason") or "Naechsten Ueberlebensschritt planen")
+                        now_step = time.monotonic()
+                        if now_step >= survival_handoff_at:
+                            survival_handoff = reason
+                            survival_handoff_at = now_step + max(60, args.idle)
+                    elif survival_busy:
+                        survival_handoff = ""
+                except (OSError, ValueError, TypeError) as exc:
+                    journal.log(f"[SURVIVAL] Schritt ausgelassen: {exc}")
+                    survival_deadline = time.monotonic() + 30
+
+            # Auch zwischen zwei lokalen Ticks keine Routineentscheidung mitten
+            # in einen soeben gestarteten Bridge-Befehl hinein senden.
+            current_cmd = (bridge.read_state() or {}).get("command") or {}
+            local_action_running = (current_cmd.get("status") == "running" or
+                                    os.path.exists(bridge.cmd_file) or survival_busy
+                                    or travel_active(bridge))
+
             # Waehrend rotate_pending KEINE neuen Weckrufe mehr starten: der
             # Swap wartet auf pending==0, jeder neue Zug wuerde ihn verzoegern.
             # buffered bleibt stehen und wird nach dem Swap der frischen
             # Session zugestellt (nichts geht verloren).
-            if buffered and pending <= 1 and bundle_ready and not rotate_pending:
+            if (buffered and pending <= 1 and bundle_ready and not rotate_pending
+                    and time.monotonic() >= backend_retry_at):
                 smalltalk = watcher.drain_smalltalk()
                 prefix = ""
                 if smalltalk:
@@ -2591,9 +2915,10 @@ def main() -> int:
             # Gate (idle_deadline selbst wird an mehreren Stellen - Zug-Ende,
             # Dispatch - immer mit dem Basis-idle gesetzt; der Faktor gehoert
             # nur in die Routine-Tick-Rechnung, nicht in die Event-Pfade).
-            elif (pending == 0 and not rotate_pending
-                  and time.monotonic() >= idle_deadline
-                      + (idle_backoff - 1) * args.idle):
+            elif (pending == 0 and not rotate_pending and not local_action_running
+                  and time.monotonic() >= backend_retry_at
+                  and (survival_handoff or time.monotonic() >= idle_deadline
+                      + (idle_backoff - 1) * args.idle)):
                 # Kein echtes Ereignis seit dem vorigen Routine-Tick: Abstand
                 # verdoppeln (1 -> 2 -> 4, Cap 4). Im BR-Modus fest 1; bei
                 # Mensch in Sichtweite ebenfalls nie strecken. Und NIE
@@ -2640,6 +2965,9 @@ def main() -> int:
                 if smalltalk:
                     tick = ("FUNKGEPLAUDER der anderen seither: " + smalltalk
                             + "\n\n" + tick)
+                if survival_handoff:
+                    tick = "SURVIVAL-HINWEIS: " + survival_handoff + "\n\n" + tick
+                    survival_handoff = ""
                 dispatch(tick, routine=True)
 
             time.sleep(2.0)

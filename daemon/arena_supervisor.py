@@ -276,18 +276,36 @@ def write_status(text: str, quiet: bool = False):
         log("STATUS: " + text)
 
 
-def round_cost_total(aids) -> float:
-    """Kumulierte Rundenkosten aller laufenden Agenten (round_cost.txt, von
-    run_agent nach jedem Zug geschrieben) aufsummieren."""
-    total = 0.0
+def round_cost_summary(aids) -> tuple[float, int]:
+    """Bekannte USD aufsummieren; unbekannte Slots nie als kostenlos ausgeben.
+
+    round_cost.txt: nichtnegative USD-Zahl oder 'unknown' bei Providern ohne
+    USD-Nachweis. Fehlende/halbe/ungueltige Dateien sind ebenfalls unbekannt.
+    """
+    total, unknown = 0.0, 0
     for aid in aids:
         try:
             path = os.path.join(agent_home_dir(aid), "round_cost.txt")
             with open(path, "r", encoding="utf-8") as f:
-                total += float((f.read() or "0").strip() or 0)
+                value = float(f.read().strip())
+            if not math.isfinite(value) or value < 0:
+                raise ValueError("invalid cost")
+            total += value
         except (OSError, ValueError):
-            pass
-    return total
+            unknown += 1
+    return total, unknown
+
+
+def round_cost_total(aids) -> float:
+    """Kompatible Zahl fuer bekannte USD; Anzeige nutzt round_cost_label."""
+    return round_cost_summary(aids)[0]
+
+
+def round_cost_label(aids) -> str:
+    total, unknown = round_cost_summary(aids)
+    if unknown:
+        return f"unbekannt + {total:.2f} USD bekannt" if total > 0 else "USD unbekannt"
+    return f"{total:.2f} USD"
 
 
 def agent_home_dir(aid: str) -> str:
@@ -356,7 +374,9 @@ def spawn_backend(key: str, script: str) -> None:
 
 def ensure_backends(cfg: dict) -> bool:
     """Startet claude-code-router / llama-server, wenn ein gewaehltes
-    Modell sie braucht. Blockiert, bis die Ports antworten."""
+    Modell sie braucht. Native codex/, gemini-cli/, antigravity/, mistral/, moonshot/
+    laufen direkt in run_agent und brauchen weder Router noch Zusatzserver.
+    Blockiert fuer Legacy-Backends, bis die Ports antworten."""
     models = [a["model"].lower() for a in cfg["agents"].values() if a.get("enabled") and a.get("model")]
     needs_ccr = any(m.startswith(("openai/", "google/", "xai/")) for m in models)
     needs_llama = any(m.startswith("local/") for m in models)
@@ -596,6 +616,15 @@ class Arena:
                     roster[aid]["language"] = acfg["language"]
         camp_x, camp_z = cfg["camp"]
         started = []
+
+        # Entwickler-Toggle "NPC radio TTS": als Env in die Prozesskette geben
+        # (Runner erben os.environ beim Popen, Claude Code und dayz_mcp erben
+        # weiter). BEIDE Werte explizit setzen, damit kein Stand der Vorrunde
+        # haengen bleibt. Gate: dayz_mcp._npc_tts.
+        os.environ["ISU_NPC_TTS"] = "1" if cfg.get("npctts") else "0"
+        if cfg.get("npctts"):
+            log("NPC radio TTS AN: auch NPC-zu-NPC-Funk wird vertont "
+                "(ElevenLabs-Kontingent im Blick behalten).")
 
         # Karte ermitteln (start_game.bat hat sie gewaehlt). Auf nicht-
         # Chernarus-Karten den Chernarus-Default-Lagerpunkt durch den
@@ -992,7 +1021,7 @@ class Arena:
             # Basis merken: der Kosten-Refresher in main() haengt " | cost ..."
             # an, ohne den RUNNING-Text zu verlieren.
             self.status_base = f"RUNNING ({mode}){orch_note}: " + ", ".join(started)
-            write_status(self.status_base)
+            write_status(f"{self.status_base} | cost {round_cost_label(self.procs.keys())}")
         else:
             self.status_base = ""
             write_status("STOPPED (no agents selected)")
@@ -1080,9 +1109,26 @@ def _effective_model(aid: str, model: str) -> str:
     # Konto/diese Route durchzieht, ist nicht garantiert. Darum standardmaessig
     # auf sonnet umbiegen; ISU_FABLE_ENABLED=1 laesst die Fable-Wahl durch.
     fable_ok = os.environ.get("ISU_FABLE_ENABLED", "").strip().lower() in ("1", "true", "yes", "on")
-    if "fable" in model.lower() and not fable_ok:
+    # Eigene IDs anderer Provider duerfen nie auf eine andere kostenpflichtige
+    # Route umgebogen werden. Nur die historische Anthropic-Ausnahme anwenden.
+    provider, separator, model_id = model.partition("/")
+    is_anthropic = not separator or provider.lower() in ("api", "anthropic")
+    name = model_id if separator else provider
+    if is_anthropic and name.lower() in ("fable", "claude-fable-5") and not fable_ok:
         log(f"{aid}: Modell '{model}' -> Fallback 'sonnet' (ISU_FABLE_ENABLED nicht gesetzt).")
         return "sonnet"
+    # Gemini CLI: Google hat den persoenlichen Login am 18.06.2026 abgeschafft,
+    # jeder Zug endet mit UNSUPPORTED_CLIENT (Session 08.09.: Birgit 0 von 6
+    # Zuegen, 14 Minuten nur Survival-Routinen). Das Menue bietet den Provider
+    # weiterhin an (Wire-Kontrakt) - darum hier auf Antigravity umleiten, das
+    # denselben Google-Login nutzt. ISU_GEMINI_CLI_ALLOWED=1 laesst die Wahl
+    # durch (Code-Assist-Lizenz).
+    if provider.lower() == "gemini-cli" and separator:
+        allowed = os.environ.get("ISU_GEMINI_CLI_ALLOWED", "").strip().lower() in ("1", "true", "yes", "on")
+        if not allowed:
+            log(f"{aid}: Modell '{model}' -> 'antigravity/default' (Gemini CLI seit "
+                f"18.06.2026 ohne persoenlichen Zugang; ISU_GEMINI_CLI_ALLOWED=1 erzwingt).")
+            return "antigravity/default"
     return model
 
 
@@ -1118,7 +1164,7 @@ def parse_command(line: str) -> dict | None:
     cfg = {"action": "start", "agents": {}, "hostile": False, "free": False,
            "camp": (4233.7, 8512.2), "idle": 120, "turns": 10, "mic": True,
            "group": False, "orch": False, "patrols": False, "mission": "",
-           "proto": 1, "expected_count": None}
+           "npctts": False, "proto": 1, "expected_count": None}
     for part in parts[1:]:
         fields = part.split(":")
         key = fields[0].lower()
@@ -1200,6 +1246,11 @@ def parse_command(line: str) -> dict | None:
             cfg["orch"] = fields[1] == "1"
         elif key == "patrols" and len(fields) >= 2:
             cfg["patrols"] = fields[1] == "1"
+        elif key == "npctts" and len(fields) >= 2:
+            # Entwickler-Toggle "NPC radio TTS" (29.08.): 1 = auch reiner
+            # NPC-zu-NPC-Funk wird über ElevenLabs vertont; 0 = nur
+            # Spieler-gerichtetes (Default). Gate sitzt in dayz_mcp._npc_tts.
+            cfg["npctts"] = fields[1] == "1"
         elif key == "mission" and len(fields) >= 2:
             cfg["mission"] = fields[1].strip().lower()
         else:
@@ -1247,9 +1298,8 @@ def main() -> int:
                 cost_tick = 0
                 base = getattr(arena, "status_base", "")
                 if base and arena.procs:
-                    total = round_cost_total(list(arena.procs.keys()))
-                    if total > 0:
-                        write_status(f"{base} | cost {total:.2f} USD", quiet=True)
+                    cost_label = round_cost_label(arena.procs.keys())
+                    write_status(f"{base} | cost {cost_label}", quiet=True)
             try:
                 with open(REQUEST_FILE, "r", encoding="utf-8", errors="replace") as f:
                     seq = (f.readline() or "").strip()
@@ -1323,4 +1373,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

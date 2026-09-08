@@ -55,6 +55,51 @@ def _inbox_should_interrupt(path: str, base_size: int) -> bool:
     return False          # nur Routine-Lagezentrum-Sitreps -> NICHT unterbrechen
 
 
+def _flag_mtime(path) -> float:
+    try:
+        return os.path.getmtime(path) if path else 0.0
+    except OSError:
+        return 0.0
+
+
+def _urgent_event(path: str, base_mtime: float) -> str:
+    """Text des kritischen Ereignisses, wenn urgent_event.json seit base_mtime
+    neu geschrieben wurde - sonst ''. run_agent schreibt die Datei atomar
+    (JSON {"event": ..., "t": ...}) bei DU BLUTEST / GEFAHR / UMGEKIPPT /
+    GESTORBEN. Ein Zeitstempel VOR dem Aktionsstart zählt nicht: dieses
+    Ereignis ist dann schon auf dem Weg zum Gehirn."""
+    if not path:
+        return ""
+    if _flag_mtime(path) <= base_mtime:
+        return ""
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            data = json.load(f)
+        return str(data.get("event") or "kritisches Ereignis")
+    except (OSError, ValueError, AttributeError):
+        return "kritisches Ereignis"
+
+
+def interrupt_reason(result: dict) -> str:
+    """Grund einer 'interrupted'-Antwort in Klartext (ohne ABGEBROCHEN-Prefix).
+
+    Zwei Auslöser: neuer Spieler-Funk (Inbox) oder ein kritisches Welt-
+    Ereignis (urgent_event.json: Blutung, Gefahr, Bewusstlosigkeit). Beim
+    zweiten soll der NPC ZUERST die Gefahr behandeln, nicht 'zuhören' -
+    früher las jede Unterbrechung als Spieler-Funk."""
+    detail = str(result.get("detail") or "")
+    if detail.startswith("kritisch:"):
+        ev = detail[len("kritisch:"):].strip()
+        return (f"kritisches Ereignis: {ev} Reagiere ZUERST darauf "
+                f"(bandage/flee/engage, bei Bedarf observe), dann weiter.")
+    return ("Der Spieler funkt dich gerade an. Hör SOFORT zu und reagiere "
+            "auf seinen Funk, bevor du weitermachst.")
+
+
+def interrupt_text(result: dict) -> str:
+    return "ABGEBROCHEN: " + interrupt_reason(result)
+
+
 class Bridge:
     def __init__(self, profile_dir: str = DEFAULT_PROFILE, npc_id: str = "viktor"):
         self.npc_id = npc_id
@@ -70,6 +115,10 @@ class Bridge:
         # sich das commands.json ueberschreiben - der Verlierer wartet dann auf
         # eine cmd_id, die nie ankommt (volles Timeout, leere Fehlermeldung).
         self._send_lock = threading.Lock()
+        # Kritische Welt-Ereignisse (run_agent: Blutung, Gefahr, Bewusstlos)
+        # brechen laufende Langaktionen ab wie neuer Spieler-Funk - Pfad zur
+        # urgent_event.json im agent_home, gesetzt von dayz_mcp.
+        self.urgent_flag = None
 
     # ------------------------------------------------------------- state I/O
 
@@ -143,7 +192,7 @@ class Bridge:
 
     def wait_status(self, cmd_id: str, timeout: float = 700.0,
                     on_progress=None, interrupt_inbox=None,
-                    stop_event=None) -> dict:
+                    stop_event=None, urgent_flag=None) -> dict:
         """Pollen bis state.command.id == cmd_id und status done/failed.
 
         Bei Timeout wird der LETZTE bekannte command-Block zurueckgegeben
@@ -154,10 +203,17 @@ class Bridge:
         abgebrochen, damit der Agent sofort zuhoeren statt weitermarschieren kann.
 
         stop_event: threading.Event - gesetzt = sofort mit "interrupted"
-        aussteigen (der Reise-Thread haengt sonst bis zu 75 s in einem
-        laufenden Segment, waehrend das naechste Tool schon die Beine will).
+        aussteigen (der Reise-Thread hängt sonst bis zu 75 s in einem
+        laufenden Segment, während das nächste Tool schon die Beine will).
+
+        urgent_flag: Pfad zur urgent_event.json. Wird sie WAEHREND des
+        Wartens neu geschrieben (kritisches Ereignis vom run_agent-Watcher),
+        endet das Warten mit status "interrupted" und detail "kritisch: ...".
+        Viktor 08.09.: DU-BLUTEST um 20:54:09, der laufende explore_step
+        blockierte das Gehirn aber bis 20:55:06 - erst dann kam bandage().
         """
         deadline = time.monotonic() + timeout
+        urgent_base = _flag_mtime(urgent_flag) if urgent_flag else 0.0
         base_size = -1
         if interrupt_inbox:
             try:
@@ -169,6 +225,11 @@ class Bridge:
             if stop_event is not None and stop_event.is_set():
                 return {"id": cmd_id, "status": "interrupted",
                         "detail": "abgebrochen (stop_event)"}
+            if urgent_flag:
+                urgent = _urgent_event(urgent_flag, urgent_base)
+                if urgent:
+                    return {"id": cmd_id, "status": "interrupted",
+                            "detail": "kritisch: " + urgent}
             state = self.read_state()
             cmd = (state or {}).get("command", {})
             if cmd.get("id") == cmd_id:
@@ -189,14 +250,16 @@ class Bridge:
         """Befehl senden und auf Endstatus warten (oder Timeout -> running).
 
         interruptible=True: lange Aktion (move_to, engage, loot, ...) bricht ab,
-        sobald neuer Funk in der Inbox liegt - der Agent reagiert dann sofort.
+        sobald neuer Funk in der Inbox liegt ODER der Watcher ein kritisches
+        Ereignis meldet (urgent_flag) - der Agent reagiert dann sofort.
         stop_event: bricht das Warten ab, sobald das Event gesetzt ist
         (Reise-Thread-Abbruch via _abort_travel).
         """
         cmd_id = self.send(action, **kwargs)
         inbox = self.voice_inbox if interruptible else None
+        urgent = getattr(self, "urgent_flag", None) if interruptible else None
         return self.wait_status(cmd_id, timeout=timeout, interrupt_inbox=inbox,
-                                stop_event=stop_event)
+                                stop_event=stop_event, urgent_flag=urgent)
 
 
 # --------------------------------------------------------- Beobachtungstext
@@ -241,7 +304,9 @@ def inventory_signature(state: dict | None) -> str:
         # "steckt in"-Hinweis (Fix 3) wuerde vom Delta-observe verschluckt
         parent = it.get("parent") or ""
         hand = "1" if it.get("in_hands") else "0"
-        parts.append(f"{it.get('classname')}:{it.get('quantity', 0):.0f}:{parent}:{hand}")
+        safety = (it.get("food_stage"), it.get("liquid_safe"), it.get("food_safe"), it.get("frozen"),
+                  it.get("health"), it.get("worn"))
+        parts.append(f"{it.get('classname')}:{it.get('quantity', 0):.0f}:{parent}:{hand}:{safety}")
     return "|".join(sorted(parts))
 
 
@@ -366,10 +431,11 @@ def format_observation(state: dict | None, last_chat_id: int = 0,
         interesting = sorted(
             interesting,
             key=lambda i: _kind_rank.get(str(i.get("kind", "")).lower(), 5))
-        if len(interesting) > 15:
-            lines.append(f"  (gekuerzt: {len(interesting) - 15} weitere Items, "
+        inventory_limit = 15 if compact else len(interesting)
+        if len(interesting) > inventory_limit:
+            lines.append(f"  (gekuerzt: {len(interesting) - inventory_limit} weitere Items, "
                          f"observe(full=true) zeigt alles)")
-        for it in interesting[:15]:
+        for it in interesting[:inventory_limit]:
             hand_marker = " [IN HAND]" if it.get("in_hands") else ""
             # Steckt das Item in einer Waffe? Dann kann man es nicht droppen
             parent = it.get("parent") or ""
@@ -384,8 +450,20 @@ def format_observation(state: dict | None, last_chat_id: int = 0,
                 lines.append(f"  - {it.get('classname')} [{it.get('kind')}]"
                              f" ({amount}){hand_marker}{stuck}")
             else:
+                details = []
+                stage_names = {1: "roh", 2: "gebraten", 3: "gekocht", 4: "getrocknet",
+                               5: "VERBRANNT", 6: "VERDORBEN"}
+                if it.get("food_stage") in stage_names:
+                    details.append(stage_names[it["food_stage"]])
+                if it.get("frozen"):
+                    details.append("GEFROREN")
+                if it.get("kind") == "food" and it.get("food_safe") is False:
+                    details.append("NICHT SICHER ESSBAR")
+                if it.get("kind") == "drink" and "liquid_safe" in it:
+                    details.append("trinkbar" if it["liquid_safe"] else "NICHT SICHER TRINKBAR")
+                safety_text = " (" + ", ".join(details) + ")" if details else ""
                 lines.append(f"  - {it.get('classname')} [{it.get('kind')}]"
-                             f" x{qty:.0f}{hand_marker}{stuck}")
+                             f" x{qty:.0f}{safety_text}{hand_marker}{stuck}")
         if not interesting:
             lines.append("  - (nur Kleidung)")
         # Kleidung als Einzeiler: getragen vs. lose im Gepaeck. Details holt
@@ -408,7 +486,7 @@ def format_observation(state: dict | None, last_chat_id: int = 0,
     # den Schnitt -> der NPC "sieht" es nicht. Das Naechste zuerst zeigen.
     nearby = sorted(state.get("nearby", []),
                     key=lambda e: e.get("distance", 9999.0))
-    limit = 8 if compact else 15
+    limit = 8 if compact else len(nearby)
     # GEFAHREN duerfen nie hinter den Schnitt fallen: am vollen Lager belegen
     # Zelt/Feuer/Squad/Items die 8 compact-Plaetze, und der Infizierte auf
     # 50 m war unsichtbar. Bedrohungen zuerst, dann der Rest nach Distanz.
@@ -429,6 +507,8 @@ def format_observation(state: dict | None, last_chat_id: int = 0,
             if e.get("cargo", 0) > 0:
                 cargo = f" [enthaelt {e.get('cargo')}]"
             extra = ""
+            if e.get("kind") == "garden":
+                extra += " [ERNTEREIF]" if e.get("harvestable") else " [waechst / abgeerntet]"
             if e.get("kind") == "item":
                 ik = e.get("item_kind") or ""
                 if ik:

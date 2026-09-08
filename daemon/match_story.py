@@ -130,7 +130,11 @@ def collect_events(t_start: float, t_end: float) -> dict:
                         q_list.append({"t_str": ms.group(1), "text": ms.group(2)})
                         continue
                     mm = SAY_RE.match(line)
-                    if mm and mm.group(2) not in ("WELT", "TOOL", "TOKENS"):
+                    # DENKT = interner Denkprozess des Modells (Extended
+                    # Thinking, 29.08.) - erwähnt oft "Mission" und würde die
+                    # Story sonst mit Pseudo-Missions-Events fluten.
+                    if mm and mm.group(2) not in ("WELT", "TOOL", "TOKENS",
+                                                  "DENKT"):
                         text = mm.group(3).strip()
                         if MISSION_RE.search(text):
                             ev_list.append({"t_str": mm.group(1), "kind": "mission",
