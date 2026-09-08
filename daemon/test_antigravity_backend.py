@@ -173,7 +173,8 @@ class AntigravityContracts(unittest.TestCase):
         self.assertFalse({key.lower() for key in child} & {key.lower() for key in dangerous})
         for name in ("SystemRoot", "PATH", "APPDATA", "LOCALAPPDATA"):
             self.assertEqual(child[name], parent[name])
-        self.assertEqual(child["AGY_CLI_DISABLE_AUTO_UPDATE"], "1")
+        # "true", nicht "1": nur so bleibt der agy-Hintergrund-Updater aus (08.09.2026)
+        self.assertEqual(child["AGY_CLI_DISABLE_AUTO_UPDATE"], "true")
         self.assertEqual(child["AGY_CLI_HIDE_ACCOUNT_INFO"], "1")
         self.assertEqual(child["NO_COLOR"], "1")
 

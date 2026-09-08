@@ -337,9 +337,14 @@ class CliPlanner:
                 "trustedWorkspaces": [str(work.resolve())],
                 "useG1Credits": False,
             }), encoding="utf-8")
+            # AGY_CLI_DISABLE_AUTO_UPDATE muss "true" sein, "1" ignoriert agy 1.1.27:
+            # dann startet jeder Aufruf "agy --bg-updater", der "agy --version" in
+            # einem NEUEN Konsolenfenster ausführt (Fenster blitzt bei jedem
+            # Modellaufruf auf, gemessen 08.09.2026). Frisches Temp-Profil pro
+            # Aufruf = keine Drosselung über last_check.timestamp.
             env.update({"HOME": str(profile), "USERPROFILE": str(profile),
                         "HOMEDRIVE": profile.drive, "HOMEPATH": str(profile)[len(profile.drive):],
-                        "AGY_CLI_DISABLE_AUTO_UPDATE": "1", "AGY_CLI_HIDE_ACCOUNT_INFO": "1",
+                        "AGY_CLI_DISABLE_AUTO_UPDATE": "true", "AGY_CLI_HIDE_ACCOUNT_INFO": "1",
                         "NO_COLOR": "1", "PYTHONIOENCODING": "utf-8"})
             schema = work / "decision-schema.json"
             schema.write_text(json.dumps(DECISION_SCHEMA), encoding="utf-8")
