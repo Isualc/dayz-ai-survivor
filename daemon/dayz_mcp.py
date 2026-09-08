@@ -1176,11 +1176,36 @@ PLAYER_NAMES = [n.strip().lower() for n in os.environ.get(
     os.environ.get("ISU_MIC_NAME", "Player")).split(",") if n.strip()]
 
 
+def _player_name_variants() -> list[str]:
+    """Alle Namen, unter denen der Spieler angesprochen werden kann: Env
+    (ISU_PLAYER_NAMES / ISU_MIC_NAME) PLUS arena/players.json (funk, dayz,
+    aliases). Vorher zaehlte nur die Env-Liste - Konrad sagte "Isu, ..."
+    (so will der Spieler laut seinem personen.md genannt werden) und wurde
+    nie vertont, waehrend Viktors "Isualc, ..." durchging (09.09.2026)."""
+    names = set(PLAYER_NAMES)
+    if players_registry is not None:
+        try:
+            for entry in players_registry.all_players():
+                for c in [entry.get("funk"), entry.get("dayz")] + list(entry.get("aliases") or []):
+                    if isinstance(c, str) and c.strip():
+                        names.add(c.strip().lower())
+        except Exception:
+            pass
+    return sorted(names, key=len, reverse=True)
+
+
 def _is_for_player(text: str) -> bool:
-    """True, wenn die Aeusserung den Spieler direkt anspricht (Name im Text).
-    Nur dann wird vertont; sonst stiller Text-Funk fuer die Gruppe."""
+    """True, wenn die Aeusserung den Spieler direkt anspricht (Name als
+    eigenes Wort im Text). Nur dann wird vertont; sonst stiller Text-Funk
+    fuer die Gruppe."""
     t = (text or "").lower()
-    return any(name in t for name in PLAYER_NAMES)
+    if not t:
+        return False
+    import re as _re
+    for name in _player_name_variants():
+        if _re.search(r"(?<![a-z0-9äöüß])" + _re.escape(name) + r"(?![a-z0-9äöüß])", t):
+            return True
+    return False
 
 
 # Entwickler-Schalter "NPC radio TTS" (Arena-Menü, 29.08.): ON = ALLE
