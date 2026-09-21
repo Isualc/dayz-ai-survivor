@@ -137,6 +137,8 @@ close_game.bat     shut everything down gracefully (preserves server persistence
 
 `start_game.bat` brings up server, supervisor and client. Once you're in, open the **setup menu** (Insert key) to add up to ten NPCs and configure everything: model, role, idle cadence, turn limit, hotkeys, disposition (co-op vs. battle-royale), spawn mode, and per-NPC name/voice. Each NPC runs its own model, voice and memory.
 
+**UI language (English / German):** `start_game.bat` and `start_server.ps1` ask once at launch (`1) English  2) Deutsch`, Enter keeps the last choice). The answer switches the launcher output **and** the whole in-game UI - setup menu, radial menu, squad HUD - and is stored in `<server>\profiles\IsuSurvivor\ui_language.txt`. Delete that file (or pass `-UiLanguage en|de`) to change it. It only affects the menus; every NPC still speaks and thinks in its own per-NPC language.
+
 **The brain on its own (headless, no client):**
 
 ```powershell

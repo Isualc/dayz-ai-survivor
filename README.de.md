@@ -109,6 +109,8 @@ close_game.bat     alles sauber herunterfahren (schont die Server-Persistenz)
 
 `start_game.bat` bringt Server, Supervisor und Client hoch; die NPCs startest du danach IM SPIEL über das Setup-Menü (Taste Einfg). Einzelne Bausteine lassen sich für Power-User auch direkt über die PowerShell-Skripte in `tools\` fahren (z. B. `tools\start_server.ps1`, `tools\start_arena.ps1` für das CLI-Arena-Menü, `tools\start_all.ps1` für den Ein-Fenster-Start).
 
+**Menüsprache (Deutsch / Englisch):** `start_game.bat` und `start_server.ps1` fragen beim Start einmal `1) English  2) Deutsch` (Enter behält die letzte Wahl). Die Antwort schaltet die Launcher-Ausgabe **und** die komplette Spiel-Oberfläche um, also Setup-Menü, Befehlsrad und Squad-HUD, und wird in `<Server>\profiles\IsuSurvivor\ui_language.txt` gespeichert. Datei löschen (oder `-UiLanguage en|de` übergeben), um zu wechseln. Betrifft nur die Menüs; jeder NPC spricht und denkt weiterhin in seiner eigenen, pro NPC eingestellten Sprache.
+
 ## Der Akzeptanztest
 
 ```powershell
