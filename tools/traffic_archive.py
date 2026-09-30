@@ -20,25 +20,55 @@ TOKEN = os.environ["GITHUB_TOKEN"]
 OUT = Path("docs/traffic")
 
 
-def api(path):
-    req = urllib.request.Request(
-        f"https://api.github.com/repos/{REPO}/{path}",
-        headers={
-            "Authorization": f"Bearer {TOKEN}",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-        },
-    )
+def _request(url):
+    return urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {TOKEN}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    })
+
+
+def _token_kind():
+    # Nur das öffentlich dokumentierte Präfix auswerten, nie den Wert ausgeben.
+    if TOKEN.startswith("github_pat_"):
+        return "Fine-grained PAT"
+    if TOKEN.startswith("ghp_"):
+        return "Classic PAT"
+    if TOKEN.startswith("gho_"):
+        return "OAuth-Token (gh-Login)"
+    if TOKEN.startswith("ghs_"):
+        return "Actions-GITHUB_TOKEN (TRAFFIC_TOKEN leer oder nicht gesetzt)"
+    return "unbekannter Token-Typ (falsch kopiert?)"
+
+
+def _repo_visible():
     try:
-        with urllib.request.urlopen(req) as r:
+        with urllib.request.urlopen(_request(f"https://api.github.com/repos/{REPO}")):
+            return "ja"
+    except urllib.error.HTTPError as e:
+        return f"nein (HTTP {e.code}, Repo nicht im Token freigegeben?)"
+
+
+def api(path):
+    try:
+        with urllib.request.urlopen(_request(f"https://api.github.com/repos/{REPO}/{path}")) as r:
             return json.load(r)
     except urllib.error.HTTPError as e:
-        if e.code == 403 and path.startswith("traffic/"):
+        if e.code in (401, 403, 404) and path.startswith("traffic/"):
             # Der Actions-GITHUB_TOKEN darf die Traffic-API grundsätzlich nicht
             # lesen (braucht Administration-Recht, das es für ihn nicht gibt).
-            sys.exit("403 auf die Traffic-API: Repo-Secret TRAFFIC_TOKEN fehlt oder ist "
-                     "abgelaufen. Fine-grained PAT nur für dieses Repo mit "
-                     "'Administration: Read-only' anlegen und als TRAFFIC_TOKEN hinterlegen.")
+            try:
+                msg = json.load(e).get("message", "")
+            except Exception:
+                msg = ""
+            sys.exit(
+                f"HTTP {e.code} auf die Traffic-API.\n"
+                f"  Token-Typ:          {_token_kind()}\n"
+                f"  Sieht das Repo:     {_repo_visible()}\n"
+                f"  GitHub verlangt:    {e.headers.get('X-Accepted-GitHub-Permissions', '?')}\n"
+                f"  GitHub-Antwort:     {msg}\n"
+                "Lösung: Fine-grained PAT nur für dieses Repo mit "
+                "'Administration: Read-only' als Repo-Secret TRAFFIC_TOKEN hinterlegen.")
         raise
 
 
