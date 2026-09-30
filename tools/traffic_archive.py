@@ -112,6 +112,10 @@ def snapshot_lists(today):
             continue
         path = OUT / f"{name}.csv"
         exists = path.exists()
+        if exists:
+            with path.open(encoding="utf-8", newline="") as f:
+                if any(row and row[0] == today for row in csv.reader(f)):
+                    continue  # Snapshot für diesen Tag schon da (manueller Zweitlauf)
         with path.open("a", encoding="utf-8", newline="") as f:
             w = csv.writer(f)
             if not exists:
@@ -162,7 +166,8 @@ def write_summary(rows):
         "_Automatisch erzeugt von `tools/traffic_archive.py`._",
         "",
     ]
-    (OUT / "SUMMARY.md").write_text("\n".join(lines), encoding="utf-8")
+    # newline="\n": lokale Läufe unter Windows sollen keine CRLF-Diffs erzeugen
+    (OUT / "SUMMARY.md").write_text("\n".join(lines), encoding="utf-8", newline="\n")
 
 
 def main():
