@@ -1,12 +1,12 @@
 name: Traffic archivieren
 
-# GitHub loescht Traffic-Daten nach 14 Tagen. Dieser Job holt sie taeglich ab
+# GitHub löscht Traffic-Daten nach 14 Tagen. Dieser Job holt sie täglich ab
 # und committet sie nach docs/traffic/, damit eine Gesamtstatistik entsteht.
 
 on:
   schedule:
-    - cron: '17 4 * * *'   # taeglich 04:17 UTC
-  workflow_dispatch:        # manuell ausloesbar im Actions-Tab
+    - cron: '17 4 * * *'   # täglich 04:17 UTC
+  workflow_dispatch:        # manuell auslösbar im Actions-Tab
 
 permissions:
   contents: write
@@ -15,17 +15,19 @@ jobs:
   archive:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Traffic abholen und mergen
         env:
-          # GITHUB_TOKEN reicht meist. Falls 403: fein granulierten PAT mit
-          # "Administration: Read-only" als Secret TRAFFIC_TOKEN hinterlegen.
+          # GITHUB_TOKEN reicht NICHT (Traffic-API braucht Administration-Recht,
+          # das der Actions-Token nie bekommt, daher 403). Pflicht: fein granulierter
+          # PAT nur für dieses Repo mit "Administration: Read-only" als Secret
+          # TRAFFIC_TOKEN. Läuft der PAT ab, kommt wieder 403.
           GITHUB_TOKEN: ${{ secrets.TRAFFIC_TOKEN || secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python3 tools/traffic_archive.py
 
-      - name: Committen, falls sich etwas geaendert hat
+      - name: Committen, falls sich etwas geändert hat
         run: |
           git config user.name  'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'

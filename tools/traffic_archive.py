@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Holt die GitHub-Traffic-Daten (14-Tage-Fenster) und merged sie in eine CSV.
 
-GitHub loescht Traffic-Daten nach 14 Tagen. Dieses Skript laeuft taeglich per
-GitHub Actions und schreibt jeden Tag genau einmal fest, sodass ueber die Zeit
-eine luekenlose Gesamtstatistik entsteht.
+GitHub löscht Traffic-Daten nach 14 Tagen. Dieses Skript läuft täglich per
+GitHub Actions und schreibt jeden Tag genau einmal fest, sodass über die Zeit
+eine lückenlose Gesamtstatistik entsteht.
 
 Aufruf:  GITHUB_TOKEN=... GITHUB_REPOSITORY=owner/name python3 tools/traffic_archive.py
 """
@@ -11,6 +11,7 @@ import csv
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -28,12 +29,23 @@ def api(path):
             "X-GitHub-Api-Version": "2022-11-28",
         },
     )
-    with urllib.request.urlopen(req) as r:
-        return json.load(r)
+    try:
+        with urllib.request.urlopen(req) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        if e.code == 403 and path.startswith("traffic/"):
+            # Der Actions-GITHUB_TOKEN darf die Traffic-API grundsätzlich nicht
+            # lesen (braucht Administration-Recht, das es für ihn nicht gibt).
+            sys.exit("403 auf die Traffic-API: Repo-Secret TRAFFIC_TOKEN fehlt oder ist "
+                     "abgelaufen. Fine-grained PAT nur für dieses Repo mit "
+                     "'Administration: Read-only' anlegen und als TRAFFIC_TOKEN hinterlegen.")
+        raise
 
 
 def merge_daily():
-    """Views + Clones pro Tag zusammenfuehren, vorhandene Zeilen nicht ueberschreiben."""
+    """Views + Clones pro Tag zusammenführen. Tage im aktuellen API-Fenster werden
+    aktualisiert (der laufende Tag ist beim ersten Abholen noch unvollständig),
+    ältere Zeilen aus der CSV bleiben unverändert erhalten."""
     rows = {}
     csv_path = OUT / "daily.csv"
     if csv_path.exists():
@@ -62,7 +74,7 @@ def merge_daily():
 
 def snapshot_lists(today):
     """Referrer und beliebte Pfade als Tages-Snapshot ablegen (nicht mergebar,
-    weil GitHub hier nur Summen ueber das Fenster liefert)."""
+    weil GitHub hier nur Summen über das Fenster liefert)."""
     for name, endpoint in (("referrers", "traffic/popular/referrers"),
                            ("paths", "traffic/popular/paths")):
         data = api(endpoint)
@@ -114,8 +126,8 @@ def write_summary(rows):
         lines.append(f"| {tag} | {name} | {count} |")
     lines += [
         "",
-        "> Die eindeutigen Besucher sind pro Tag gezaehlt und deshalb nur addiert,",
-        "> nicht dedupliziert. Ein Besucher an drei Tagen zaehlt hier dreifach.",
+        "> Die eindeutigen Besucher sind pro Tag gezählt und deshalb nur addiert,",
+        "> nicht dedupliziert. Ein Besucher an drei Tagen zählt hier dreifach.",
         "",
         "_Automatisch erzeugt von `tools/traffic_archive.py`._",
         "",

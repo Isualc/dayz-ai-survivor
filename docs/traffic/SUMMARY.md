@@ -1,22 +1,24 @@
 # Traffic-Gesamtstatistik
 
-Zeitraum: **2026-08-02 bis 2026-08-15** (14 erfasste Tage)
+Zeitraum: **2026-08-02 bis 2026-09-29** (28 erfasste Tage)
 
 | Kennzahl | Gesamt |
 |---|---:|
-| Seitenaufrufe | 93 |
-| Eindeutige Besucher (Summe pro Tag) | 37 |
-| Clones | 15 |
-| Eindeutige Cloner (Summe pro Tag) | 12 |
-| Release-Downloads | 4 |
+| Seitenaufrufe | 202 |
+| Eindeutige Besucher (Summe pro Tag) | 82 |
+| Clones | 506 |
+| Eindeutige Cloner (Summe pro Tag) | 448 |
+| Release-Downloads | 9 |
 
 ## Release-Downloads im Detail
 
 | Release | Datei | Downloads |
 |---|---|---:|
-| v1.1.0 | dayz-ai-survivor-Setup.zip | 4 |
+| v1.3.0 | dayz-ai-survivor-Setup.zip | 1 |
+| v1.2.0 | dayz-ai-survivor-Setup.zip | 2 |
+| v1.1.0 | dayz-ai-survivor-Setup.zip | 6 |
 
-> Die eindeutigen Besucher sind pro Tag gezaehlt und deshalb nur addiert,
-> nicht dedupliziert. Ein Besucher an drei Tagen zaehlt hier dreifach.
+> Die eindeutigen Besucher sind pro Tag gezählt und deshalb nur addiert,
+> nicht dedupliziert. Ein Besucher an drei Tagen zählt hier dreifach.
 
 _Automatisch erzeugt von `tools/traffic_archive.py`._
