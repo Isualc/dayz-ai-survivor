@@ -1,22 +1,22 @@
 # Traffic-Gesamtstatistik
 
-Zeitraum: **2026-08-02 bis 2026-10-03** (32 erfasste Tage)
+Zeitraum: **2026-08-02 bis 2026-10-04** (33 erfasste Tage)
 
 | Kennzahl | Gesamt |
 |---|---:|
-| Seitenaufrufe | 218 |
-| Eindeutige Besucher (Summe pro Tag) | 92 |
-| Clones | 625 |
-| Eindeutige Cloner (Summe pro Tag) | 531 |
-| Release-Downloads | 12 |
+| Seitenaufrufe | 221 |
+| Eindeutige Besucher (Summe pro Tag) | 95 |
+| Clones | 658 |
+| Eindeutige Cloner (Summe pro Tag) | 555 |
+| Release-Downloads | 15 |
 
 ## Release-Downloads im Detail
 
 | Release | Datei | Downloads |
 |---|---|---:|
-| v1.3.0 | dayz-ai-survivor-Setup.zip | 4 |
-| v1.2.0 | dayz-ai-survivor-Setup.zip | 2 |
-| v1.1.0 | dayz-ai-survivor-Setup.zip | 6 |
+| v1.3.0 | dayz-ai-survivor-Setup.zip | 5 |
+| v1.2.0 | dayz-ai-survivor-Setup.zip | 3 |
+| v1.1.0 | dayz-ai-survivor-Setup.zip | 7 |
 
 > Die eindeutigen Besucher sind pro Tag gezählt und deshalb nur addiert,
 > nicht dedupliziert. Ein Besucher an drei Tagen zählt hier dreifach.
