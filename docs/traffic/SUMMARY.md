@@ -1,20 +1,20 @@
 # Traffic-Gesamtstatistik
 
-Zeitraum: **2026-08-02 bis 2026-10-19** (48 erfasste Tage)
+Zeitraum: **2026-08-02 bis 2026-10-20** (49 erfasste Tage)
 
 | Kennzahl | Gesamt |
 |---|---:|
-| Seitenaufrufe | 267 |
-| Eindeutige Besucher (Summe pro Tag) | 125 |
-| Clones | 962 |
-| Eindeutige Cloner (Summe pro Tag) | 779 |
-| Release-Downloads | 25 |
+| Seitenaufrufe | 268 |
+| Eindeutige Besucher (Summe pro Tag) | 126 |
+| Clones | 975 |
+| Eindeutige Cloner (Summe pro Tag) | 789 |
+| Release-Downloads | 26 |
 
 ## Release-Downloads im Detail
 
 | Release | Datei | Downloads |
 |---|---|---:|
-| v1.3.0 | dayz-ai-survivor-Setup.zip | 13 |
+| v1.3.0 | dayz-ai-survivor-Setup.zip | 14 |
 | v1.2.0 | dayz-ai-survivor-Setup.zip | 4 |
 | v1.1.0 | dayz-ai-survivor-Setup.zip | 8 |
 
