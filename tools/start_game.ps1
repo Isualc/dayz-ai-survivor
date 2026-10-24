@@ -28,6 +28,7 @@ $maps = @{
     "1" = @{ key = "chernarus"; template = "dayzOffline.chernarusplus"; name = "Chernarus"; camp = "4233.7,8512.2" }
     "2" = @{ key = "enoch";     template = "dayzOffline.enoch";         name = "Livonia (DLC)"; camp = "7900,6700" }
     "3" = @{ key = "sakhal";    template = "dayzOffline.sakhal";        name = "Sakhal (DLC, Winter)"; camp = "7680,7800" }
+    "4" = @{ key = "nasdara";   template = "dayzOffline.nasdara";       name = "Nasdara (Badlands DLC)"; camp = "8528,8669" }
 }
 $lastMap = ""
 if (Test-Path $activeMapFile) { $lastMap = (Get-Content $activeMapFile -TotalCount 1).Trim() }
@@ -36,6 +37,7 @@ Write-Host (Get-IsuLaunchText '[0/4] Choose a map:' '[0/4] Karte wählen:') -For
 Write-Host (Get-IsuLaunchText '      1) Chernarus            (base game)' '      1) Chernarus            (Basisspiel)')
 Write-Host (Get-IsuLaunchText '      2) Livonia             (requires Livonia DLC on Steam)' '      2) Livonia             (braucht Livonia-DLC im Steam-Konto)')
 Write-Host (Get-IsuLaunchText '      3) Sakhal / Winter     (requires Frostline DLC on Steam)' '      3) Sakhal / Winter     (braucht Frostline-DLC im Steam-Konto)')
+Write-Host (Get-IsuLaunchText '      4) Nasdara / Desert    (requires Badlands DLC on Steam)' '      4) Nasdara / Wüste     (braucht Badlands-DLC im Steam-Konto)')
 $mapAns = Read-Host (Get-IsuLaunchText '      Number (Enter = previous/Chernarus)' '      Nummer (Enter = letzte/Chernarus)')
 $sel = $maps[$mapAns]
 if (-not $sel) {
@@ -43,6 +45,15 @@ if (-not $sel) {
     if (-not $sel) { $sel = $maps["1"] }
 }
 Write-Host ((Get-IsuLaunchText '      Map: {0}' '      Karte: {0}') -f $sel.name) -ForegroundColor Green
+
+# Claude-Login VOR dem Serverstart prüfen (16.10.: abgelaufener OAuth-Login
+# kam sonst erst im Spiel als NPC-Sprechblase an). Rein lokal, kein Modellaufruf;
+# bei Bedarf startet preflight --fix direkt 'claude auth login'.
+Write-Host (Get-IsuLaunchText '      Checking Claude login...' '      Prüfe Claude-Login...')
+python (Join-Path $repo "daemon\preflight.py") --login --fix
+if ($LASTEXITCODE -ne 0) {
+    Write-Host (Get-IsuLaunchText "      WARNING: Claude login missing/expired - plan-model NPCs stay silent. Fix: new terminal -> 'claude auth login'." "      WARNUNG: Claude-Login fehlt/abgelaufen - NPCs mit Plan-Modell bleiben stumm. Abhilfe: neues Terminal -> 'claude auth login'.") -ForegroundColor Yellow
+}
 
 # Map-Wechsel an der ECHTEN Server-Config festmachen (welche Karte laedt der
 # Server gerade), NICHT an active_map.txt - das kann mit der cfg auseinander-

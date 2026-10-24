@@ -4,11 +4,12 @@
 Nimmt das lokale Mikrofon (Auto-Auswahl wie mic_listener), transkribiert per
 ElevenLabs Scribe und stellt das Transkript gezielt zu:
 
-  1. NAMENSANSPRACHE: Kommt ein Agentenname im Satz vor ("Igor, komm her"),
-     bekommen genau die genannten Agenten die Nachricht.
-  2. NAEHE: Ohne Namen bekommt sie der Agent, der dem Spieler im Spiel am
-     naechsten steht (aus state_<id>.json: nearby-Spieler-Distanz).
-  3. Sieht kein Agent einen Spieler in der Naehe: Hinweis im Log, verworfen.
+  1. NAMENSANSPRACHE: Beginnt der Satz mit einem Agentennamen ("Igor, komm
+     her", auch "Hey Igor, ..." oder "Victor Conrad, ..." für zwei), bekommen
+     genau die Genannten die Nachricht (privat). Namen werden normalisiert
+     verglichen, damit STT-Schreibweisen wie "Victor"/"Conrad" treffen.
+  2. MAPWEIT: Ohne direkte Anrede hören ALLE aktiven NPCs zu, egal wie weit
+     weg (Spieler-Wunsch) - kein Funk wird verworfen.
 
 Start (durch start_arena): python voice_router.py --selected viktor,birgit
 """
@@ -16,6 +17,7 @@ Start (durch start_arena): python voice_router.py --selected viktor,birgit
 import argparse
 import json
 import os
+import re
 import sys
 import time
 
@@ -36,33 +38,33 @@ REPO_DIR = os.path.dirname(DAEMON_DIR)
 _SERVER_DIR = os.environ.get("DAYZ_SERVER_DIR", r"C:\Program Files (x86)\Steam\steamapps\common\DayZServer")
 PROFILE_DIR = os.path.join(_SERVER_DIR, "profiles", "IsuSurvivor")
 ROSTER_FILE = os.path.join(REPO_DIR, "arena", "agents.json")
-# Effektive (im Spiel-Menue frei gewaehlte) Namen - vom Supervisor geschrieben
+# Effektive (im Spiel-Menü frei gewählte) Namen - vom Supervisor geschrieben
 ACTIVE_ROSTER_FILE = os.path.join(REPO_DIR, "arena", "active_roster.json")
 
 ELEVEN_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
 # MIC_NAME ist der Funk-Absendername des EINEN lokalen Mikrofons (Single-Host,
-# wie bisher). Sprecher-Stempelung laeuft trotzdem ueber die players_registry:
+# wie bisher). Sprecher-Stempelung läuft trotzdem über die players_registry:
 # steht MIC_NAME (oder sein Alias) dort drin, wird der kanonische Funk-Name
-# aus der Registry verwendet (z.B. Tippfehler/Gross-Kleinschreibung in der
+# aus der Registry verwendet (z.B. Tippfehler/Groß-Kleinschreibung in der
 # Env-Variable werden auf die registrierte Schreibweise normalisiert). Ist
-# der Name unbekannt, bleibt MIC_NAME unveraendert - kein Verhaltensbruch.
+# der Name unbekannt, bleibt MIC_NAME unverändert - kein Verhaltensbruch.
 MIC_NAME = os.environ.get("ISU_MIC_NAME", "Player")
 
 
 def resolve_speaker_name(raw_name: str) -> str:
-    """Normalisiert den Funk-Absendername ueber die players_registry.
+    """Normalisiert den Funk-Absendername über die players_registry.
 
     MEHRSPIELER-VORBEREITUNG (noch nicht implementiert): Dieser Router nutzt
-    EIN Mikrofon fuer alle Sprecher (Single-Host-Fluss, mic_listener waehlt
-    EIN Eingabegeraet in main()). Sobald mehrere echte Menschen mit eigenen
+    EIN Mikrofon für alle Sprecher (Single-Host-Fluss, mic_listener wählt
+    EIN Eingabegerät in main()). Sobald mehrere echte Menschen mit eigenen
     Mikros mitspielen sollen, braucht players.json pro Eintrag ein Feld
-    "mic_name" (welches Audiogeraet zu welchem Spieler gehoert) und der
+    "mic_name" (welches Audiogerät zu welchem Spieler gehört) und der
     vorgesehene Weg ist EIN eigener mic_listener/voice_router-Prozess PRO
     Eintrag (je ein --selected-Aufruf mit eigenem ISU_MIC_DEVICE/ISU_MIC_NAME
     in der Prozess-Umgebung), nicht ein einzelner Prozess, der mehrere
-    Geraete gleichzeitig abhoert. Diese Funktion bliebe dabei unveraendert -
+    Geräte gleichzeitig abhört. Diese Funktion bliebe dabei unverändert -
     jeder Prozess stempelt weiterhin nur seinen eigenen MIC_NAME. Bis dahin
-    wird hier NICHTS am mic_listener-Start geaendert (Auflage: Single-Host-
+    wird hier NICHTS am mic_listener-Start geändert (Auflage: Single-Host-
     Fluss darf sich nicht verschlechtern)."""
     if resolve_player is None:
         return raw_name
@@ -70,13 +72,15 @@ def resolve_speaker_name(raw_name: str) -> str:
     if entry and entry.get("funk"):
         return entry["funk"]
     return raw_name
-# Datei-Log: der Router laeuft in einem eigenen Konsolenfenster - stuerzt er
+# Datei-Log: der Router läuft in einem eigenen Konsolenfenster - stürzt er
 # ab, ist das Fenster weg und mit ihm die Spur. Hierhin schreibt er mit.
 LOG_FILE = os.path.join(REPO_DIR, "agent_home", "journal", "voice_router.log")
 
 
 def log(msg: str):
-    line = f"[router] {msg}"
+    # Zeitstempel (Sessionfix 24.10., VI-13/VOICE-2): ohne Uhrzeit ließ sich
+    # weder die STT-Latenz messen noch klären, ob nach 18:17 noch gefunkt wurde.
+    line = f"[{time.strftime('%H:%M:%S')}] [router] {msg}"
     print(line, flush=True)
     try:
         os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -101,11 +105,11 @@ def inbox_append(agent_id: str, entry: dict) -> None:
         pass
 
 
-HEAR_RANGE = 60.0  # Hoerweite wie der Spiel-Chat
+HEAR_RANGE = 60.0  # Hörweite wie der Spiel-Chat
 
 
 def agents_in_earshot(agent_ids: list[str]) -> list[str]:
-    """Alle Agenten, die einen Spieler in Hoerweite haben (State-Dateien).
+    """Alle Agenten, die einen Spieler in Hörweite haben (State-Dateien).
     Funk ohne Namensnennung geht an ALLE davon - wie ein Zuruf im Spiel."""
     out = []
     for agent_id in agent_ids:
@@ -123,8 +127,8 @@ def agents_in_earshot(agent_ids: list[str]) -> list[str]:
 
 
 def load_name_aliases(agent_ids: list[str]) -> dict[str, str]:
-    """Anzeigename (klein) -> Slot-Id. Namen sind im Spiel-Menue frei
-    waehlbar (z.B. birgit-Slot heisst 'Angie'); der Supervisor publiziert
+    """Anzeigename (klein) -> Slot-Id. Namen sind im Spiel-Menü frei
+    wählbar (z.B. birgit-Slot heißt 'Angie'); der Supervisor publiziert
     sie in active_roster.json. Slot-Ids matchen immer mit."""
     aliases = {a.lower(): a for a in agent_ids}
     for path in (ROSTER_FILE, ACTIVE_ROSTER_FILE):  # active zuletzt = gewinnt
@@ -141,21 +145,145 @@ def load_name_aliases(agent_ids: list[str]) -> dict[str, str]:
     return aliases
 
 
+# Anrede-Erkennung (Sessionfix 24.10., VOICE-1): Die STT schreibt "Victor",
+# "Conrad", "Wiktor" - der alte Präfixvergleich mit "viktor"/"konrad" traf
+# das nicht, der Funk ging an alle vier und kostete drei NPCs je einen Zug
+# "betrifft Viktor, nicht mich". Deshalb Namen und Satzanfang normalisiert
+# vergleichen und bis zu einer Namenskette am Satzanfang erkennen.
+_WORD_RE = re.compile(r"[^\W_]+")
+# Vor dem Namen erlaubte Anrede-Floskel ("Hey Viktor, ..."). Bewusst nur
+# eindeutige Grußwörter - "Holt Igor" oder "Folgt Viktor" sind KEINE Anrede.
+_LEAD_GREETINGS = ("hey", "hallo", "hi", "servus")
+# Bindewort zwischen zwei Namen ("Viktor und Konrad, ...")
+_NAME_JOINERS = ("und", "and")
+
+
+def _norm(s: str) -> str:
+    """Schreibweisen-Normalisierung für den Namensvergleich: klein,
+    ph->f, c->k, w->v, Doppelbuchstaben zusammenziehen. Victor/Wiktor ->
+    viktor, Conrad -> konrad. Gilt nur für den Vergleich mit Rufnamen,
+    nie für den zugestellten Text."""
+    s = s.lower().replace("ph", "f").replace("c", "k").replace("w", "v")
+    return re.sub(r"(.)\1+", r"\1", s)
+
+
+_GREETINGS_N = {_norm(g) for g in _LEAD_GREETINGS}
+_JOINERS_N = {_norm(j) for j in _NAME_JOINERS}
+
+
+def _alias_table(aliases: dict[str, str]) -> list[tuple[list[str], str]]:
+    """Normalisierte Rufnamen als Wortfolgen -> Slot-Id, längste zuerst
+    (Mehrwort-Namen aus dem Menü gewinnen vor einem kürzeren Einwort-Namen)."""
+    table = []
+    for alias, aid in aliases.items():
+        toks = [_norm(t) for t in _WORD_RE.findall(alias.lower())]
+        if toks:
+            table.append((toks, aid))
+    table.sort(key=lambda e: -len(e[0]))
+    return table
+
+
+def _name_at(tokens: list[str], i: int, table) -> tuple[str, int]:
+    for toks, aid in table:
+        if tokens[i:i + len(toks)] == toks:
+            return aid, len(toks)
+    return "", 0
+
+
+def addressed_agents(aliases: dict[str, str], text: str) -> list[str]:
+    """Slot-Ids der am Satzanfang direkt Angesprochenen (sortiert, leer =
+    keine direkte Anrede). Erkannt wird: Name als erstes Wort, optional nach
+    einem Grußwort, gefolgt von weiteren Namen bzw. "und <Name>"
+    ("Victor Conrad, ..." -> viktor + konrad). Ein Name erst im zweiten Wort
+    ohne Grußwort ("Holt Igor her") ist keine Anrede."""
+    tokens = [_norm(t) for t in _WORD_RE.findall(text.lower())[:12]]
+    table = _alias_table(aliases)
+    i = 1 if tokens and tokens[0] in _GREETINGS_N else 0
+    found: list[str] = []
+    while i < len(tokens):
+        aid, n = _name_at(tokens, i, table)
+        if not aid and found and tokens[i] in _JOINERS_N:
+            aid, n = _name_at(tokens, i + 1, table)
+            if aid:
+                n += 1
+        if not aid:
+            break
+        found.append(aid)
+        i += n
+    return sorted(set(found))
+
+
 def route(agent_ids: list[str], aliases: dict[str, str],
           text: str) -> tuple[list[str], str]:
-    """(Zielagenten, Begruendung) - Begruendung landet im Debug-Log.
+    """(Zielagenten, Begründung) - Begründung landet im Debug-Log.
 
-    Beginnt der Satz mit einer Anrede ("Igor, ..."), bekommt ihn NUR der
-    Genannte (privater Befehl). OHNE direkte Anrede hoeren ALLE deine NPCs
-    zu - mapweit, egal wie weit weg (Spieler-Wunsch). Hoerweite ist KEINE
+    Beginnt der Satz mit einer Anrede ("Igor, ...", "Victor Conrad, ..."),
+    bekommen ihn NUR die Genannten (privater Befehl), siehe
+    addressed_agents. OHNE direkte Anrede hören ALLE deine NPCs zu -
+    mapweit, egal wie weit weg (Spieler-Wunsch). Hörweite ist KEINE
     Bedingung; so wird kein Funk verworfen, nur weil niemand nahe steht."""
-    text_l = text.lower()
-    lead = text_l.strip()[:24]
-    direct = sorted({aid for alias, aid in aliases.items() if lead.startswith(alias)})
+    direct = addressed_agents(aliases, text)
     if direct:
         return direct, "direkte Anrede (privat)"
-    # MAPWEIT: ohne direkte Anrede an ALLE aktiven NPCs, ueber die ganze Karte.
+    # MAPWEIT: ohne direkte Anrede an ALLE aktiven NPCs, über die ganze Karte.
     return sorted(agent_ids), "mapweit an alle NPCs"
+
+
+# Lebenszeichen der Leseschleife (Sessionfix 24.10., VOICE-2): Ab 18:17 kam
+# 64 min lang kein Funk mehr an, und aus dem Log war nicht zu klären, ob der
+# Spieler schwieg oder stream.read() am Bluetooth-Headset still hing. Jetzt
+# schreibt die Schleife alle HEARTBEAT_SEC eine Zeile (Blockzahl, max. RMS);
+# fehlt sie, hängt das Lesen. Im PTT-Modus wird zusätzlich jeder Tastendruck
+# mit Dauer und Pegel geloggt - ein Druck mit RMS ~0 heißt: Mikro liefert
+# Stille.
+HEARTBEAT_SEC = 60.0
+
+
+class AudioHeartbeat:
+    """Zählt Audio-Blöcke und Pegel und loggt Herzschlag + PTT-Flanken.
+    feed() pro gelesenem Block aufrufen; rein diagnostisch, ändert nichts am
+    Routing."""
+
+    def __init__(self, ptt: bool = False, interval: float = HEARTBEAT_SEC,
+                 logger=None):
+        self.ptt = ptt
+        self.interval = interval
+        self.log = logger or log
+        self.t0 = None
+        self.blocks = 0
+        self.max_rms = 0.0
+        self.presses = 0
+        self.last_hot = None
+        self.press_t = 0.0
+        self.press_max = 0.0
+
+    def feed(self, now: float, level: float, hot: bool) -> None:
+        if self.t0 is None:
+            self.t0 = now
+        self.blocks += 1
+        if level > self.max_rms:
+            self.max_rms = level
+        if self.ptt:
+            if hot and level > self.press_max:
+                self.press_max = level
+            if self.last_hot is not None and hot != self.last_hot:
+                if hot:
+                    self.presses += 1
+                    self.press_t = now
+                    self.press_max = level
+                    self.log(f"PTT gedrückt (Pegel {level:.0f})")
+                else:
+                    self.log(f"PTT losgelassen nach {now - self.press_t:.1f} s, "
+                             f"max. RMS {self.press_max:.0f}")
+            self.last_hot = hot
+        if now - self.t0 >= self.interval:
+            extra = f", PTT {self.presses}x gedrückt" if self.ptt else ""
+            self.log(f"Herzschlag: {self.blocks} Audio-Blöcke in "
+                     f"{now - self.t0:.0f} s, max. RMS {self.max_rms:.0f}{extra}")
+            self.t0 = now
+            self.blocks = 0
+            self.max_rms = 0.0
+            self.presses = 0
 
 
 def main() -> int:
@@ -172,13 +300,13 @@ def main() -> int:
     aliases = load_name_aliases(agent_ids)
     shown = sorted({n.capitalize() for n in aliases})
     log(f"Aktive Agenten/Rufnamen: {', '.join(shown)}")
-    log("ANSPRACHE: Namen im Satz nennen ('Igor, komm her'). OHNE Namen")
-    log("antwortet der Agent, der dir am naechsten steht.")
+    log("ANSPRACHE: Satz mit dem Namen beginnen ('Igor, komm her', auch")
+    log("'Viktor und Konrad, ...'). OHNE Namen hören alle NPCs mit (mapweit).")
 
-    # Sprecher-Stempelung ueber die players_registry (Schnittstelle 5): der
+    # Sprecher-Stempelung über die players_registry (Schnittstelle 5): der
     # rohe MIC_NAME (ISU_MIC_NAME) wird einmalig auf den registrierten
-    # Funk-Namen normalisiert (z.B. andere Gross-/Kleinschreibung oder ein
-    # in players.json hinterlegter Alias). Unbekannter Name -> unveraendert.
+    # Funk-Namen normalisiert (z.B. andere Groß-/Kleinschreibung oder ein
+    # in players.json hinterlegter Alias). Unbekannter Name -> unverändert.
     speaker_name = resolve_speaker_name(MIC_NAME)
     if speaker_name != MIC_NAME:
         log(f"Sprecher '{MIC_NAME}' -> Registry-Funkname '{speaker_name}'.")
@@ -192,7 +320,7 @@ def main() -> int:
 
     mode, ptt_vk, ptt_name = load_mic_mode()
     if mode == "ptt":
-        log(f"PUSH-TO-TALK aktiv: [{ptt_name}] gedrueckt halten zum Sprechen.")
+        log(f"PUSH-TO-TALK aktiv: [{ptt_name}] gedrückt halten zum Sprechen.")
     else:
         log(f"IMMER-OFFEN-Modus: Schwelle {threshold:.0f} (Teppich {floor:.0f}).")
 
@@ -200,6 +328,7 @@ def main() -> int:
     chunks: list[bytes] = []
     voiced = False
     last_voice = 0.0
+    beat = AudioHeartbeat(ptt=(mode == "ptt"))
 
     def flush():
         nonlocal chunks, voiced
@@ -242,6 +371,7 @@ def main() -> int:
             else:
                 hot = level >= threshold
                 tail = GAP_SECONDS
+            beat.feed(now, level, hot)
 
             if hot:
                 if not voiced:

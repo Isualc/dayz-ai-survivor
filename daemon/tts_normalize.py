@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sprechbar-Machen von Zahlen fuer ElevenLabs-TTS (Deutsch).
+"""Sprechbar-Machen von Zahlen für ElevenLabs-TTS (Deutsch).
 
 ElevenLabs verhaspelt sich an rohen Koordinaten (x=4540 z=2525, 3755/9013)
 und Kaliberangaben (9x39, 7,62x39, 12ga) und liefert Kauderwelsch. Diese
@@ -7,13 +7,13 @@ Funktion wandelt genau diese Muster VOR dem TTS-Call in gut sprechbaren
 deutschen Text um:
 
   Koordinaten -> ziffernweise (Funk-Standard, eindeutig):
-      "x=4540 z=2525"   -> "vier fuenf vier null, zwei fuenf zwei fuenf"
-      "3755/9013"       -> "drei sieben fuenf fuenf, neun null eins drei"
+      "x=4540 z=2525"   -> "vier fünf vier null, zwei fünf zwei fünf"
+      "3755/9013"       -> "drei sieben fünf fünf, neun null eins drei"
   Kaliber:
-      "9x39"            -> "neun mal neununddreissig"
-      "7,62x39"         -> "sieben sechs zwei mal neununddreissig"
-      "12ga"            -> "Kaliber zwoelf"
-      ".308" / ".45"    -> "Punkt drei null acht" / "Punkt vier fuenf"
+      "9x39"            -> "neun mal neununddreißig"
+      "7,62x39"         -> "sieben sechs zwei mal neununddreißig"
+      "12ga"            -> "Kaliber zwölf"
+      ".308" / ".45"    -> "Punkt drei null acht" / "Punkt vier fünf"
       "9mm"             -> "neun Millimeter"
       "2x SmallStone"   -> "zwei mal SmallStone"
 
@@ -22,8 +22,8 @@ Bewusst UNANGETASTET (kein Kauderwelsch, ElevenLabs kann das):
   - Waffen-/Item-Namen mit Ziffern: SSG82, CZ527, Izh18, AK74, Saiga12
   - der Slang "x0" (kaputte Waffe), bleibt stehen
 
-Echte deutsche Umlaute im Output (TTS liest sie korrekt); die Docstrings hier
-nutzen ae/oe/ue nur, damit die Datei auf jedem Editor sauber bleibt.
+Echte deutsche Umlaute im Output (TTS liest sie korrekt), ebenso in den
+Docstrings und Kommentaren dieser Datei.
 """
 import re
 
@@ -73,7 +73,7 @@ def num_de(n) -> str:
 
 
 def digits_de(s: str) -> str:
-    """Ziffernfolge -> ziffernweise gesprochen ('4540' -> 'vier fuenf vier null')."""
+    """Ziffernfolge -> ziffernweise gesprochen ('4540' -> 'vier fünf vier null')."""
     return " ".join(_DIG[c] for c in s if c in _DIG)
 
 
@@ -81,11 +81,11 @@ def _coord_pair(m: "re.Match") -> str:
     return f"{digits_de(m.group(1))}, {digits_de(m.group(2))}"
 
 
-# Achsbuchstabe nur als eigenstaendiges x/z werten (nicht in "max=", "Holz=")
+# Achsbuchstabe nur als eigenständiges x/z werten (nicht in "max=", "Holz=")
 _AX = r"(?<![A-Za-zÄÖÜäöü])"
 
-# Abkuerzungen, die ElevenLabs falsch liest ("ca." als "ka", "z.B." buchstabiert).
-# Der Punkt macht sie eindeutig -> gefahrlos ausschreibbar. (?i) = Gross/Klein egal.
+# Abkürzungen, die ElevenLabs falsch liest ("ca." als "ka", "z.B." buchstabiert).
+# Der Punkt macht sie eindeutig -> gefahrlos ausschreibbar. (?i) = Groß/Klein egal.
 _ABBREV = [
     (re.compile(r"(?i)\bz\.\s?b\."), "zum Beispiel"),
     (re.compile(r"(?i)\bd\.\s?h\."), "das heißt"),
@@ -104,7 +104,7 @@ _ABBREV = [
     (re.compile(r"(?i)\bMrd\."), "Milliarden"),
     (re.compile(r"(?i)\bStd\."), "Stunden"),
     # "ca." oder blankes "ca" vor Leerzeichen -> circa. "Camp"/"circa" bleiben
-    # unberuehrt (kein Wortanfang-"ca" + Punkt/Leerzeichen dahinter).
+    # unberührt (kein Wortanfang-"ca" + Punkt/Leerzeichen dahinter).
     (re.compile(r"(?i)\bca\.?(?=\s)"), "circa"),
 ]
 # Sonderzeichen, die TTS verschluckt oder falsch liest.
@@ -122,25 +122,25 @@ def normalize_for_tts(text: str) -> str:
         return text
     t = text
 
-    # ---------- Abkuerzungen & Sonderzeichen ausschreiben (ZUERST, damit die
-    # Punkte in "z.B." nicht spaeter in die Kaliber-/Koordinaten-Regex geraten) --
+    # ---------- Abkürzungen & Sonderzeichen ausschreiben (ZUERST, damit die
+    # Punkte in "z.B." nicht später in die Kaliber-/Koordinaten-Regex geraten) --
     for _pat, _rep in _ABBREV:
         t = _pat.sub(_rep, t)
     for _pat, _rep in _SYMBOLS:
         t = _pat.sub(_rep, t)
 
     # ---------- Kaliber zuerst (brauchen x/Komma/Punkt zwischen Ziffern) -------
-    # 7,62x39 / 5.56x45 -> Praefix ziffernweise, Rest Kardinal
+    # 7,62x39 / 5.56x45 -> Präfix ziffernweise, Rest Kardinal
     t = re.sub(
         r"(?<!\d)(\d{1,2})[.,](\d{2})\s*[x×]\s*(\d{2,3})(?!\d)",
         lambda m: f"{digits_de(m.group(1) + m.group(2))} mal {num_de(m.group(3))}",
         t)
-    # 9x39 / 7x57 (ohne Komma) -> "neun mal neununddreissig"
+    # 9x39 / 7x57 (ohne Komma) -> "neun mal neununddreißig"
     t = re.sub(
         r"(?<![\w.,])(\d{1,2})\s*[x×]\s*(\d{2})(?!\d)",
         lambda m: f"{num_de(m.group(1))} mal {num_de(m.group(2))}",
         t)
-    # 12ga / 12 ga -> "Kaliber zwoelf"
+    # 12ga / 12 ga -> "Kaliber zwölf"
     t = re.sub(
         r"(?<!\d)(\d{1,2})\s*ga\b",
         lambda m: f"Kaliber {num_de(m.group(1))}",
@@ -162,9 +162,9 @@ def normalize_for_tts(text: str) -> str:
         t)
 
     # ---------------------------- Einheiten -----------------------------------
-    # Abgekuerzte Einheiten hinter einer Zahl ausschreiben: "300m" -> "300 Meter",
-    # "2km" -> "2 Kilometer". km VOR m. Der \b-Anker schuetzt "mm" (oben schon
-    # Millimeter), die Lookbehind (_AX, kein Buchstabe davor) schuetzt Waffen-
+    # Abgekürzte Einheiten hinter einer Zahl ausschreiben: "300m" -> "300 Meter",
+    # "2km" -> "2 Kilometer". km VOR m. Der \b-Anker schützt "mm" (oben schon
+    # Millimeter), die Lookbehind (_AX, kein Buchstabe davor) schützt Waffen-
     # namen wie "Izh18m". Die Zahl bleibt Ziffer (ElevenLabs liest "300 Meter"
     # sauber); ausgeschriebenes "Meter" wird durch das kleine "m" NICHT getroffen.
     t = re.sub(_AX + r"(\d{1,4})\s*km\b", lambda m: f"{m.group(1)} Kilometer", t)
@@ -193,7 +193,7 @@ def normalize_for_tts(text: str) -> str:
 
 
 if __name__ == "__main__":
-    # Selbsttest gegen echte Journal-Beispiele + Randfaelle. Aufruf:
+    # Selbsttest gegen echte Journal-Beispiele + Randfälle. Aufruf:
     #   python daemon/tts_normalize.py
     CASES = [
         # --- echte Journal-Zeilen (mcp__dayz__say) ---
@@ -224,7 +224,7 @@ if __name__ == "__main__":
         "Hab 9mm und ein paar Patronen.",
         "Treffen bei 4540 2525 oder am Punkt 3700/9000.",
         "max=500 Liter Wasser im Tank.",  # Falle: darf nicht zu Koordinate werden
-        # --- Abkuerzungen & Symbole (sollen ausgeschrieben werden) ---
+        # --- Abkürzungen & Symbole (sollen ausgeschrieben werden) ---
         "Treffpunkt ca. 300 Meter weiter, z.B. beim Brunnen.",
         "HP bei 65%, Kälte usw. - bzw. später nachschauen.",
         "~500 Meter östlich, ggf. Loot.",
@@ -235,7 +235,7 @@ if __name__ == "__main__":
         # --- Einheiten m/km hinter Zahl ausschreiben ---
         "~300m östlich, noch 2km bis zum Lager.",
         "Infizierter 36m südlich, komm runter auf 5m.",
-        # --- diese duerfen NICHT angefasst werden ---
+        # --- diese dürfen NICHT angefasst werden ---
         "Infizierter, 36 Meter südlich. Vorsicht.",   # ausgeschrieben bleibt
         "Merk mir: Vikhr = 9x39. Hab auch 9mm dabei.",  # 9mm bleibt Millimeter
     ]

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Smoke-Test fuer das intent()-Tool (Gedanken-HUD).
+"""Smoke-Test für das intent()-Tool (Gedanken-HUD).
 
-Ruft intent() ueber den MCP-Server auf und prueft, dass intent_<id>.txt
+Ruft intent() über den MCP-Server auf und prüft, dass intent_<id>.txt
 atomar mit dem erwarteten UTF-8-Inhalt (inkl. Umlaut) geschrieben wird.
 Braucht den DayZ-Server NICHT - testet nur den Daemon-/Datei-Pfad.
 """

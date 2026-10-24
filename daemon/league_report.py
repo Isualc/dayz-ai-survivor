@@ -1,11 +1,11 @@
-"""IsuSurvivor Liga-Report — Aggregation pro Modell/Agent ueber alle Sessions.
+"""IsuSurvivor Liga-Report — Aggregation pro Modell/Agent über alle Sessions.
 
-Parst die Journale aller agent_home(s), zusaetzlich (falls vorhanden) die
+Parst die Journale aller agent_home(s), zusätzlich (falls vorhanden) die
 Positions-/HP-Tracks aus arena/tracks_*.jsonl, und schreibt fortschreibend:
   - arena/league.json  (Rohdaten, gemerged pro Session-ID)
   - arena/league.html  (sortierbare Tabelle, stdlib-only, kein JS-Framework)
 
-Eigenstaendig aufrufbar:
+Eigenständig aufrufbar:
     python daemon\\league_report.py                # alle Journale seit je
     python daemon\\league_report.py --since 20260701
     python daemon\\league_report.py --session <id>  # nur eine Session
@@ -15,11 +15,11 @@ selbst, dass Journale/Tracks fehlen oder kaputt sind - bricht dann NICHT ab,
 sondern liefert einen Report mit den Daten, die lesbar waren.
 
 Es gibt bewusst KEIN persistentes BR-Kampf-Log (_br_monitor.py schreibt nur
-nach stdout) - Tode/Ueberlebensdauer werden daher ausschliesslich aus den
+nach stdout) - Tode/Überlebensdauer werden daher ausschließlich aus den
 Journal-Marken [TOD] und den Zug-/Session-Grenzen abgeleitet. Tokens/Kosten
 sind bei usage-blinden CCR-Backends (openai/google/xai via claude-code-router)
-NICHT ableitbar und werden dann explizit als "n/a" gefuehrt, NIEMALS als 0 -
-0 wuerde faelschlich "kostenlos" suggerieren statt "nicht messbar".
+NICHT ableitbar und werden dann explizit als "n/a" geführt, NIEMALS als 0 -
+0 würde fälschlich "kostenlos" suggerieren statt "nicht messbar".
 """
 
 import argparse
@@ -89,8 +89,8 @@ def _load_roster() -> dict:
 def session_id_for(path: str) -> str:
     """Journal-Datei -> Session-ID (Datumsstempel des Dateinamens). Mehrere
     Agenten, die im selben Sekundenfenster gestartet wurden, teilen sich
-    naeherungsweise dieselbe Runde; exakte Rundenzuordnung ist ohne
-    Supervisor-Metadaten nicht moeglich, darum gilt: Session = Tag_Uhrzeit
+    näherungsweise dieselbe Runde; exakte Rundenzuordnung ist ohne
+    Supervisor-Metadaten nicht möglich, darum gilt: Session = Tag_Uhrzeit
     des JEWEILIGEN Journals (pro-Agent-Session, nicht global-Runde)."""
     m = JOURNAL_NAME_RE.search(os.path.basename(path))
     if m:
@@ -184,7 +184,7 @@ def parse_journal(path: str) -> dict:
                     cur = float(mz.group(6))
                     saw_usd = True
                     if cur < prev_usd - 1e-9:
-                        seg_usd += prev_usd  # Reset (Rotation/Tod) -> Segment abschliessen
+                        seg_usd += prev_usd  # Reset (Rotation/Tod) -> Segment abschließen
                     prev_usd = cur
     except OSError:
         return result
@@ -198,10 +198,10 @@ def parse_journal(path: str) -> dict:
 
 
 def is_usage_blind(model: str) -> bool:
-    """CCR-Backends (openai/google/xai-Provider ueber claude-code-router)
+    """CCR-Backends (openai/google/xai-Provider über claude-code-router)
     melden Token-Usage=0 -> Kosten nicht ableitbar, siehe Memory
-    gemini_rotation_blind_usage0. Modellname traegt bei CCR das Provider-
-    Praefix (z.B. "openai,gpt-5.5", "google,gemini-3.5-flash")."""
+    gemini_rotation_blind_usage0. Modellname trägt bei CCR das Provider-
+    Präfix (z.B. "openai,gpt-5.5", "google,gemini-3.5-flash")."""
     m = (model or "").lower()
     return m.startswith(("openai,", "google,", "gemini,", "xai,", "grok"))
 
@@ -496,7 +496,7 @@ def main():
         write_league_json(merged)
 
         roster = _load_roster()
-        # Fuer die Auswertung ALLE gemergten Sessions heranziehen (fortschreibend),
+        # Für die Auswertung ALLE gemergten Sessions heranziehen (fortschreibend),
         # nicht nur die gerade neu geparsten.
         summary = summarize(merged["sessions"], roster)
         write_league_html(summary["by_agent"], summary["by_model"], len(merged["sessions"]))

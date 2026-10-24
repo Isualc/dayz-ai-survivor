@@ -1,20 +1,20 @@
-"""IsuSurvivor Zuschauer-Server — read-only Webserver fuer Twitch/OBS.
+"""IsuSurvivor Zuschauer-Server — read-only Webserver für Twitch/OBS.
 
 Aggregiert die state_<id>.json / intent_<id>.txt der Bridge sowie die letzten
-Journal-Zeilen jedes aktiven Agenten und liefert sie ueber ein einfaches
+Journal-Zeilen jedes aktiven Agenten und liefert sie über ein einfaches
 JSON-API plus ein eingebettetes Single-File-HTML-Dashboard aus. Schreibt
 NIEMALS in commands_<id>.json oder sonst irgendeine Steuerdatei - reiner
 Beobachter, wie der Orchestrator selbst.
 
 Nebenbei: Track-Logger, der alle 5s Position/HP/Blut jedes Agenten nach
-arena/tracks_<session>.jsonl anhaengt (Grundlage fuer match_story.py und
+arena/tracks_<session>.jsonl anhängt (Grundlage für match_story.py und
 league_report.py).
 
 Aufruf:
     python daemon\\spectator_server.py [--port 8090] [--session <name>]
 
-Port ueber Env ISU_SPECTATOR_PORT ueberschreibbar (Default 8090).
-Nur stdlib, keine Abhaengigkeiten.
+Port über Env ISU_SPECTATOR_PORT überschreibbar (Default 8090).
+Nur stdlib, keine Abhängigkeiten.
 """
 
 import argparse
@@ -109,8 +109,8 @@ def _latest_journal(npc_id: str) -> str:
 
 
 def _tail_lines(path: str, n: int = 400) -> list:
-    """Simples Tail: bei Journal-Groessen im Bereich weniger MB reicht ein
-    kompletter Read + Slice, kein Seek-Backwards-Gefrickel noetig."""
+    """Simples Tail: bei Journal-Größen im Bereich weniger MB reicht ein
+    kompletter Read + Slice, kein Seek-Backwards-Gefrickel nötig."""
     if not path:
         return []
     try:
@@ -122,8 +122,8 @@ def _tail_lines(path: str, n: int = 400) -> list:
 
 
 def _last_meaningful(npc_id: str) -> dict:
-    """Letzte Aktion/Gedanke/Kosten aus dem juengsten Journal ableiten.
-    Prioritaet fuer 'Gedanke': [<NAME>]-Sagezeile > [WECKRUF]. Aktion: letzte
+    """Letzte Aktion/Gedanke/Kosten aus dem jüngsten Journal ableiten.
+    Priorität für 'Gedanke': [<NAME>]-Sagezeile > [WECKRUF]. Aktion: letzte
     [TOOL]-Zeile. Kosten: letzte [TOKENS ZUG]-Zeile (Modell, kumulierte USD)."""
     path = _latest_journal(npc_id)
     lines = _tail_lines(path, 300)
@@ -208,7 +208,7 @@ def build_state() -> dict:
 
 
 class TrackLogger(threading.Thread):
-    """Haengt alle INTERVAL Sekunden einen Positions-Snapshot pro Agent an
+    """Hängt alle INTERVAL Sekunden einen Positions-Snapshot pro Agent an
     arena/tracks_<session>.jsonl an. Reiner Beobachter, keine Steuerdatei."""
 
     INTERVAL = 5.0
@@ -226,7 +226,7 @@ class TrackLogger(threading.Thread):
                 with open(self.path, "a", encoding="utf-8") as f:
                     f.write(json.dumps(snap, ensure_ascii=False) + "\n")
             except Exception:
-                pass  # Track-Logging darf den Server nie mitreissen
+                pass  # Track-Logging darf den Server nie mitreißen
             self._stop.wait(self.INTERVAL)
 
     def stop(self):
@@ -463,7 +463,7 @@ def main():
     parser.add_argument("--port", type=int,
                          default=int(os.environ.get("ISU_SPECTATOR_PORT", "8090")))
     parser.add_argument("--session", default=datetime.now().strftime("%Y%m%d_%H%M%S"),
-                         help="Session-ID fuer die tracks_<session>.jsonl")
+                         help="Session-ID für die tracks_<session>.jsonl")
     parser.add_argument("--no-tracks", action="store_true",
                          help="Track-Logger deaktivieren (nur Dashboard/API)")
     args = parser.parse_args()

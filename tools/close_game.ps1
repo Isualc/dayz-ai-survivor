@@ -20,15 +20,49 @@ Write-Host "[1/5] Agenten sanft stoppen (stop.flag) - despawnt + sichert Inventa
 $homes = @(Join-Path $repo "agent_home")
 $homes += (Get-ChildItem (Join-Path $repo "agent_homes") -Directory -ErrorAction SilentlyContinue |
            ForEach-Object { $_.FullName })
+$flags = @()
 foreach ($h in $homes) {
     $flag = Join-Path $h "stop.flag"
     try {
         if (-not (Test-Path $flag)) { New-Item -ItemType File -Path $flag | Out-Null }
         else { (Get-Item $flag).LastWriteTime = Get-Date }
+        $flags += $flag
     } catch {}
 }
-Write-Host "      warte auf sauberes Despawnen/Inventar-Sichern (8 s)..."
-Start-Sleep -Seconds 8
+
+# Laufende Runner (run_agent.py) - frische Prozessliste pro Abfrage.
+function Get-RunnerProcs {
+    @(Get-CimInstance Win32_Process |
+      Where-Object { $_.CommandLine -and $_.CommandLine -match "run_agent\.py" })
+}
+
+# Statt fester 8 s bis zu 25 s warten (Sessionfix 24.10., RUN-4): der
+# finally-Pfad im Runner braucht bei laufendem Zug bis 15 s (Gehirn) plus bis
+# 10 s (despawn). Nach 8 s fehlte bei Viktor/Birgit "Koerper despawnt".
+# Fertig, sobald kein Runner mehr laeuft oder alle stop.flag-Dateien weg sind
+# (der Supervisor raeumt sie nach dem Runner-Ende weg; run_agent selbst
+# loescht seine Flag erst beim naechsten Start).
+$maxWait = 25
+Write-Host ("      warte auf sauberes Despawnen/Inventar-Sichern (max. {0} s)..." -f $maxWait)
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+$done = $false
+while ((-not $done) -and ($sw.Elapsed.TotalSeconds -lt $maxWait)) {
+    $runners = Get-RunnerProcs
+    $left = @($flags | Where-Object { Test-Path $_ })
+    if ($runners.Count -eq 0) {
+        Write-Host ("      alle Runner beendet nach {0:N0} s." -f $sw.Elapsed.TotalSeconds)
+        $done = $true
+    } elseif ($left.Count -eq 0) {
+        Write-Host ("      alle stop.flag-Dateien abgearbeitet nach {0:N0} s." -f $sw.Elapsed.TotalSeconds)
+        $done = $true
+    } else {
+        Start-Sleep -Milliseconds 500
+    }
+}
+if (-not $done) {
+    $n = (Get-RunnerProcs).Count
+    Write-Host ("      Zeitlimit {0} s erreicht, {1} Runner laufen noch - werden hart beendet." -f $maxWait, $n) -ForegroundColor Yellow
+}
 
 # 2)-3) Hintergrund-Prozesse beenden (halten keine Persistenz -> Force ok).
 function Kill-ByCmd([string]$pattern, [string]$label) {

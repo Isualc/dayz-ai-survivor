@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline-Tests fuer die Effizienz-Fixes vom 2026-06-16 (kein Server noetig):
+"""Offline-Tests für die Effizienz-Fixes vom 2026-06-16 (kein Server nötig):
 
   * Alias-Params der MCP-Tools (wear/find_item/drop/give_to) - ein vertippter
     Parametername darf den needle nicht mehr leeren.
@@ -101,7 +101,7 @@ class FireBridge:
         return {"status": "done"}
 
 
-# Feuer 2m oestlich, NPC bei (100,100): Rueckzug muss WEITER weg vom Feuer sein
+# Feuer 2m östlich, NPC bei (100,100): Rückzug muss WEITER weg vom Feuer sein
 fb = FireBridge({"pos_x": 100.0, "pos_z": 100.0},
                 [{"kind": "fire_burning", "x": 102.0, "z": 100.0}])
 tactics._retreat_from_fire(fb, dist=6.0)
@@ -113,7 +113,7 @@ check("Rueckzug ist WEITER vom Feuer weg (6 m statt 2 m)",
       moved is not None and abs(new_d - 6.0) < 0.01 and new_d > old_d,
       f"alt={old_d:.1f}m neu={new_d:.1f}m")
 
-# Kein Feuer in der Naehe -> kein move_to
+# Kein Feuer in der Nähe -> kein move_to
 fb2 = FireBridge({"pos_x": 5.0, "pos_z": 5.0}, [{"kind": "item", "x": 6.0, "z": 5.0}])
 tactics._retreat_from_fire(fb2)
 check("kein Feuer -> kein Rueckzug", fb2.move is None)

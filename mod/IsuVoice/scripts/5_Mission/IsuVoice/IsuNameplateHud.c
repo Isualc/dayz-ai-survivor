@@ -122,20 +122,36 @@ class IsuNameplateHud
 		}
 
 		vector cam = GetGame().GetCurrentCameraPosition();
+		int nowMs = GetGame().GetTime();
 		ref array<string> stale = new array<string>();
 		int overflow = 4;
 
 		foreach (string key, IsuAgentTag t : IsuNametagStore.s_Agents)
 		{
-			Object obj = GetGame().GetObjectByNetworkId(t.low, t.high);
-			if (!obj)
+			// Abraeumen erst nach IsuNametagStore.STALE_MS (10 s) ohne Server-
+			// RPC (despawnt, Agent nicht mehr gefuehrt, Leiche ohne Remove):
+			// Key vormerken und nach der Iteration entfernen (kein Leak, kein
+			// Iterator-Bruch). NICHT mehr pro Frame loeschen, nur weil das
+			// Objekt nicht aufloesbar ist - ferne Agenten ausserhalb der
+			// Netzwerk-Bubble (~1 km) bleiben so fuer das Squad-HUD erhalten
+			// (Position per RPC_AGENTPOS). Leichen raeumt das Remove-Signal
+			// (RPC_NAMETAG packed < 0) weiterhin sofort ab.
+			if (IsuNametagStore.IsStale(t, nowMs))
 			{
-				// Despawnt oder ausserhalb der Netzwerk-Bubble: Key vormerken
-				// und nach der Iteration entfernen (kein Leak, kein Iterator-
-				// Bruch). Lebende Agenten kommen per Nametag-RPC wieder rein.
 				stale.Insert(key);
 				continue;
 			}
+
+			// Noch ohne Namen (Position/Intent/Sprechblase kam vor dem ersten
+			// Nametag-RPC): kein namenloses Schild zeigen.
+			if (t.name == "")
+				continue;
+
+			// Ausserhalb der Bubble: kein Schild (MAX_DIST liegt ohnehin weit
+			// darunter), der Eintrag bleibt aber im Store.
+			Object obj = GetGame().GetObjectByNetworkId(t.low, t.high);
+			if (!obj)
+				continue;
 
 			vector head = obj.GetPosition();
 			head[1] = head[1] + 2.0;
@@ -201,7 +217,6 @@ class IsuNameplateHud
 			// langsam aus (Alpha Text + Hintergrund), statt hart zu verschwinden.
 			ImageWidget sbg = m_SpeechBgs[poolIdx];
 			TextWidget spt = m_Speeches[poolIdx];
-			int nowMs = GetGame().GetTime();
 			bool showSpeech = IsuArenaMenu.s_ComicChat && t.speech != "" && nowMs < t.speechExpiry + SPEECH_FADE_MS;
 			if (showSpeech && spt && sbg)
 			{

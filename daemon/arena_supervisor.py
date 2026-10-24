@@ -2,11 +2,11 @@
 """IsuSurvivor Arena-Supervisor - startet/stoppt die Agenten auf Befehl aus
 dem Spiel.
 
-Das In-Game-Menue (IsuVoice, Taste Einfg) schickt seine Befehle per RPC
+Das In-Game-Menü (IsuVoice, Taste Einfg) schickt seine Befehle per RPC
 an den Server; die IsuSurvivor-Mod schreibt sie in arena_request.txt im
 Server-Profil. Dieser Supervisor pollt die Datei, verwaltet die
-run_agent-Prozesse und meldet den Zustand ueber arena_status.txt zurueck
-(die Mod funkt ihn ins Menue).
+run_agent-Prozesse und meldet den Zustand über arena_status.txt zurück
+(die Mod funkt ihn ins Menü).
 
 Befehlsformat (eine Zeile, Pipe-getrennt). Pro Agent:
   <slot>:<an>:<modell>[:<persona>[:<name>]]
@@ -16,8 +16,8 @@ hostile:<n> ist das Modus-Encoding: 0 = Neutral (Coop), 1 = Hostile (Battle
 Royale), 2 = Free (freier Survival-Modus: 1 Leben, kein BR, kein Rally-Marsch,
 keine Missionen, run_agent bekommt --free).
 orch:1 schaltet den Orchestrator (Schiedsrichter/Lagezentrum, daemon/orchestrator.py)
-zu - AUS laufen die Agenten voellig unabhaengig (sauberer Modell-Benchmark).
-Persona-Schluessel = Dateiname in daemon/characters/<key>.md
+zu - AUS laufen die Agenten völlig unabhängig (sauberer Modell-Benchmark).
+Persona-Schlüssel = Dateiname in daemon/characters/<key>.md
 (jaeger, bauer, sanitaeter, exmilitaer, kampfmaschine). Fehlt persona/name,
 gelten die Defaults aus arena/agents.json.
 
@@ -50,10 +50,10 @@ CHARACTERS_DIR = os.path.join(REPO_DIR, "daemon", "characters")
 DISCORD_FILE = os.path.join(REPO_DIR, "arena", "discord.json")
 ACTIVE_MAP_FILE = os.path.join(REPO_DIR, "arena", "active_map.txt")
 SERVER_LOADOUTS = os.path.join(_SERVER_DIR, "profiles", "ExpansionMod", "Loadouts")
-# Battle-Royale: einheitliches, faires Leicht-Loadout fuer ALLE vier (Pistole +
+# Battle-Royale: einheitliches, faires Leicht-Loadout für ALLE vier (Pistole +
 # 1 Magazin, Rest wird unterwegs gelootet). Liegt in SERVER_LOADOUTS.
 BR_LOADOUT = "IsuBrLoadout.json"
-# Ambient-AI-Patrouillen (Expansion) je Karte: Menue-Toggle schreibt das
+# Ambient-AI-Patrouillen (Expansion) je Karte: Menü-Toggle schreibt das
 # Top-Level-"Enabled" der Mission-AIPatrolSettings. active_map() -> Mission-Ordner.
 MPMISSIONS = os.path.join(_SERVER_DIR, "mpmissions")
 MISSION_DIRS = {
@@ -61,24 +61,27 @@ MISSION_DIRS = {
     "enoch": "dayzOffline.enoch",
     "livonia": "dayzOffline.enoch",
     "sakhal": "dayzOffline.sakhal",
+    "nasdara": "dayzOffline.nasdara",
+    "badlands": "dayzOffline.nasdara",
 }
 
 # Standard-Lagerpunkt je Karte (Land, nicht im Wasser). Wird genommen, wenn
-# der Spieler im Menue keinen eigenen Punkt gesetzt hat (= Chernarus-Default).
+# der Spieler im Menü keinen eigenen Punkt gesetzt hat (= Chernarus-Default).
 MAP_CAMPS = {
     "chernarus": (4233.7, 8512.2),
-    "enoch": (7900.0, 6700.0),    # zentral Livonia, Landesinneres zwischen Radunin/Lembork (KEIN Flugplatz - frueher faelschlich "Lukow Airfield")
-    "sakhal": (7680.0, 7800.0),   # Petropavlovsk-Sakhalinsk (Hauptstadt, West-Mitte) - offener Platz mitten in der Stadt, ~13m frei von Gebaeuden, Land ~5m. (Alter Punkt 7400/5500 lag im Wasser.) Verifiziert aus mapgrouppos.xml der Sakhal-Mission.
+    "enoch": (7900.0, 6700.0),    # zentral Livonia, Landesinneres zwischen Radunin/Lembork (KEIN Flugplatz - früher fälschlich "Lukow Airfield")
+    "sakhal": (7680.0, 7800.0),   # Petropavlovsk-Sakhalinsk (Hauptstadt, West-Mitte) - offener Platz mitten in der Stadt, ~13m frei von Gebäuden, Land ~5m. (Alter Punkt 7400/5500 lag im Wasser.) Verifiziert aus mapgrouppos.xml der Sakhal-Mission.
+    "nasdara": (8528.0, 8669.0),  # Badlands-DLC (16.10.): größte Stadt im Kartenzentrum, ~160 Gebäude im 250-m-Radius, Freifläche >=12 m zum nächsten Gebäude, ~260 m Höhe. Nasdara ist komplett Binnenland (kein Meer). Aus mapgrouppos.xml der Nasdara-Mission.
 }
 CHERNARUS_DEFAULT = (4233.7, 8512.2)
 
-# Skript-Missionen: vordefinierte Szenarien (Menue-Knopf "Mission"). Seit dem
+# Skript-Missionen: vordefinierte Szenarien (Menü-Knopf "Mission"). Seit dem
 # Missions-Engine-Umbau liegen die Definitionen als Daten in
-# arena/missions/<id>.json (v1: birgit, horde) und werden ueber daemon/missions.py
-# geladen. Das Menue schickt weiterhin "mission:<id>" ueber den bestehenden
+# arena/missions/<id>.json (v1: birgit, horde) und werden über daemon/missions.py
+# geladen. Das Menü schickt weiterhin "mission:<id>" über den bestehenden
 # Kanal; unbekannte IDs geben einen Fehlerstatus. WICHTIG (Konvention wie
-# s_LangCodes == LANG_NAMES): Missions-Liste im Mod-Menue == Dateiliste.
-# Die Birgit-Rettung (Trupp + Gefangene, Kopa-Gefaengnis x5968 z9102, Banditen
+# s_LangCodes == LANG_NAMES): Missions-Liste im Mod-Menü == Dateiliste.
+# Die Birgit-Rettung (Trupp + Gefangene, Kopa-Gefängnis x5968 z9102, Banditen
 # als feste Raiders-Patrouille der Livonia-AIPatrolSettings) steckt komplett in
 # birgit.json; die Freilassungs-Heuristik bleibt hier (check_birgit_release).
 
@@ -104,8 +107,8 @@ def start_voice_bots(cfg: dict, roster: dict) -> list:
     bots = dcfg.get("bots") or {}
     default_channel = dcfg.get("default_channel", "DayZ")
 
-    # Laeuft der lokale Mikro-Router (gleiche Bedingung wie sein Start in
-    # Arena.start), duerfen die Bots NICHT zusaetzlich hoeren - sonst kommt
+    # Läuft der lokale Mikro-Router (gleiche Bedingung wie sein Start in
+    # Arena.start), dürfen die Bots NICHT zusätzlich hören - sonst kommt
     # jeder Funkspruch doppelt an (Router + Bot-Ohr, je eigenes Transkript)
     no_listen = bool(os.environ.get("ELEVENLABS_API_KEY"))
 
@@ -128,7 +131,7 @@ def start_voice_bots(cfg: dict, roster: dict) -> list:
         token_env = bot.get("token_env", "")
         channel = bot.get("channel", default_channel)
         if token_env and os.environ.get(token_env):
-            # Log in Datei statt fluechtigem Konsolenfenster - nur so laesst
+            # Log in Datei statt flüchtigem Konsolenfenster - nur so lässt
             # sich ein stummer Bot hinterher diagnostizieren
             logdir = os.path.join(home, "journal")
             os.makedirs(logdir, exist_ok=True)
@@ -181,11 +184,11 @@ def start_voice_bots(cfg: dict, roster: dict) -> list:
 
 # Spawn-Versatz der vier Agenten um den Lagerpunkt (NW, NO, SW, SO)
 # "Getrennt": die Agenten spawnen WEIT auseinander (~45 m in die vier
-# Diagonalen, also 90-130 m Abstand) und marschieren dann selbststaendig zum
+# Diagonalen, also 90-130 m Abstand) und marschieren dann selbstständig zum
 # Treffpunkt (= Lager), wo sie sich im Coop vereinen - ohne den Spieler (der
 # Konvergenz-Auftrag kommt per --rally an run_agent). Distanz bewusst moderat,
 # damit alle vier Punkte am Orts-/Stadtlager auf Land bleiben (ResolvePos in der
-# Mod prueft kein Wasser; am Sakhal-Stadtlager 7680/7800 verifiziert).
+# Mod prüft kein Wasser; am Sakhal-Stadtlager 7680/7800 verifiziert).
 SPAWN_OFFSETS = {
     "viktor": (-45.0, -45.0),
     "birgit": (45.0, -45.0),
@@ -193,7 +196,7 @@ SPAWN_OFFSETS = {
     "konrad": (45.0, 45.0),
 }
 # "Als Gruppe": enger Cluster am Lager statt der ~14-m-Streuung, damit die
-# Agenten direkt beisammen starten (Menue-Schalter "Spawn: als Gruppe").
+# Agenten direkt beisammen starten (Menü-Schalter "Spawn: als Gruppe").
 GROUP_OFFSETS = {
     "viktor": (-2.0, -2.0),
     "birgit": (2.0, -2.0),
@@ -203,14 +206,14 @@ GROUP_OFFSETS = {
 # Maximal-Streuung: jeder Agent spawnt in einer ANDEREN Stadt (km weit) und
 # marschiert dann selbst zum Treffpunkt (= Lager), wo sich die Gruppe vereint.
 # ABSOLUTE Koordinaten pro Karte (NICHT lagerrelativ). Aus den Server-Mission-
-# Dateien (mapgrouppos.xml) als dichte Gebaeude-Cluster verifiziert = Land.
-# Fehlt eine Karte/ein Slot hier, faellt der getrennte Spawn auf SPAWN_OFFSETS
-# (~45 m) zurueck. Distanz bewusst <= ~5 km, damit der Marsch (auf Sakhal in
-# toedlicher Kaelte) machbar bleibt.
-# Spawn-Versatz fuer einen Agenten. Die vier Klassiker behalten ihre kuratierten
-# Diagonal-Offsets; Zusatz-Slots (npc5..npc10) verteilen sich gleichmaessig auf
+# Dateien (mapgrouppos.xml) als dichte Gebäude-Cluster verifiziert = Land.
+# Fehlt eine Karte/ein Slot hier, fällt der getrennte Spawn auf SPAWN_OFFSETS
+# (~45 m) zurück. Distanz bewusst <= ~5 km, damit der Marsch (auf Sakhal in
+# tödlicher Kälte) machbar bleibt.
+# Spawn-Versatz für einen Agenten. Die vier Klassiker behalten ihre kuratierten
+# Diagonal-Offsets; Zusatz-Slots (npc5..npc10) verteilen sich gleichmäßig auf
 # einem Ring, 22.5 Grad versetzt zu den Diagonalen, damit niemand auf einem der
-# Stammplaetze (oder frueher: exakt auf dem Lagerpunkt, Offset 0/0) landet.
+# Stammplätze (oder früher: exakt auf dem Lagerpunkt, Offset 0/0) landet.
 def spawn_offset(aid: str, ring_index: int, ring_total: int, separate: bool) -> tuple:
     table = SPAWN_OFFSETS if separate else GROUP_OFFSETS
     if aid in table:
@@ -225,33 +228,42 @@ def spawn_offset(aid: str, ring_index: int, ring_total: int, separate: bool) -> 
 
 
 SCATTER_TOWNS = {
-    # Punkte sind gebaeudefreie Stellen (>=9 m Abstand) im jeweiligen Stadtkern,
+    # Punkte sind gebäudefreie Stellen (>=9 m Abstand) im jeweiligen Stadtkern,
     # verifiziert, damit kein NPC in einem Haus stecken bleibt.
     "sakhal": {
         "viktor": (5490.0, 10108.0),    # West-Stadt         ~3,2 km NW vom Lager
         "birgit": (10869.0, 6305.0),    # Slum-Stadt         ~3,5 km SO
-        "igor":   (6086.0, 7299.0),     # SW-Dorf (naechste)  ~1,7 km SW
+        "igor":   (6086.0, 7299.0),     # SW-Dorf (nächste)  ~1,7 km SW
         "konrad": (12703.0, 7278.0),    # Ost-Stadt          ~5,0 km O
     },
-    # Chernarus-Lager 4233/8512 (West-Hochland nahe Vybor/Mil). Hoehen 195-307 m
-    # = kontinentales Hochland (kein Wasser). Keine toedliche Kaelte.
+    # Chernarus-Lager 4233/8512 (West-Hochland nahe Vybor/Mil). Höhen 195-307 m
+    # = kontinentales Hochland (kein Wasser). Keine tödliche Kälte.
     "chernarus": {
-        "viktor": (6032.0, 7792.0),     # Zentral-Dorf       ~1,9 km SO (naechste)
+        "viktor": (6032.0, 7792.0),     # Zentral-Dorf       ~1,9 km SO (nächste)
         "birgit": (2704.0, 5248.0),     # Zelenogorsk        ~3,6 km SW
         "igor":   (3422.0, 12939.0),    # NW-Dorf            ~4,5 km NW
         "konrad": (9556.0, 8847.0),     # Ost-Stadt          ~5,3 km O
     },
-    # Livonia-Lager 7900/6700 (Lukow-Airfield, zentral). Hoehen 186-389 m, huegelig.
+    # Livonia-Lager 7900/6700 (Lukow-Airfield, zentral). Höhen 186-389 m, hügelig.
     "enoch": {
         "viktor": (4991.0, 9869.0),     # NW-Dorf            ~4,3 km NW
-        # 11398/9604 lag ZWISCHEN den Gebaeudeclustern des NO-Dorfs: Birgit kam
-        # dort nur mit ~0,7 m/s voran (Zaeune/Gestruepp) und flee/travel schlugen
-        # fehl (03.07.). Neuer Punkt 250 m suedwestlich am Dorfrand - auf ihrem
-        # eigenen Bewegungspfad mit nachgewiesenem Lauftempo (2,4 m/s), naechstes
-        # Gebaeude 82 m.
+        # 11398/9604 lag ZWISCHEN den Gebäudeclustern des NO-Dorfs: Birgit kam
+        # dort nur mit ~0,7 m/s voran (Zäune/Gestrüpp) und flee/travel schlugen
+        # fehl (03.07.). Neuer Punkt 250 m südwestlich am Dorfrand - auf ihrem
+        # eigenen Bewegungspfad mit nachgewiesenem Lauftempo (2,4 m/s), nächstes
+        # Gebäude 82 m.
         "birgit": (11140.0, 9440.0),    # NO-Dorfrand        ~4,2 km NO
-        "igor":   (6008.0, 4219.0),     # SW-Dorf (naechste)  ~3,1 km SW
+        "igor":   (6008.0, 4219.0),     # SW-Dorf (nächste)  ~3,1 km SW
         "konrad": (11094.0, 4274.0),    # SO-Dorf            ~4,0 km SO
+    },
+    # Nasdara-Lager 8528/8669 (Zentral-Stadt). Wüste/Binnenland, Höhen
+    # 160-300 m. Punkte = Freifläche (>=12 m) nahe dem Schwerpunkt der vier
+    # nächsten großen Gebäude-Cluster aus mapgrouppos.xml (16.10.).
+    "nasdara": {
+        "viktor": (5276.0, 8194.0),     # West-Stadt         ~3,3 km W
+        "birgit": (11330.0, 9430.0),    # NO-Stadt           ~2,9 km NO
+        "igor":   (7211.0, 5751.0),     # SW-Stadt           ~3,2 km SW
+        "konrad": (9375.0, 12014.0),    # Nord-Stadt         ~3,4 km N
     },
 }
 
@@ -263,7 +275,7 @@ def log(msg: str):
 
 def write_status(text: str, quiet: bool = False):
     # Atomar (tmp + rename): die Mod pollt die Datei und darf nie einen
-    # halben Status sehen. quiet=True fuer periodische Refreshes (Kosten-
+    # halben Status sehen. quiet=True für periodische Refreshes (Kosten-
     # Anhang), die das Log nicht fluten sollen.
     try:
         tmp = STATUS_FILE + ".tmp"
@@ -280,7 +292,7 @@ def round_cost_summary(aids) -> tuple[float, int]:
     """Bekannte USD aufsummieren; unbekannte Slots nie als kostenlos ausgeben.
 
     round_cost.txt: nichtnegative USD-Zahl oder 'unknown' bei Providern ohne
-    USD-Nachweis. Fehlende/halbe/ungueltige Dateien sind ebenfalls unbekannt.
+    USD-Nachweis. Fehlende/halbe/ungültige Dateien sind ebenfalls unbekannt.
     """
     total, unknown = 0.0, 0
     for aid in aids:
@@ -297,7 +309,7 @@ def round_cost_summary(aids) -> tuple[float, int]:
 
 
 def round_cost_total(aids) -> float:
-    """Kompatible Zahl fuer bekannte USD; Anzeige nutzt round_cost_label."""
+    """Kompatible Zahl für bekannte USD; Anzeige nutzt round_cost_label."""
     return round_cost_summary(aids)[0]
 
 
@@ -312,20 +324,44 @@ def agent_home_dir(aid: str) -> str:
     return agent_paths.agent_home_dir(aid)
 
 
+# Lagezentrum-Heartbeat (Sessionfix 24.10., MISS-2): Default 150 s, "0" = aus.
+ORCH_HEARTBEAT_DEFAULT = 150.0
+
+
+def orch_heartbeat_args(env=None) -> list[str]:
+    """--heartbeat-Argument für den Orchestrator aus $env:ISU_ORCH_HEARTBEAT.
+    Ungesetzt/leer -> ORCH_HEARTBEAT_DEFAULT, "0" (oder <= 0) -> aus, keine
+    Zahl -> Default mit Logzeile (sonst bricht argparse den Orchestrator ab)."""
+    env = os.environ if env is None else env
+    raw = (env.get("ISU_ORCH_HEARTBEAT") or "").strip()
+    if not raw:
+        sec = ORCH_HEARTBEAT_DEFAULT
+    else:
+        try:
+            sec = float(raw)
+        except ValueError:
+            log(f"ISU_ORCH_HEARTBEAT='{raw}' ist keine Zahl - nehme "
+                f"{ORCH_HEARTBEAT_DEFAULT:g} s.")
+            sec = ORCH_HEARTBEAT_DEFAULT
+    if not math.isfinite(sec) or sec <= 0:
+        return []
+    return ["--heartbeat", f"{sec:g}"]
+
+
 def load_roster() -> dict:
     with open(ROSTER_FILE, "r", encoding="utf-8") as f:
         return {a["id"]: a for a in json.load(f)["agents"]}
 
 
-# --- Fremd-Backends (Ports muessen zu run_agent.resolve_backend passen) ---
+# --- Fremd-Backends (Ports müssen zu run_agent.resolve_backend passen) ---
 CCR_PORT = 3456      # claude-code-router: openai/ google/ xai/
 LLAMA_PORT = 8080    # llama-server: local/ (Gemma 4 E4B)
 # Starter-Prozesse merken: verhindert Doppelstart (z.B. zweiter
-# 5-GB-Gemma-Download), wenn der User waehrend des Wartens erneut Start drueckt
+# 5-GB-Gemma-Download), wenn der User während des Wartens erneut Start drückt
 BACKEND_PROCS: dict[str, subprocess.Popen] = {}
 # Von main gepflegt: zuletzt verarbeitete Request-Sequenz. wait_port bricht
 # ab, sobald eine NEUE Request eintrifft (User soll nicht 20 min auf einen
-# haengenden Backend-Start warten muessen, ohne stoppen zu koennen).
+# hängenden Backend-Start warten müssen, ohne stoppen zu können).
 LAST_SEQ = {"seq": ""}
 
 
@@ -364,7 +400,7 @@ def wait_port(port: int, timeout_s: int, label: str) -> bool:
 def spawn_backend(key: str, script: str) -> None:
     prev = BACKEND_PROCS.get(key)
     if prev and prev.poll() is None:
-        log(f"{key}-Starter laeuft noch (PID {prev.pid}) - warte nur auf den Port.")
+        log(f"{key}-Starter läuft noch (PID {prev.pid}) - warte nur auf den Port.")
         return
     BACKEND_PROCS[key] = subprocess.Popen(
         ["powershell", "-ExecutionPolicy", "Bypass", "-File",
@@ -373,10 +409,10 @@ def spawn_backend(key: str, script: str) -> None:
 
 
 def ensure_backends(cfg: dict) -> bool:
-    """Startet claude-code-router / llama-server, wenn ein gewaehltes
+    """Startet claude-code-router / llama-server, wenn ein gewähltes
     Modell sie braucht. Native codex/, gemini-cli/, antigravity/, mistral/, moonshot/
     laufen direkt in run_agent und brauchen weder Router noch Zusatzserver.
-    Blockiert fuer Legacy-Backends, bis die Ports antworten."""
+    Blockiert für Legacy-Backends, bis die Ports antworten."""
     models = [a["model"].lower() for a in cfg["agents"].values() if a.get("enabled") and a.get("model")]
     needs_ccr = any(m.startswith(("openai/", "google/", "xai/")) for m in models)
     needs_llama = any(m.startswith("local/") for m in models)
@@ -415,9 +451,9 @@ class Arena:
 
     def check_birgit_release(self) -> None:
         """Mission: die Gefangene (Birgit) erscheint erst, wenn der Trupp das
-        Kopa-Gefaengnis ERREICHT und GESAEUBERT hat. Heuristik: mind. ein Kampf-
-        Agent <= 45 m am Ziel UND seit >= 30 s kaempft KEINER mehr (Banditen tot/
-        weg). So laeuft sie nicht als Gefangene mitten unter den Banditen los."""
+        Kopa-Gefängnis ERREICHT und GESÄUBERT hat. Heuristik: mind. ein Kampf-
+        Agent <= 45 m am Ziel UND seit >= 30 s kämpft KEINER mehr (Banditen tot/
+        weg). So läuft sie nicht als Gefangene mitten unter den Banditen los."""
         pb = self.pending_birgit
         if not pb:
             return
@@ -491,9 +527,9 @@ class Arena:
         self.pending_birgit = None
         self._birgit_calm_since = None
 
-        # Sanft beenden ueber Stop-Flag-Dateien: CTRL_BREAK erreicht
+        # Sanft beenden über Stop-Flag-Dateien: CTRL_BREAK erreicht
         # CREATE_NEW_CONSOLE-Prozesse NICHT (eigene Konsole, Signal verpufft
-        # ohne Fehler). Der Runner prueft die Flag in seiner 2-s-Schleife,
+        # ohne Fehler). Der Runner prüft die Flag in seiner 2-s-Schleife,
         # sichert das Inventar und despawnt selbst (finally-Pfad).
         stopped = list(self.procs.keys())
         for aid, proc in self.procs.items():
@@ -516,7 +552,7 @@ class Arena:
                 log(f"{aid} beendet.")
             except subprocess.TimeoutExpired:
                 # Letzte Eskalation: ganzen Prozessbaum killen - sonst
-                # ueberleben node/cli.js + dayz_mcp.py als Waisen und
+                # überleben node/cli.js + dayz_mcp.py als Waisen und
                 # steuern den Slot weiter (zwei Gehirne auf einer Bridge)
                 subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
                                capture_output=True)
@@ -545,7 +581,7 @@ class Arena:
             log("Orchestrator beendet.")
         self.orch_proc = None
 
-        # BR-Monitor beenden (laeuft sonst bis zum Zeitlimit weiter)
+        # BR-Monitor beenden (läuft sonst bis zum Zeitlimit weiter)
         if self.br_proc and self.br_proc.poll() is None:
             self.br_proc.terminate()
             try:
@@ -555,7 +591,7 @@ class Arena:
             log("BR-Monitor beendet.")
         self.br_proc = None
 
-        # Sicherheitsnetz: uebrig gebliebene Koerper despawnen (z.B. wenn
+        # Sicherheitsnetz: übrig gebliebene Körper despawnen (z.B. wenn
         # ein Runner hart starb, bevor sein finally lief)
         if stopped:
             sys.path.insert(0, DAEMON_DIR)
@@ -571,7 +607,7 @@ class Arena:
                     except Exception as e:
                         log(f"{aid}: Nach-Despawn fehlgeschlagen: {e}")
             except Exception as e:
-                log(f"Despawn-Sicherheitsnetz nicht verfuegbar: {e}")
+                log(f"Despawn-Sicherheitsnetz nicht verfügbar: {e}")
 
         # Post-Round-Hook: Liga-Report detached erzeugen (daemon/league_report.py).
         # Fehlt die Datei, passiert still nichts - die Liga ist optional.
@@ -587,14 +623,14 @@ class Arena:
 
     def start(self, cfg: dict):
         self.stop()
-        # Loadout-Dateien VOR allem anderen spiegeln - der Loadout-Waehler im
-        # Menue (ld:-Segment) verlaesst sich darauf, dass jede Datei aus
+        # Loadout-Dateien VOR allem anderen spiegeln - der Loadout-Wähler im
+        # Menü (ld:-Segment) verlässt sich darauf, dass jede Datei aus
         # mod/loadouts serverseitig existiert.
         ensure_loadouts()
         roster = load_roster()
-        # Dynamische Slots (Protokoll v2): fuer IDs ohne agents.json-Eintrag
+        # Dynamische Slots (Protokoll v2): für IDs ohne agents.json-Eintrag
         # einen Default-Rostereintrag synthetisieren, statt den Slot still zu
-        # verwerfen (frueher blockierte hier die 4er-Annahme). run_agent legt
+        # verwerfen (früher blockierte hier die 4er-Annahme). run_agent legt
         # agent_homes/<id> beim ersten Start selbst an.
         for aid, acfg in cfg.get("agents", {}).items():
             if aid not in roster:
@@ -605,9 +641,9 @@ class Arena:
                 log(f"{aid}: kein agents.json-Eintrag - Default-Roster "
                     f"synthetisiert (Loadout/Stimme leer, Persona kommt "
                     f"aus dem Menue).")
-        # Menue-Overrides (Stimme + Sprache pro Slot, aus dem "av:"-Segment) in
+        # Menü-Overrides (Stimme + Sprache pro Slot, aus dem "av:"-Segment) in
         # den Roster ziehen, damit Discord-Voice-Bots UND run_agent denselben
-        # Wert nutzen. agents.json bleibt der Default, wenn das Menue nichts setzt.
+        # Wert nutzen. agents.json bleibt der Default, wenn das Menü nichts setzt.
         for aid, acfg in cfg.get("agents", {}).items():
             if aid in roster:
                 if acfg.get("voice"):
@@ -620,16 +656,16 @@ class Arena:
         # Entwickler-Toggle "NPC radio TTS": als Env in die Prozesskette geben
         # (Runner erben os.environ beim Popen, Claude Code und dayz_mcp erben
         # weiter). BEIDE Werte explizit setzen, damit kein Stand der Vorrunde
-        # haengen bleibt. Gate: dayz_mcp._npc_tts.
+        # hängen bleibt. Gate: dayz_mcp._npc_tts.
         os.environ["ISU_NPC_TTS"] = "1" if cfg.get("npctts") else "0"
         if cfg.get("npctts"):
             log("NPC radio TTS AN: auch NPC-zu-NPC-Funk wird vertont "
                 "(ElevenLabs-Kontingent im Blick behalten).")
 
-        # Karte ermitteln (start_game.bat hat sie gewaehlt). Auf nicht-
+        # Karte ermitteln (start_game.bat hat sie gewählt). Auf nicht-
         # Chernarus-Karten den Chernarus-Default-Lagerpunkt durch den
         # map-eigenen Landpunkt ersetzen (4233/8512 liegt z.B. auf Sakhal im
-        # Meer). Hat der Spieler im Menue einen EIGENEN Punkt gesetzt (Koords
+        # Meer). Hat der Spieler im Menü einen EIGENEN Punkt gesetzt (Koords
         # weichen vom Default ab), bleibt der respektiert.
         amap = active_map()
         if amap != "chernarus":
@@ -637,20 +673,20 @@ class Arena:
             if dist < 2.0 and amap in MAP_CAMPS:
                 camp_x, camp_z = MAP_CAMPS[amap]
                 log(f"Karte '{amap}': Lagerpunkt auf {camp_x}/{camp_z} gesetzt.")
-        # Auf Sakhal die Winter-Loadouts waehlen (dicke Kleidung beim Spawn)
+        # Auf Sakhal die Winter-Loadouts wählen (dicke Kleidung beim Spawn)
         winter = (amap == "sakhal")
-        # Ambient-AI-Patrouillen der Karte per Menue-Toggle (wirkt ab Neustart)
+        # Ambient-AI-Patrouillen der Karte per Menü-Toggle (wirkt ab Neustart)
         set_patrols(amap, cfg.get("patrols", False))
 
-        # Skript-Mission (Menue-Knopf "Mission"): Definition aus
+        # Skript-Mission (Menü-Knopf "Mission"): Definition aus
         # arena/missions/<id>.json (daemon/missions.py). Rescue-Missionen
-        # ueberschreiben pro Agent Spawn, Rally und Briefing; Defend-Missionen
-        # briefen alle und fahren ihre Wellen ueber die Missions-Engine.
+        # überschreiben pro Agent Spawn, Rally und Briefing; Defend-Missionen
+        # briefen alle und fahren ihre Wellen über die Missions-Engine.
         mission = None
         mobj: dict = {}
         mission_id = (cfg.get("mission") or "").strip().lower()
         # Missionen laufen nur im Neutral-Modus: im freien Modus gibt es keine
-        # Auftraege (und im BR blockt das Menue sie schon). Hinweis + skip.
+        # Aufträge (und im BR blockt das Menü sie schon). Hinweis + skip.
         if mission_id and cfg.get("free"):
             log(f"FREIER MODUS: Mission '{mission_id}' wird uebersprungen - "
                 f"Missionen laufen nur im Neutral-Modus.")
@@ -677,7 +713,7 @@ class Arena:
                     f"Server auf {mlabel} starten, sonst spawnt die "
                     f"Mission an der falschen Stelle.")
             if rescue:
-                # Missions-Rollen erzwingen (auch wenn das Menue sie aus hatte) -
+                # Missions-Rollen erzwingen (auch wenn das Menü sie aus hatte) -
                 # ohne die Gefangene gibt es nichts zu befreien.
                 roles = mobj.get("roles") or {}
                 for mid in combat_agents + ([captive_id] if captive_id else []):
@@ -689,13 +725,13 @@ class Arena:
                                               "persona": roles.get(mid, "")}
             if mission.get("force_group"):
                 # Verteidigungsmissionen brauchen den Trupp AM Lager - ein
-                # Streu-Spawn (km entfernt) wuerde die ersten Wellen verpassen.
+                # Streu-Spawn (km entfernt) würde die ersten Wellen verpassen.
                 if not cfg.get("group"):
                     log(f"MISSION '{mission_id}': erzwingt Gruppen-Spawn am Lager.")
                 cfg["group"] = True
             if mission.get("force_ambient_patrols"):
-                # Banditen brauchen die AI-Patrouillen global AN - den Menue-
-                # patrols-Toggle ueberstimmen (wirkt ab Serverstart der Karte).
+                # Banditen brauchen die AI-Patrouillen global AN - den Menü-
+                # patrols-Toggle überstimmen (wirkt ab Serverstart der Karte).
                 set_patrols(mmap or amap, True)
             # Optionale Missions-Patrouillen in die Karten-Settings injizieren
             missions.ensure_patrols(mmap or amap, mission.get("patrols") or [],
@@ -709,14 +745,14 @@ class Arena:
                 log(f"MISSION '{mission.get('name') or mission_id}' aktiv "
                     f"({len(mission.get('events') or [])} Events).")
 
-        # Spawn-Modus folgt dem Menue-Toggle "Gruppe" - auch im BR. GETRENNT =
+        # Spawn-Modus folgt dem Menü-Toggle "Gruppe" - auch im BR. GETRENNT =
         # verstreut + Marsch zum Treffpunkt-Showdown (volles Erlebnis). GRUPPE =
         # alle eng am Lager -> sofortiges Gefecht (schneller BR-Test; wer zuerst
         # spawnt, ist im Vorteil).
         separate = not cfg.get("group")
         if separate and cfg.get("free") and amap in SCATTER_TOWNS:
-            log("Spawn-Modus: GETRENNT (verschiedene Staedte) - freier Modus: "
-                "jeder Agent startet fuer sich, KEIN Treffpunkt-Marsch.")
+            log("Spawn-Modus: GETRENNT (verschiedene Städte) - freier Modus: "
+                "jeder Agent startet für sich, KEIN Treffpunkt-Marsch.")
         elif separate and cfg.get("free"):
             log("Spawn-Modus: GETRENNT (~45 m) - freier Modus: Agenten spawnen "
                 "verstreut, KEIN Treffpunkt-Marsch.")
@@ -730,7 +766,7 @@ class Arena:
         else:
             log("Spawn-Modus: GRUPPE - Agenten spawnen eng beisammen am Lager.")
 
-        # Battle-Royale: Modus klar ankuendigen (Loadouts spiegelt start()
+        # Battle-Royale: Modus klar ankündigen (Loadouts spiegelt start()
         # inzwischen IMMER via ensure_loadouts)
         if cfg["hostile"]:
             log("BATTLE ROYALE aktiv: Free-for-all (auch der Spieler ist Ziel), "
@@ -738,7 +774,7 @@ class Arena:
 
         # Freier Survival-Modus: KEIN BR (kein br-Flag an die Mod, kein
         # BR-Loadout, keine Funkstille, kein BR-Monitor), kein Rally-Marsch,
-        # keine Missionen - die Agenten entscheiden voellig selbst. 1 Leben
+        # keine Missionen - die Agenten entscheiden völlig selbst. 1 Leben
         # setzt der Runner selbst (--free impliziert --no-respawn).
         if cfg.get("free"):
             log("FREIER MODUS aktiv: 1 Leben, Ueberleben ist das Ziel - keine "
@@ -749,7 +785,7 @@ class Arena:
         if not ensure_backends(cfg):
             return
 
-        # Effektive Namen (Menue darf umbenennen) VOR Router und Runnern
+        # Effektive Namen (Menü darf umbenennen) VOR Router und Runnern
         # publizieren - voice_router (Funk-Adressierung) und
         # run_agent.load_roster_names (Chat-Routing) lesen sie beim Start.
         active = []
@@ -764,7 +800,7 @@ class Arena:
             log(f"active_roster.json nicht schreibbar: {e}")
 
         # Voice: eigener Discord-Bot + Kanal pro Agent (discord.json),
-        # Rest ueber den Sammel-Bot; dazu EIN Mikro-Router fuer alle
+        # Rest über den Sammel-Bot; dazu EIN Mikro-Router für alle
         if cfg["mic"]:
             self.voice_procs += start_voice_bots(cfg, roster)
         if cfg["mic"] and os.environ.get("ELEVENLABS_API_KEY"):
@@ -775,7 +811,7 @@ class Arena:
                      "--selected", ids],
                     creationflags=subprocess.CREATE_NEW_CONSOLE))
 
-        # Zusatz-Slots ohne kuratierten Offset: Reihenfolge fuer die Ring-
+        # Zusatz-Slots ohne kuratierten Offset: Reihenfolge für die Ring-
         # Verteilung (spawn_offset) einmal vorab bestimmen.
         extra_ids = [aid2 for aid2, c2 in cfg["agents"].items()
                      if c2.get("enabled") and aid2 not in SPAWN_OFFSETS]
@@ -784,7 +820,7 @@ class Arena:
             if not acfg.get("enabled") or aid not in roster:
                 continue
             a = roster[aid]
-            # Spawn-Position: getrennt + Stadtliste fuer die Karte -> jeder in
+            # Spawn-Position: getrennt + Stadtliste für die Karte -> jeder in
             # einer ANDEREN Stadt (km weit), Marsch zum Treffpunkt (Lager). Sonst
             # getrennt = ~90m-Streuung, Gruppe = ~2m eng beisammen.
             town = SCATTER_TOWNS.get(amap, {}).get(aid) if separate else None
@@ -797,11 +833,11 @@ class Arena:
                 doff = spawn_offset(aid, ring_idx, len(extra_ids), separate)
                 spawn_x, spawn_z = camp_x + doff[0], camp_z + doff[1]
 
-            # Mission ueberschreibt Spawn/Rally/Briefing pro Agent:
+            # Mission überschreibt Spawn/Rally/Briefing pro Agent:
             # - Rettungstrupp: eng am Missions-Start, Rally = Zielort
-            # - Gefangene: direkt am Zielort, kein Rally (spawnt spaeter)
+            # - Gefangene: direkt am Zielort, kein Rally (spawnt später)
             # - Defend-Mission (horde): alle bekommen das Briefing, Spawn/Rally
-            #   bleiben wie vom Menue gewaehlt (verteidigt wird das Lager)
+            #   bleiben wie vom Menü gewählt (verteidigt wird das Lager)
             mission_brief = ""
             # Freier Modus: KEIN Rally-/Konvergenz-Auftrag - die Agenten sind
             # frei. Sonst wie gehabt: getrennter Spawn -> Treffpunkt = Lager.
@@ -818,11 +854,11 @@ class Arena:
                     mission.get("briefing") or "", mtarget[0], mtarget[1])
             # Agenten bleiben IMMER civilian - die BR-Aggro kommt deterministisch
             # aus IsuAgentRegistry.s_BrMode (Mod), nicht aus der Fraktions-Matrix.
-            # So bleibt der zivile Friendly-Fire-Schutz fuer den Coop-Modus intakt.
+            # So bleibt der zivile Friendly-Fire-Schutz für den Coop-Modus intakt.
             faction = "civilian"
             eff_name = acfg.get("name") or a.get("name", aid.capitalize())
 
-            # Persona: Menue-Schluessel -> daemon/characters/<key>.md,
+            # Persona: Menü-Schlüssel -> daemon/characters/<key>.md,
             # Fallback: character-Pfad aus agents.json
             character = ""
             persona_key = (acfg.get("persona") or "").strip().lower()
@@ -835,7 +871,7 @@ class Arena:
             if not character and a.get("character"):
                 character = os.path.join(REPO_DIR, a["character"])
 
-            # Rollen-Briefing (role_briefings.<persona>) ueberstimmt das
+            # Rollen-Briefing (role_briefings.<persona>) überstimmt das
             # generische Missions-Briefing, wenn es zur Persona passt.
             if mission and persona_key:
                 rb = (mission.get("role_briefings") or {}).get(persona_key)
@@ -844,9 +880,9 @@ class Arena:
                         rb, mtarget[0], mtarget[1])
 
             # Mission-Gefangene (Birgit) wird NICHT am Anfang gespawnt: als
-            # Gefangene wuerde sie mitten unter den Banditen loslaufen (auch zum
+            # Gefangene würde sie mitten unter den Banditen loslaufen (auch zum
             # Treffpunkt) und sterben. Sie erscheint erst, wenn der Trupp das
-            # Gefaengnis erreicht UND gesaeubert hat (check_birgit_release in der
+            # Gefängnis erreicht UND gesäubert hat (check_birgit_release in der
             # Hauptschleife). Hier nur ihre Startparameter merken.
             if rescue and aid == captive_id:
                 self.pending_birgit = {
@@ -890,23 +926,23 @@ class Arena:
             if mission_brief:
                 args += ["--mission", mission_brief]
             # Battle-Royale: Free-for-all + 1 Leben + kein Inventar-Restore
-            # (jeder Lauf startet gleich) + faires, fuer ALLE identisches Leicht-
+            # (jeder Lauf startet gleich) + faires, für ALLE identisches Leicht-
             # Loadout. Sonst das rollenspezifische Loadout (ggf. Winter-Variante).
             # Freier Survival-Modus (Schnittstelle 2): nur das --free-Flag -
             # 1 Leben/Persona-Lockerung regelt der Runner selbst. Loadout
             # bleibt das normale Rollen-Loadout (else-Zweig unten).
             if cfg.get("free"):
                 args += ["--free"]
-            # Loadout-Praezedenz: BR (fair fuer alle) > Missions-Override >
-            # Menue-Wahl (ld:-Segment) > Rollen-Default aus agents.json.
+            # Loadout-Präzedenz: BR (fair für alle) > Missions-Override >
+            # Menü-Wahl (ld:-Segment) > Rollen-Default aus agents.json.
             ui_loadout = acfg.get("loadout_override")
             if cfg["hostile"]:
                 args += ["--br", "--no-respawn", "--no-restore"]
                 loadout = BR_LOADOUT
             elif rescue and aid in combat_agents:
-                # Elite-Mission-Loadout + --no-restore: ueberspringt das langsame
+                # Elite-Mission-Loadout + --no-restore: überspringt das langsame
                 # Inventar-Wiederherstellen (Konrad-Startverzug) und gibt sofort
-                # eine suppressierte Elitewaffe + Munition + Ausruestung.
+                # eine suppressierte Elitewaffe + Munition + Ausrüstung.
                 args += ["--no-restore"]
                 loadout = (mobj.get("loadouts") or {}).get(aid) or ui_loadout or a.get("loadout")
             else:
@@ -925,9 +961,9 @@ class Arena:
             if ui_loadout and loadout and loadout.startswith(ui_loadout[:-5]):
                 # trifft auch die Winter-Variante (IsuPresetScout_Winter.json)
                 log(f"{aid}: Menue-Loadout '{loadout}' aktiv.")
-                # Menue-Wahl heisst FRISCH equippen: sonst wuerde der Inventar-
+                # Menü-Wahl heißt FRISCH equippen: sonst würde der Inventar-
                 # Restore (Snapshot der letzten Runde) bzw. ein noch lebender
-                # Alt-Koerper das gewaehlte Loadout stillschweigend ueberschreiben.
+                # Alt-Körper das gewählte Loadout stillschweigend überschreiben.
                 if "--no-restore" not in args:
                     args += ["--no-restore"]
                 args += ["--fresh-loadout"]
@@ -948,9 +984,9 @@ class Arena:
                 f"persona={persona_key or 'default'} faction={faction}")
             time.sleep(3)
 
-        # Orchestrator (Menue-Toggle "Orchestr."): Schiedsrichter/Lagezentrum
-        # ueber den Squad. AN = gemeinsames Lagebild (squad_state.json) +
-        # ratenbegrenzter Funk an alle; AUS = die vier laufen unabhaengig
+        # Orchestrator (Menü-Toggle "Orchestr."): Schiedsrichter/Lagezentrum
+        # über den Squad. AN = gemeinsames Lagebild (squad_state.json) +
+        # ratenbegrenzter Funk an alle; AUS = die vier laufen unabhängig
         # (sauberer Modell-Benchmark). Erst NACH den Runnern starten, damit die
         # Bridges schon Zustand schreiben.
         if cfg.get("orch") and active and not cfg["hostile"]:
@@ -960,25 +996,29 @@ class Arena:
                          "--agents", orch_ids,
                          "--camp-x", str(camp_x),
                          "--camp-z", str(camp_z)]
-            # (Kein --hostile: der Orchestrator laeuft per Gate oben NUR im Coop;
+            # (Kein --hostile: der Orchestrator läuft per Gate oben NUR im Coop;
             # im BR wird er gar nicht gestartet -> Funkstille R1.)
-            # Optionaler periodischer Lagebericht (sichtbares Lebenszeichen):
-            # $env:ISU_ORCH_HEARTBEAT=120 vor dem Start setzen. Unset = aus.
-            hb = os.environ.get("ISU_ORCH_HEARTBEAT")
-            if hb:
-                orch_args += ["--heartbeat", hb]
+            # Periodischer Lagebericht (Sessionfix 24.10., MISS-2): ohne ihn
+            # reisten Positionen nur als Beifang von Kampf-/Bedrohungs-
+            # Änderungen, in ruhigen oder verstreuten Phasen bekam 17 min lang
+            # niemand ein neues Lagebild. Default 150 s; der Heartbeat geht
+            # ungefiltert, aber NICHT weckend an alle Lebenden (Info-Digest,
+            # kostet keinen Zug). $env:ISU_ORCH_HEARTBEAT=<Sekunden>
+            # übersteuert, "0" schaltet ihn aus.
+            orch_args += orch_heartbeat_args()
             # Mindestabstand zwischen zwei Routine-Lageberichten: im Arena-
             # Betrieb 90 s statt der 40 s des Orchestrator-Defaults (Audit
-            # 03.07.: bei 40 s bis zu 360 Lage-Zuege/h ueber 4 Agenten, 37%
-            # davon reine Bestaetigungen). Kampf-Eskalation deckt der prio-
-            # Pfad (Tod/kritisch, ungedrosselt relevant) und die eigene
-            # GEFAHR-Wahrnehmung jedes NPCs ab - 90 s kosten keine Info.
-            # Uebersteuerbar via $env:ISU_ORCH_MINBC=<Sekunden>.
+            # 03.07.: bei 40 s bis zu 360 Lage-Züge/h über 4 Agenten, 37%
+            # davon reine Bestätigungen). Tod/kritisch und "zurück im Spiel"
+            # umgehen die Sperre im Orchestrator (seit 24.10. wirklich, vorher
+            # prüfte der Code die Sperre zuerst), gedrosselte Ereignisse
+            # liefert er nach; dazu die eigene GEFAHR-Wahrnehmung jedes NPCs.
+            # Übersteuerbar via $env:ISU_ORCH_MINBC=<Sekunden>.
             mbc = os.environ.get("ISU_ORCH_MINBC")
             orch_args += ["--min-broadcast", mbc if mbc else "90"]
             self.orch_proc = subprocess.Popen(
                 orch_args, creationflags=subprocess.CREATE_NEW_CONSOLE)
-            log(f"Orchestrator gestartet (Lagezentrum ueber {orch_ids}).")
+            log(f"Orchestrator gestartet (Lagezentrum über {orch_ids}).")
 
         # Battle-Royale-Monitor: liest die state-Dateien direkt, loggt Spawns,
         # Treffer, Tode und am Ende den Sieger. Eigene Konsole, endet selbst
@@ -992,9 +1032,9 @@ class Arena:
             except Exception as e:
                 log(f"BR-Monitor-Start fehlgeschlagen: {e}")
 
-        # Missions-Engine (zeitgesteuerte Events + Erfolgspruefung, z.B. die
+        # Missions-Engine (zeitgesteuerte Events + Erfolgsprüfung, z.B. die
         # horde-Wellen) als Supervisor-Thread. Die Rettungs-Freilassung (birgit)
-        # laeuft weiter ueber check_birgit_release in der Hauptschleife -
+        # läuft weiter über check_birgit_release in der Hauptschleife -
         # birgit.json hat keine Events, dort startet kein Thread.
         if mission and self.procs and missions.needs_thread(mission):
             try:
@@ -1007,9 +1047,9 @@ class Arena:
             except Exception as e:
                 log(f"Missions-Engine-Start fehlgeschlagen: {e}")
 
-        # Frueh gestorbene Voice-Bots melden (falscher Token, fehlender
-        # Kanal) - sonst bleibt ein Slot still stumm, waehrend alles
-        # "LAEUFT" meldet
+        # Früh gestorbene Voice-Bots melden (falscher Token, fehlender
+        # Kanal) - sonst bleibt ein Slot still stumm, während alles
+        # "LÄUFT" meldet
         dead_bots = [p for p in self.voice_procs if p.poll() is not None]
         if dead_bots:
             log(f"WARNUNG: {len(dead_bots)} Voice-Bot(s) sofort wieder "
@@ -1018,7 +1058,7 @@ class Arena:
         mode = "HOSTILE" if cfg["hostile"] else ("FREE" if cfg.get("free") else "neutral")
         orch_note = " +Orch" if (cfg.get("orch") and started) else ""
         if started:
-            # Basis merken: der Kosten-Refresher in main() haengt " | cost ..."
+            # Basis merken: der Kosten-Refresher in main() hängt " | cost ..."
             # an, ohne den RUNNING-Text zu verlieren.
             self.status_base = f"RUNNING ({mode}){orch_note}: " + ", ".join(started)
             write_status(f"{self.status_base} | cost {round_cost_label(self.procs.keys())}")
@@ -1029,8 +1069,8 @@ class Arena:
 
 def ensure_loadouts() -> None:
     """ALLE Loadout-JSONs aus mod/loadouts ins Server-Verzeichnis spiegeln
-    (frueher wurde nur die BR-Datei kopiert - der Loadout-Waehler im Menue
-    haette sonst still auf den Mod-Default zurueckfallen koennen). Kopiert
+    (früher wurde nur die BR-Datei kopiert - der Loadout-Wähler im Menü
+    hätte sonst still auf den Mod-Default zurückfallen können). Kopiert
     nur fehlende oder neuere Dateien (mtime). Idempotent, fehlertolerant."""
     src_dir = os.path.join(REPO_DIR, "mod", "loadouts")
     try:
@@ -1060,7 +1100,7 @@ def ensure_loadouts() -> None:
 def set_patrols(amap: str, enabled: bool) -> None:
     """Ambient-AI-Patrouillen der Karte an/aus (Expansion AIPatrolSettings).
     Setzt NUR das Top-Level-"Enabled" (erstes Vorkommnis), Rest unangetastet.
-    Wirkt ab dem naechsten Server-Neustart (Expansion liest es beim Start)."""
+    Wirkt ab dem nächsten Server-Neustart (Expansion liest es beim Start)."""
     mission = MISSION_DIRS.get(amap)
     if not mission:
         log(f"Patrouillen: Karte '{amap}' ohne Mission-Mapping - uebersprungen.")
@@ -1068,7 +1108,7 @@ def set_patrols(amap: str, enabled: bool) -> None:
     path = os.path.join(MPMISSIONS, mission, "expansion", "settings",
                         "AIPatrolSettings.json")
     if not os.path.exists(path):
-        log(f"Patrouillen: AIPatrolSettings fuer '{amap}' nicht da - uebersprungen.")
+        log(f"Patrouillen: AIPatrolSettings für '{amap}' nicht da - übersprungen.")
         return
     val = "1" if enabled else "0"
     try:
@@ -1088,7 +1128,7 @@ def set_patrols(amap: str, enabled: bool) -> None:
         log(f"Patrouillen-Schreiben fehlgeschlagen: {e}")
 
 
-# Gueltige Agent-IDs fuer dynamische Slots (Protokoll v2): klein, mit
+# Gültige Agent-IDs für dynamische Slots (Protokoll v2): klein, mit
 # Buchstabe beginnend, max. 16 Zeichen. Bewusst restriktiv - die ID wird
 # Verzeichnisname (agent_homes/<id>) und Dateiname (state_<id>.json).
 VALID_AID = re.compile(r"^[a-z][a-z0-9_]{1,15}$")
@@ -1098,18 +1138,18 @@ VALID_AID = re.compile(r"^[a-z][a-z0-9_]{1,15}$")
 VALID_LOADOUT = re.compile(r"^[A-Za-z0-9_\-]+\.json$")
 
 # Die vier klassischen Slots (Alt-Protokoll: Agent-ID ist direkt das
-# Segment-Kennwort). Bleibt fuer aeltere Mod-Clients bestehen.
+# Segment-Kennwort). Bleibt für ältere Mod-Clients bestehen.
 LEGACY_AIDS = ("viktor", "birgit", "igor", "konrad")
 
 
 def _effective_model(aid: str, model: str) -> str:
     # Fable-Fallback: claude-fable-5 war 12.-30.06.2026 weltweit wegen
     # US-Exportkontrollen gesperrt (0 Tokens, Sofort-Abbruch, Slot stumm).
-    # Seit dem Redeploy (01.07.2026) global wieder verfuegbar - ob dieses
-    # Konto/diese Route durchzieht, ist nicht garantiert. Darum standardmaessig
-    # auf sonnet umbiegen; ISU_FABLE_ENABLED=1 laesst die Fable-Wahl durch.
+    # Seit dem Redeploy (01.07.2026) global wieder verfügbar - ob dieses
+    # Konto/diese Route durchzieht, ist nicht garantiert. Darum standardmäßig
+    # auf sonnet umbiegen; ISU_FABLE_ENABLED=1 lässt die Fable-Wahl durch.
     fable_ok = os.environ.get("ISU_FABLE_ENABLED", "").strip().lower() in ("1", "true", "yes", "on")
-    # Eigene IDs anderer Provider duerfen nie auf eine andere kostenpflichtige
+    # Eigene IDs anderer Provider dürfen nie auf eine andere kostenpflichtige
     # Route umgebogen werden. Nur die historische Anthropic-Ausnahme anwenden.
     provider, separator, model_id = model.partition("/")
     is_anthropic = not separator or provider.lower() in ("api", "anthropic")
@@ -1117,11 +1157,11 @@ def _effective_model(aid: str, model: str) -> str:
     if is_anthropic and name.lower() in ("fable", "claude-fable-5") and not fable_ok:
         log(f"{aid}: Modell '{model}' -> Fallback 'sonnet' (ISU_FABLE_ENABLED nicht gesetzt).")
         return "sonnet"
-    # Gemini CLI: Google hat den persoenlichen Login am 18.06.2026 abgeschafft,
+    # Gemini CLI: Google hat den persönlichen Login am 18.06.2026 abgeschafft,
     # jeder Zug endet mit UNSUPPORTED_CLIENT (Session 08.09.: Birgit 0 von 6
-    # Zuegen, 14 Minuten nur Survival-Routinen). Das Menue bietet den Provider
+    # Zügen, 14 Minuten nur Survival-Routinen). Das Menü bietet den Provider
     # weiterhin an (Wire-Kontrakt) - darum hier auf Antigravity umleiten, das
-    # denselben Google-Login nutzt. ISU_GEMINI_CLI_ALLOWED=1 laesst die Wahl
+    # denselben Google-Login nutzt. ISU_GEMINI_CLI_ALLOWED=1 lässt die Wahl
     # durch (Code-Assist-Lizenz).
     if provider.lower() == "gemini-cli" and separator:
         allowed = os.environ.get("ISU_GEMINI_CLI_ALLOWED", "").strip().lower() in ("1", "true", "yes", "on")
@@ -1135,7 +1175,7 @@ def _effective_model(aid: str, model: str) -> str:
 def _parse_slot_fields(cfg: dict, aid: str, fields: list):
     """Slot-Tupel [en, model, persona?, name...] in cfg['agents'][aid] mergen.
 
-    Gemeinsamer Kern fuer das Alt-Format (viktor:...) und das v2-Format
+    Gemeinsamer Kern für das Alt-Format (viktor:...) und das v2-Format
     (npc:<aid>:...). Der Name ist das LETZTE Feld und darf ':' enthalten.
     """
     agent = {"enabled": fields[0] == "1",
@@ -1147,7 +1187,7 @@ def _parse_slot_fields(cfg: dict, aid: str, fields: list):
         if name:
             agent["name"] = name
     # update statt assign: ein evtl. zuvor geparstes "av:"-Segment
-    # (Stimme/Sprache) im selben Dict nicht ueberschreiben.
+    # (Stimme/Sprache) im selben Dict nicht überschreiben.
     cfg["agents"].setdefault(aid, {}).update(agent)
 
 
@@ -1174,7 +1214,7 @@ def parse_command(line: str) -> dict | None:
         elif key == "npc" and len(fields) >= 4:
             # v2-Format: npc:<aid>:<en>:<model>[:<persona>[:<name>]] -
             # gleicher Aufbau, aber freie (validierte) Agent-ID statt der
-            # frueheren Vierer-Whitelist.
+            # früheren Vierer-Whitelist.
             aid = fields[1].strip().lower()
             if not VALID_AID.match(aid):
                 log(f"npc-Segment mit ungueltiger ID verworfen: '{aid}'")
@@ -1196,7 +1236,7 @@ def parse_command(line: str) -> dict | None:
             else:
                 log(f"av-Segment mit ungueltiger ID verworfen: '{aid}'")
         elif key == "ld" and len(fields) >= 3:
-            # ld:<aid>:<datei.json> - Loadout-Wahl aus dem Menue (Phase 4).
+            # ld:<aid>:<datei.json> - Loadout-Wahl aus dem Menü (Phase 4).
             # Immer der BASIS-Dateiname ohne _Winter-Suffix; die Winter-
             # Substitution macht weiterhin der Supervisor beim Start. Fehlt
             # das Segment, gilt das Rollen-Loadout aus agents.json.
@@ -1209,7 +1249,7 @@ def parse_command(line: str) -> dict | None:
             else:
                 cfg["agents"].setdefault(aid, {})["loadout_override"] = fname
         elif key == "v" and len(fields) >= 2:
-            # Protokoll-Version des Clients (v:2 = npc:-Segmente moeglich)
+            # Protokoll-Version des Clients (v:2 = npc:-Segmente möglich)
             try:
                 cfg["proto"] = int(fields[1])
             except ValueError:
@@ -1222,11 +1262,11 @@ def parse_command(line: str) -> dict | None:
             except ValueError:
                 pass
         elif key == "hostile" and len(fields) >= 2:
-            # Modus-Encoding (Menue == Supervisor): 0 = Neutral (Coop),
+            # Modus-Encoding (Menü == Supervisor): 0 = Neutral (Coop),
             # 1 = Hostile (Battle Royale), 2 = Free (freier Survival-Modus).
             # "hostile" bleibt das reine BR-Flag - alle bestehenden
             # cfg["hostile"]-Pfade (Loadout, Funkstille, BR-Monitor, Aggro)
-            # gelten damit unveraendert NUR fuer Wert 1.
+            # gelten damit unverändert NUR für Wert 1.
             val = fields[1].strip()
             cfg["hostile"] = val == "1"
             cfg["free"] = val == "2"
@@ -1254,7 +1294,7 @@ def parse_command(line: str) -> dict | None:
         elif key == "mission" and len(fields) >= 2:
             cfg["mission"] = fields[1].strip().lower()
         else:
-            # Frueher wurden unbekannte Segmente still verworfen - der Spieler
+            # Früher wurden unbekannte Segmente still verworfen - der Spieler
             # sah RUNNING und wunderte sich, warum die Einstellung nicht griff.
             log(f"Unbekanntes Kommando-Segment ignoriert: '{part}'")
     if cfg["expected_count"] is not None and cfg["expected_count"] != len(cfg["agents"]):
@@ -1267,12 +1307,12 @@ def main() -> int:
     os.makedirs(PROFILE_DIR, exist_ok=True)
     arena = Arena()
     last_seq = ""
-    # Stale Request aus einer frueheren Session WEGLOESCHEN, statt nur ihren seq
-    # zu merken: der Mod-Zaehler s_Seq (IsuArenaControl) faengt nach jedem
+    # Stale Request aus einer früheren Session WEGLÖSCHEN, statt nur ihren seq
+    # zu merken: der Mod-Zähler s_Seq (IsuArenaControl) fängt nach jedem
     # Server-Neustart wieder bei 1 an. Ein gemerkter alter seq (z.B. "1" aus der
-    # letzten Session) wuerde den ersten echten Klick (seq "1") faelschlich als
+    # letzten Session) würde den ersten echten Klick (seq "1") fälschlich als
     # "schon gesehen" verwerfen -> Symptom "erster Klick nur WARTE, zweiter
-    # startet". Datei weg = sauberer Start, jeder neue seq zaehlt.
+    # startet". Datei weg = sauberer Start, jeder neue seq zählt.
     if os.path.exists(REQUEST_FILE):
         try:
             os.remove(REQUEST_FILE)
@@ -1281,25 +1321,42 @@ def main() -> int:
 
     LAST_SEQ["seq"] = last_seq
     write_status("READY - in-game menu: Insert")
-    log(f"Supervisor laeuft. Warte auf Befehle in {REQUEST_FILE}")
+    log(f"Supervisor läuft. Warte auf Befehle in {REQUEST_FILE}")
 
     bad_tries = 0
     cost_tick = 0
+    auth_warned = False
     try:
         while True:
             time.sleep(2.0)
             # Mission: Birgit erscheinen lassen, sobald der Trupp Kopa erreicht
-            # und die Banditen erledigt hat (no-op ausserhalb der Mission).
+            # und die Banditen erledigt hat (no-op außerhalb der Mission).
             arena.check_birgit_release()
-            # Rundenkosten alle ~30 s an die RUNNING-Statuszeile anhaengen
-            # (das Menue trennt den " | cost ..."-Teil in ein eigenes Feld).
+            # Rundenkosten alle ~30 s an die RUNNING-Statuszeile anhängen
+            # (das Menü trennt den " | cost ..."-Teil in ein eigenes Feld).
             cost_tick += 1
             if cost_tick >= 15:
                 cost_tick = 0
                 base = getattr(arena, "status_base", "")
                 if base and arena.procs:
                     cost_label = round_cost_label(arena.procs.keys())
-                    write_status(f"{base} | cost {cost_label}", quiet=True)
+                    # run_agent legt auth_error.txt an, solange der Claude-Login
+                    # fehlt (Gehirn pausiert). Im Menü sichtbar machen, statt dass
+                    # die NPCs nur stumm wirken.
+                    auth_bad = [aid for aid in arena.procs
+                                if os.path.exists(os.path.join(agent_home_dir(aid),
+                                                               "auth_error.txt"))]
+                    if auth_bad:
+                        if not auth_warned:
+                            log("AUTH: Claude-Login abgelaufen bei " + ", ".join(auth_bad)
+                                + " - 'claude auth login' im Terminal ausführen.")
+                        auth_warned = True
+                        base_txt = (f"{base} | LOGIN EXPIRED ({', '.join(auth_bad)}): "
+                                    f"run 'claude auth login'")
+                    else:
+                        auth_warned = False
+                        base_txt = base
+                    write_status(f"{base_txt} | cost {cost_label}", quiet=True)
             try:
                 with open(REQUEST_FILE, "r", encoding="utf-8", errors="replace") as f:
                     seq = (f.readline() or "").strip()
@@ -1313,7 +1370,7 @@ def main() -> int:
                 cfg = parse_command(cmd_line)
             except Exception as e:
                 # Zerrissener Read (Mod schreibt nicht atomar): seq NICHT
-                # verbrauchen, der naechste 2-s-Tick liest vollstaendig.
+                # verbrauchen, der nächste 2-s-Tick liest vollständig.
                 # Nach 3 Fehlversuchen aufgeben (dauerhaft kaputter Befehl).
                 bad_tries += 1
                 if bad_tries >= 3:
@@ -1336,10 +1393,10 @@ def main() -> int:
                 write_status("STOPPED")
             else:
                 write_status("STARTING...")
-                # Preflight: Keys/CLI/Backends pruefen, BEVOR Slots an einem
+                # Preflight: Keys/CLI/Backends prüfen, BEVOR Slots an einem
                 # toten Token/Modell verbrennen. Voice-Keys sind nur warn.
                 # Mind. ein FAIL -> Start verweigern (ISU_PREFLIGHT_FORCE=1
-                # uebersteuert). Ein kaputter Preflight selbst blockiert nie.
+                # übersteuert). Ein kaputter Preflight selbst blockiert nie.
                 try:
                     models = [a.get("model", "") for a in cfg["agents"].values()
                               if a.get("enabled")]

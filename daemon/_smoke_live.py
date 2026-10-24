@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Live-Smoke gegen den laufenden DayZ-Server ueber die File-Bridge.
+"""Live-Smoke gegen den laufenden DayZ-Server über die File-Bridge.
 
 Default (sicher, keine Welt-Wirkung):
   - State lesen + Eckdaten zeigen
   - Lebenszeichen: seq steigt zwischen zwei Lesungen (Mod tickt)
   - ping: voller Command-Round-trip (Mod liest Befehl, antwortet "done")
 
-Mit Argument "active" zusaetzlich (reversibel, stupst aber einen evtl.
+Mit Argument "active" zusätzlich (reversibel, stupst aber einen evtl.
 laufenden Agenten an):
   - stop: NPC bleibt stehen (Basis von PlayerHalt)
 

@@ -1,4 +1,4 @@
-"""Verwaiste Agenten-Koerper despawnen (nach hartem Prozess-Kill)."""
+"""Verwaiste Agenten-Körper despawnen (nach hartem Prozess-Kill)."""
 
 import json
 import os

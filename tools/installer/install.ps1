@@ -74,6 +74,31 @@ function Set-Status($key, $value) { $script:Summary[$key] = $value }
 # ===========================================================================
 #  Environment helpers
 # ===========================================================================
+# Claude Code >= ~2.1.19x ships a native bin\claude.exe and no cli.js anymore.
+function Find-ClaudeCli($npmRoot) {
+    if (-not $npmRoot) { return $null }
+    foreach ($rel in @("@anthropic-ai\claude-code\bin\claude.exe", "@anthropic-ai\claude-code\cli.js")) {
+        $cand = Join-Path $npmRoot $rel
+        if (Test-Path $cand) { return $cand }
+    }
+    return $null
+}
+
+# Local login check via 'claude auth status --json' (no model call, no tokens).
+# Returns $true / $false, or $null when it cannot be determined.
+function Test-ClaudeLogin {
+    $exe = $env:ISU_CLAUDE_CLI
+    if (-not $exe -or -not (Test-Path $exe)) {
+        try { $exe = Find-ClaudeCli ((& npm root -g) 2>$null) } catch { $exe = $null }
+    }
+    if (-not $exe -or -not $exe.EndsWith(".exe")) { return $null }
+    try {
+        $raw = (& $exe auth status --json 2>$null) -join "`n"
+        $info = $raw | ConvertFrom-Json
+        return [bool]$info.loggedIn
+    } catch { return $null }
+}
+
 function Set-UserEnv($name, $value) {
     # Persist (User scope, no admin needed) AND apply to this process so later
     # steps and the scripts we call see it immediately.
@@ -202,8 +227,7 @@ if ($SkipTools) {
     if (Test-Cmd npm) {
         try {
             $npmRoot = (& npm root -g) 2>$null
-            $cand = Join-Path $npmRoot "@anthropic-ai\claude-code\cli.js"
-            if (Test-Path $cand) { $claudeCli = $cand }
+            $claudeCli = Find-ClaudeCli $npmRoot
         } catch {}
         if (-not $claudeCli) {
             Write-Info "Claude Code CLI is missing."
@@ -211,8 +235,7 @@ if ($SkipTools) {
                 & npm install -g "@anthropic-ai/claude-code"
                 try {
                     $npmRoot = (& npm root -g) 2>$null
-                    $cand = Join-Path $npmRoot "@anthropic-ai\claude-code\cli.js"
-                    if (Test-Path $cand) { $claudeCli = $cand }
+                    $claudeCli = Find-ClaudeCli $npmRoot
                 } catch {}
             }
         }
@@ -223,7 +246,9 @@ if ($SkipTools) {
 
     # Pin the resolved tool paths so the daemons do not have to guess.
     if (Test-Cmd node)   { Set-UserEnv "ISU_NODE_BIN"   (Get-Command node).Source }
-    if ($claudeCli)      { Set-UserEnv "ISU_CLAUDE_CLI" $claudeCli }
+    # ISU_CLAUDE_CLI is started directly as an executable, so only pin the
+    # native claude.exe; the legacy cli.js is found via %APPDATA% by default.
+    if ($claudeCli -and $claudeCli.EndsWith(".exe")) { Set-UserEnv "ISU_CLAUDE_CLI" $claudeCli }
 }
 Set-Status "Python"       $(if (Test-Cmd python) { "ok" } else { "MISSING" })
 Set-Status "Node.js"      $(if (Test-Cmd node)   { "ok" } else { "MISSING" })
@@ -439,15 +464,30 @@ Write-Host ""
 if ($env:ANTHROPIC_API_KEY) {
     Write-Ok "ANTHROPIC_API_KEY is already set."
 } else {
-    if (Ask-YesNo "Do you have a Max/Pro plan and want to sign in via /login (way A)?" $true) {
-        Write-Info "After the wizard, open a NEW terminal and type:  claude"
-        Write-Info "Then  /login  and follow the browser flow. No key needed."
+    $loggedIn = Test-ClaudeLogin
+    if ($loggedIn -eq $true) {
+        Write-Ok "Claude plan login is active."
+    } elseif (Ask-YesNo "Do you have a Max/Pro plan and want to sign in now (way A, browser opens)?" $true) {
+        $exe = $env:ISU_CLAUDE_CLI
+        if (-not $exe -or -not (Test-Path $exe)) {
+            try { $exe = Find-ClaudeCli ((& npm root -g) 2>$null) } catch { $exe = $null }
+        }
+        if ($exe -and $exe.EndsWith(".exe")) {
+            & $exe auth login
+            $loggedIn = Test-ClaudeLogin
+        }
+        if ($loggedIn -eq $true) {
+            Write-Ok "Claude plan login is active."
+        } else {
+            Write-Warn "Login not confirmed. Later: new terminal -> 'claude auth login' (or 'claude' then /login)."
+            Write-Info "start_game.bat checks the login on every start and offers to sign in again."
+        }
     } else {
         $k = Read-Host "  Enter ANTHROPIC_API_KEY (empty = skip)"
         if ($k) { Set-UserEnv "ANTHROPIC_API_KEY" $k.Trim(); Write-Ok "API key saved." }
     }
 }
-Set-Status "Claude login" $(if ($env:ANTHROPIC_API_KEY) { "API key" } else { "plan /login (manual)" })
+Set-Status "Claude login" $(if ($env:ANTHROPIC_API_KEY) { "API key" } elseif ((Test-ClaudeLogin) -eq $true) { "ok (plan)" } else { "MISSING - run 'claude auth login'" })
 
 # ===========================================================================
 #  STEP 7: Optional extras (cloud models, voice, Discord)

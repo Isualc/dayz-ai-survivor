@@ -4,9 +4,12 @@
 // Identitaetsfarbe, Name, HP-Balken, Distanz zum lokalen Spieler, aktuelle
 // Aktion und Gedankenzeile (zweizeilig, umbrechend). Datenquelle ist
 // AUSSCHLIESSLICH der bestehende IsuNametagStore (gefuellt von
-// RPC_NAMETAG/RPC_INTENT) - kein eigener Server-RPC, reine Zweitverwertung
-// der Nameplate-Daten. Getrieben von MissionGameplay.OnUpdate
-// (IsuArenaMenu.c), Dreifach-Schalter "HUD" im Arena-Menue
+// RPC_NAMETAG/RPC_INTENT/RPC_AGENTPOS) - kein eigener Server-RPC, reine
+// Zweitverwertung der Nameplate-Daten. Agenten ausserhalb der Netzwerk-
+// Bubble (Objekt auf dem Client nicht repliziert) erscheinen mit der per
+// RPC_AGENTPOS gefunkten Position und "(fern)" hinter dem Namen; ohne
+// diesen RPC (alter Server) nur replizierte Agenten. Getrieben von
+// MissionGameplay.OnUpdate (IsuArenaMenu.c), Dreifach-Schalter "HUD" im Arena-Menue
 // (IsuArenaMenu.s_SquadHudMode: 0=OFF, 1=LEFT, 2=RIGHT - Default rechts
 // oben, damit das Discord-Overlay links oben frei bleibt). Rein Client-seitig.
 
@@ -157,14 +160,33 @@ class IsuSquadHud
 
 		int overflow = 4;
 		int visible = 0;
+		int nowMs = GetGame().GetTime();
 
 		foreach (string key, IsuAgentTag t : IsuNametagStore.s_Agents)
 		{
-			// Despawnt/ausserhalb der Bubble: still ueberspringen. Das Abraeumen
-			// stiller Keys uebernimmt IsuNameplateHud (laeuft im selben Tick).
-			Object obj = GetGame().GetObjectByNetworkId(t.low, t.high);
-			if (!obj)
+			// Abgelaufen (kein Server-RPC seit 10 s) oder noch ohne Namen
+			// (Position/Intent kam vor dem ersten Nametag-RPC): still
+			// ueberspringen. Das Abraeumen abgelaufener Keys uebernimmt
+			// IsuNameplateHud (laeuft im selben Tick davor).
+			if (IsuNametagStore.IsStale(t, nowMs))
 				continue;
+			if (t.name == "")
+				continue;
+
+			// Repliziert (in der Netzwerk-Bubble): Live-Position vom Objekt.
+			// Sonst die letzte per RPC_AGENTPOS gefunkte Position, Zeile mit
+			// Zusatz "(fern)". Ein alter Server ohne RPC_AGENTPOS liefert keine
+			// Position -> wie bisher nur replizierte Agenten anzeigen.
+			Object obj = GetGame().GetObjectByNetworkId(t.low, t.high);
+			if (!obj && !t.hasPos)
+				continue;
+			bool isFar = true;
+			vector apos = t.pos;
+			if (obj)
+			{
+				isFar = false;
+				apos = obj.GetPosition();
+			}
 
 			int row;
 			if (t.slot >= 0 && t.slot <= 3)
@@ -190,10 +212,16 @@ class IsuSquadHud
 			if (chip)
 				chip.SetColor(SlotColor(t.slot));
 
+			// "(fern)" steht hinter dem Namen statt hinter der Distanz: SqDist
+			// ist im Layout nur 70 px breit ("1460 m" fuellt es), ein Zusatz
+			// liefe in die Aktionsspalte. SqName hat 130 px.
 			TextWidget nm = m_Names[row];
 			if (nm)
 			{
-				nm.SetText(t.name);
+				string nameTxt = t.name;
+				if (isFar)
+					nameTxt = nameTxt + " " + IsuUiText.Choose("(far)", "(fern)");
+				nm.SetText(nameTxt);
 				nm.SetColor(SlotColor(t.slot));
 			}
 
@@ -202,8 +230,16 @@ class IsuSquadHud
 			{
 				if (hasPlayer)
 				{
-					int dist = Math.Round(vector.Distance(pp, obj.GetPosition()));
-					dt.SetText(dist.ToString() + " m");
+					// Ferne Agenten koennen ueber 10 km weg sein ("12345 m"
+					// sprengt die 70-px-Spalte) -> ab 10 km ganze Kilometer.
+					int dist = Math.Round(vector.Distance(pp, apos));
+					string distTxt = dist.ToString() + " m";
+					if (dist >= 10000)
+					{
+						int distKm = dist / 1000;
+						distTxt = distKm.ToString() + " km";
+					}
+					dt.SetText(distTxt);
 				}
 				else
 				{

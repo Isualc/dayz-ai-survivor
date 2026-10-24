@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Schneller MCP-Handshake-Test fuer dayz_mcp.py ohne Claude Code.
+"""Schneller MCP-Handshake-Test für dayz_mcp.py ohne Claude Code.
 
-Spricht rohes JSON-RPC ueber stdio: initialize -> tools/list -> observe.
+Spricht rohes JSON-RPC über stdio: initialize -> tools/list -> observe.
 """
 
 import json

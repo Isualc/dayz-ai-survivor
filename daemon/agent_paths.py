@@ -1,9 +1,9 @@
-"""Gemeinsame Pfad-Aufloesung fuer Agenten-Homes.
+"""Gemeinsame Pfad-Auflösung für Agenten-Homes.
 
-Bis 2026-08 lag diese Funktion als identische Kopie in fuenf Dateien
+Bis 2026-08 lag diese Funktion als identische Kopie in fünf Dateien
 (arena_supervisor, dayz_mcp, missions, orchestrator, voice_router) - vor der
 Erweiterung auf dynamische NPC-Slots hier konsolidiert, damit ein neuer
-Sonderfall nie wieder an fuenf Stellen gepflegt werden muss.
+Sonderfall nie wieder an fünf Stellen gepflegt werden muss.
 """
 
 import os

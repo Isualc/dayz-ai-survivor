@@ -27,6 +27,12 @@ class IsuBridge
 	// Comic-Sprechblase: gesagter Text eines Agenten an die Clients ("ISUO")
 	static const int RPC_SAY = 0x4953554F;
 
+	// Squad-HUD: Agenten-Position an die Clients ("ISUP"), auch fuer Agenten
+	// ausserhalb der Netzwerk-Bubble (~1 km), deren Objekt der Client nicht
+	// kennt. Muss zu ISU_RPC_AGENTPOS in IsuVoice/IsuVoiceReceiver.c passen.
+	// Param3<int, int, vector> (low, high, Position), ungarantiert.
+	static const int RPC_AGENTPOS = 0x49535550;
+
 	// Arena: eine Bridge-Instanz pro Agent (Id = Dateisuffix)
 	private static ref map<string, ref IsuBridge> s_Instances = new map<string, ref IsuBridge>();
 
@@ -92,6 +98,36 @@ class IsuBridge
 	private int m_BleedTicks;            // Ticks in Folge mit aktiver Blutung
 	private int m_LastAutoBandageMs;     // GetGame().GetTime() des letzten Reflex-Verbands
 	private int m_AutoBandages;          // Zähler Reflex-Verbände (State: auto_bandages)
+	// engage: eigene Startzeit (m_CmdStartTime setzt StartWalk bei jedem
+	// Nachziehen neu), Nahkampf-Lock (text "melee") und Eskalationsgrund
+	private float m_EngageStartTime;
+	private bool m_EngageMelee;
+	private string m_EngageEscalated;
+	private int m_EngageShotsStart;      // Schusszaehler beim engage-Start
+	// equip_melee_lock (engage mode="melee"): Nahkampf-Lock schon beim Ziehen
+	// setzen - ohne Ziel griff Expansion in den 1-2 s bis zum engage-Befehl
+	// sonst sofort wieder zur Schusswaffe. Der engage-Dispatch loest den Lock
+	// und CmdEngage setzt ihn im selben Tick neu (kein FSM-Schritt dazwischen).
+	private bool m_EquipMeleeLock;
+	// EnsureHandsFree: abgelegtes Hand-Item (Meldung im equip-Ergebnis) bzw.
+	// Typ der Feuerwaffe, die nicht verstaut werden konnte (nie abwerfen)
+	private string m_LastHandDrop;
+	private string m_HandsBlockedType;
+	// drop: asynchrone Erfolgspruefung ueber bis zu 3 Ticks
+	private ItemBase m_DropPendingItem;
+	private string m_DropPendingType;
+	private int m_DropPendingCount;      // Anzahl dieses Typs im Inventar VOR dem Drop
+	private int m_DropPendingTries;
+	// regroup: Ziel (Spieler ODER Kamerad) wird alle 5 s nachgefuehrt
+	private PlayerBase m_RegroupTarget;
+	private string m_RegroupTargetName;
+	private float m_RegroupStart;
+	private float m_LastRegroupRetarget;
+	// Neben-Befehl (say/intent/ping waehrend ein Hauptbefehl laeuft)
+	private string m_SideCmdId;
+	private string m_SideCmdAction;
+	private string m_SideCmdStatus;
+	private string m_SideCmdDetail;
 
 	static IsuBridge GetInstance(string id = "viktor")
 	{
@@ -172,6 +208,10 @@ class IsuBridge
 		m_CmdDetail = "";
 		m_Following = false;
 		m_Intent = "";
+		m_SideCmdId = "";
+		m_SideCmdAction = "";
+		m_SideCmdStatus = "";
+		m_SideCmdDetail = "";
 
 		// Default-Anzeigename aus der Id ("viktor" -> "Viktor")
 		m_NpcName = id;
@@ -184,7 +224,7 @@ class IsuBridge
 
 		GetGame().GetCallQueue(CALL_CATEGORY_SYSTEM).CallLater(Tick, 1000, true);
 
-		Print("[IsuSurvivor] bridge v0.13-weltmed slot '" + id + "' started");
+		Print("[IsuSurvivor] bridge v0.14-sessionfix slot '" + id + "' started");
 	}
 
 	void Tick()
@@ -273,6 +313,9 @@ class IsuBridge
 	// Gedanken-HUD: aktuelle Absicht aus intent_<id>.txt lesen (vom MCP-Tool
 	// intent() gesetzt). Die Datei wird NICHT geloescht - die Absicht bleibt
 	// gueltig bis zur naechsten Setzung. Muster wie TickArenaStatus.
+	// Auch eine LEERE Datei gilt (24.10.2026): run_agent leert sie beim Start,
+	// frueher blieb dann die Absicht aus einer 8 Tage alten Session stehen.
+	// Fehlt die Datei gerade (fh == 0), bleibt der alte Wert.
 	private void ReadIntent()
 	{
 		FileHandle fh = OpenFile("$profile:IsuSurvivor/intent_" + m_Id + ".txt", FileMode.READ);
@@ -282,8 +325,7 @@ class IsuBridge
 		FGets(fh, line);
 		CloseFile(fh);
 		line = line.Trim();
-		if (line != "")
-			m_Intent = line;
+		m_Intent = line;
 	}
 
 	// Fraktions-Watchdog: Expansions Spiel-Interaktion "Entlassen" wirft den
@@ -409,6 +451,16 @@ class IsuBridge
 			return;
 		}
 
+		// Sofort-Aktionen (say/intent/ping/bubble/say_voice) verdraengen keinen laufenden Befehl
+		// mehr: 35 Verdraengungen in der Session vom 24.10.2026, meist Reise-
+		// Segmente und Pickups (der Reise-Thread wartete danach bis 60 s auf eine
+		// cmd-id, die nie fertig wurde). Ergebnis steht in state.side_command.
+		if (m_CmdStatus == "running" && IsSideAction(cmd.action))
+		{
+			DispatchSide(cmd);
+			return;
+		}
+
 		if (m_CmdStatus == "running")
 			LogError("Befehl " + m_CmdId + " durch " + cmd.id + " verdraengt");
 
@@ -419,6 +471,9 @@ class IsuBridge
 		m_PickupItem = null;
 		m_PickupWalking = false;
 		m_PickupFilter = "";
+		// Nahkampf-Lock eines verdraengten engage loesen, bevor das Ziel faellt
+		ReleaseMeleeLock();
+		m_EngageEscalated = "";
 		m_EngageTarget = null;
 		m_CorpseTarget = null;
 		m_HarvestTarget = null;
@@ -429,12 +484,25 @@ class IsuBridge
 		m_EquipPendingItem = null;
 		m_EquipPendingTries = 0;
 		m_EquipPendingType = "";
+		m_EquipMeleeLock = false;
 		m_StoreFilter = "";
+		m_LastHandDrop = "";
+		m_HandsBlockedType = "";
+		m_DropPendingItem = null;
+		m_DropPendingType = "";
+		m_DropPendingCount = 0;
+		m_DropPendingTries = 0;
+		m_RegroupTarget = null;
+		m_RegroupTargetName = "";
 
 		switch (cmd.action)
 		{
 			case "ping":
 				m_CmdStatus = "done";
+				break;
+
+			case "intent":
+				CmdIntent(cmd);
 				break;
 
 			case "spawn":
@@ -494,6 +562,11 @@ class IsuBridge
 				break;
 
 			case "equip":
+				CmdEquip(cmd);
+				break;
+
+			case "equip_melee_lock":
+				m_EquipMeleeLock = true;
 				CmdEquip(cmd);
 				break;
 
@@ -642,6 +715,89 @@ class IsuBridge
 		Print("[IsuSurvivor] cmd " + cmd.id + " (" + cmd.action + ") -> " + m_CmdStatus);
 	}
 
+	// Sofort-Aktionen ohne Laufzeit, die einen laufenden Hauptbefehl nicht
+	// verdraengen duerfen (Schnittstelle C6: say/intent/ping). bubble und
+	// say_voice sind genauso reine RPC-Aktionen ohne Laufzeit - say_voice
+	// verdraengte am 24.10. 18:54:37 Viktors Reise-Segment. bridge.wait_status
+	// erkennt side_command allein an der cmd_id, die Erweiterung ist also
+	// kompatibel.
+	private bool IsSideAction(string action)
+	{
+		if (action == "say")
+			return true;
+		if (action == "intent")
+			return true;
+		if (action == "ping")
+			return true;
+		if (action == "bubble")
+			return true;
+		if (action == "say_voice")
+			return true;
+		return false;
+	}
+
+	// Neben-Befehl ausfuehren, ohne den Hauptslot (m_CmdId/m_CmdAction/
+	// Pending-Zustaende) anzufassen. Die Cmd*-Handler schreiben ihr Ergebnis in
+	// m_CmdStatus/m_CmdDetail - deshalb den Hauptstatus sichern, das
+	// Neben-Ergebnis nach state.side_command umlenken und zuruecksetzen.
+	private void DispatchSide(IsuCommand cmd)
+	{
+		string mainStatus = m_CmdStatus;
+		string mainDetail = m_CmdDetail;
+
+		m_CmdDetail = "";
+		if (cmd.action == "say")
+		{
+			CmdSay(cmd);
+		}
+		else if (cmd.action == "intent")
+		{
+			CmdIntent(cmd);
+		}
+		else if (cmd.action == "bubble")
+		{
+			CmdBubble(cmd);
+		}
+		else if (cmd.action == "say_voice")
+		{
+			CmdSayVoice(cmd);
+		}
+		else
+		{
+			m_CmdStatus = "done";
+		}
+
+		m_SideCmdId = cmd.id;
+		m_SideCmdAction = cmd.action;
+		m_SideCmdStatus = m_CmdStatus;
+		m_SideCmdDetail = m_CmdDetail;
+
+		m_CmdStatus = mainStatus;
+		m_CmdDetail = mainDetail;
+
+		Print("[IsuSurvivor] cmd " + cmd.id + " (" + cmd.action + ", neben " + m_CmdId + ") -> " + m_SideCmdStatus);
+	}
+
+	// Absicht direkt per Befehl setzen (Gedanken-HUD). Hauptkanal bleibt
+	// intent_<id>.txt: existiert die Datei, liest ReadIntent sie im naechsten
+	// Tick wieder ein und ihr Inhalt hat Vorrang.
+	private void CmdIntent(IsuCommand cmd)
+	{
+		string intentText = cmd.text;
+		m_Intent = intentText.Trim();
+		m_CmdStatus = "done";
+		m_CmdDetail = "Absicht gesetzt";
+	}
+
+	// Nahkampf-Lock (engage mode="melee") loesen - in JEDEM Ausstieg aus
+	// engage: Ende, Tod, Timeout, Eskalation, neuer Befehl, Spieler-Direktbefehl.
+	private void ReleaseMeleeLock()
+	{
+		m_EngageMelee = false;
+		if (m_Npc)
+			IsuAgentRegistry.SetMeleeLock(m_Npc, false);
+	}
+
 	// ------------------------------------------------------- Basis-Kommandos
 
 	private void CmdSpawn(IsuCommand cmd)
@@ -704,6 +860,13 @@ class IsuBridge
 
 		ai.SetMovementSpeedLimits(2.0, 3.0);
 
+		// Alter (toter) Koerper: Namensschild-Remove SOFORT funken. Register()
+		// wirft ihn gleich still aus der Registry - kam das vor dem naechsten
+		// 3-s-Nametag-Tick, erfuhr der Client nie davon (HUD-4).
+		if (m_Npc && m_Npc != ai)
+			SendNametagRemove(m_Npc, m_NpcName);
+		ResetBodyState();
+
 		m_Npc = ai;
 		IsuAgentRegistry.Register(ai, m_NpcName);
 		// Battle-Royale PER AGENT setzen: jeder Spawn traegt seinen eigenen Modus
@@ -711,6 +874,19 @@ class IsuBridge
 		// kein Server-Neustart zum Umschalten noetig.
 		IsuAgentRegistry.SetBrMode(ai, cmd.br == "1");
 		m_CmdStatus = "done";
+	}
+
+	// Koerpergebundener Zustand der Bridge-Instanz (pro Agenten-Id) darf den
+	// Koerperwechsel (Spawn/Adopt nach Tod) nicht ueberleben: sonst zeigte der
+	// neue Koerper sofort "folgt" (m_Following vom AutoFollowDriver des alten)
+	// und die letzte Vor-Tod-Absicht (HUD-6). Laeuft VOR m_Npc = neu, damit der
+	// Nahkampf-Lock noch am alten Koerper geloest wird.
+	private void ResetBodyState()
+	{
+		ReleaseMeleeLock();
+		m_Following = false;
+		m_Slinged = false;
+		m_Intent = "";
 	}
 
 	private void CmdMoveTo(IsuCommand cmd)
@@ -770,6 +946,7 @@ class IsuBridge
 		ReleaseClaim();
 		m_PickupItem = null;
 		m_PickupWalking = false;
+		ReleaseMeleeLock();
 		m_EngageTarget = null;
 		m_CorpseTarget = null;
 		m_HarvestTarget = null;
@@ -787,6 +964,7 @@ class IsuBridge
 		ReleaseClaim();
 		m_PickupItem = null;
 		m_PickupWalking = false;
+		ReleaseMeleeLock();
 		m_EngageTarget = null;
 		m_CorpseTarget = null;
 		m_HarvestTarget = null;
@@ -881,6 +1059,8 @@ class IsuBridge
 		ReleaseClaim();
 		m_PickupItem = null;
 		m_PickupWalking = false;
+		ReleaseMeleeLock();
+		m_EngageEscalated = "";
 		m_EngageTarget = null;
 		m_CorpseTarget = null;
 		m_HarvestTarget = null;
@@ -1790,6 +1970,14 @@ class IsuBridge
 				continue;
 
 			float dist = vector.Distance(m_Npc.GetPosition(), cont.GetPosition());
+			// Aufgebaute Zelte bevorzugen (Depot): ein Zelt in 35 m schlaegt einen
+			// abgelegten Rucksack/Kochtopf in 6 m. Viktor verstaute 24.10. in einen
+			// kleinen Behaelter neben dem Lagerzelt und hielt das Zelt danach fuer
+			// "voll". Nur PITCHED (vanilla tentbase.c:21/459) - ein eingepacktes
+			// Zelt am Boden ist kein Depot.
+			TentBase storeTent = TentBase.Cast(cont);
+			if (storeTent && storeTent.GetState() == TentBase.PITCHED)
+				dist = dist - 30.0;
 			if (dist < nearest)
 			{
 				nearest = dist;
@@ -1862,6 +2050,11 @@ class IsuBridge
 		EntityAI storeTarget = m_CorpseTarget;   // vor dem Nullen fuer die Diagnose merken
 		m_CorpseTarget = null;
 		m_StoreFilter = "";
+		// Ziel-Typ in jede Meldung: "Container voll" ohne Typ fuehrte zur
+		// Fehldiagnose "das LargeTent fasst kaum etwas" (Viktor 24.10.)
+		string storeType = "Container";
+		if (storeTarget)
+			storeType = storeTarget.GetType();
 
 		if (stored == 0)
 		{
@@ -1879,9 +2072,9 @@ class IsuBridge
 					cargoCount = storeTarget.GetInventory().GetCargo().GetItemCount();
 
 				if (cargoCount == 0)
-					m_CmdDetail = "Container nahm nichts an, ist aber leer - das Zelt ist evtl. noch nicht fertig aufgebaut. Kurz warten oder das Zelt einmal oeffnen, dann erneut versuchen (kein Bug).";
+					m_CmdDetail = "Container " + storeType + " nahm nichts an, ist aber leer - das Zelt ist evtl. noch nicht fertig aufgebaut. Kurz warten oder das Zelt einmal oeffnen, dann erneut versuchen (kein Bug).";
 				else
-					m_CmdDetail = "Container voll (" + cargoCount.ToString() + " drin) - " + full.ToString() + " Item(s) passten nicht rein";
+					m_CmdDetail = "Container " + storeType + " voll (" + cargoCount.ToString() + " drin) - " + full.ToString() + " Item(s) passten nicht rein";
 			}
 			else
 				m_CmdDetail = "nichts Loses zum Verstauen im Inventar (nur Getragenes/Waffe)";
@@ -1889,7 +2082,9 @@ class IsuBridge
 		}
 
 		m_CmdStatus = "done";
-		m_CmdDetail = stored.ToString() + " Item(s) verstaut";
+		m_CmdDetail = stored.ToString() + " Item(s) in " + storeType + " verstaut";
+		if (full > 0)
+			m_CmdDetail = m_CmdDetail + ", " + full.ToString() + " passten nicht mehr rein";
 	}
 
 	// Konserven oeffnen braucht Werkzeug (wie beim Spieler); Getraenkedosen
@@ -2001,17 +2196,22 @@ class IsuBridge
 				continue;
 			if (IsDrinkItem(edible) != liquid)
 				continue;
-			if (edible.GetQuantity() <= 0)
-				continue;
 			if (liquid && !IsSafeDrink(edible))
 				continue;
 			if (!liquid && !IsSafeFood(edible))
 				continue;
+			// Verschluss VOR der Menge pruefen: verschlossene Konserven haben
+			// keine echte Menge (BakedBeansCan taeuscht die Leiste nur per
+			// GetQuantityNormalizedScripted vor, observe zeigt sie mit x0).
+			// Der Mengenfilter davor liess sealedSeen nie true werden - eat
+			// oeffnete keine Dose mehr (Viktor 24.10.: ganze Session Magen 0).
 			if (IsSealedCan(edible))
 			{
 				sealedSeen = true;
 				continue;
 			}
+			if (edible.GetQuantity() <= 0)
+				continue;
 			if (!edible.CanBeConsumed())
 				continue;
 			if (!firstAny)
@@ -2073,6 +2273,28 @@ class IsuBridge
 		return false;
 	}
 
+	// Liegt eine verschlossene Konserve der Kategorie (passend zum Filter) im
+	// Inventar? Fuer eine ehrliche eat-Meldung statt "kein passendes Essbares".
+	private bool HasSealedConsumable(bool liquid, string filter)
+	{
+		array<EntityAI> sealedItems = new array<EntityAI>();
+		m_Npc.GetInventory().EnumerateInventory(InventoryTraversalType.PREORDER, sealedItems);
+		foreach (EntityAI sealedEnt : sealedItems)
+		{
+			Edible_Base sealedEdible = Edible_Base.Cast(sealedEnt);
+			if (!sealedEdible)
+				continue;
+			if (IsDrinkItem(sealedEdible) != liquid)
+				continue;
+			if (!IsSealedCan(sealedEdible))
+				continue;
+			if (filter != "" && sealedEdible.GetType().IndexOf(filter) == -1)
+				continue;
+			return true;
+		}
+		return false;
+	}
+
 	private void CmdConsume(bool liquid, string filter)
 	{
 		if (!NpcReady())
@@ -2114,7 +2336,12 @@ class IsuBridge
 		if (!best)
 		{
 			m_CmdStatus = "failed";
-			if (filter != "")
+			bool sealedMatch = false;
+			if (!liquid && sealedSeen)
+				sealedMatch = HasSealedConsumable(liquid, filter);
+			if (filter != "" && sealedMatch && !HasCanOpeningTool())
+				m_CmdDetail = "nur verschlossene Konserve (" + filter + ") - Dosenoeffner oder Messer noetig";
+			else if (filter != "")
 				m_CmdDetail = "kein passendes Essbares im Inventar (filter: " + filter + ")";
 			else if (sealedSeen && !liquid)
 				m_CmdDetail = "nur verschlossene Konserven - Dosenoeffner oder Messer noetig";
@@ -2154,7 +2381,9 @@ class IsuBridge
 
 	private void CmdEquipBest()
 	{
-		if (!NpcReady())
+		// Im Fahrzeug greift eAI_TakeItemToHands nicht: frueher 16 Retry-Ticks
+		// bis "Hand blockiert?" (Birgit 24.10. auf dem Motorrad-Sozius)
+		if (!NpcReadyOnFoot())
 			return;
 
 		m_Slinged = false;   // Waffe in der Hand = kein Schulter-Marsch mehr
@@ -2180,7 +2409,19 @@ class IsuBridge
 			{
 				if (weapon.Expansion_HasAmmo())
 				{
+					// Unter den geladenen dieselbe Wahl wie Expansion treffen:
+					// eAI_WeaponSelection(aktuell, Vergleich) liefert true, wenn
+					// Expansion die Vergleichswaffe nehmen wuerde (DPS, Handgun
+					// nie statt Langwaffe, Einzellader nie statt Mehrlader;
+					// eAIBase.c:3528-3626). Frueher gewann die ERSTE geladene in
+					// PREORDER-Reihenfolge (Izh18 statt Izh43, Derringer statt
+					// Flinte) - Expansion tauschte Sekunden spaeter per
+					// TakeItemToHands.Guard zurueck und "Ausgeruestet: X" war
+					// veraltet. Die Python-Tabelle tactics.WEAPON_TIERS bleibt nur
+					// fuer die Loot-Bewertung zustaendig.
 					if (!bestLoaded)
+						bestLoaded = weapon;
+					else if (m_Npc.eAI_WeaponSelection(bestLoaded, weapon))
 						bestLoaded = weapon;
 				}
 				else if (!bestEmpty)
@@ -2217,7 +2458,12 @@ class IsuBridge
 		Weapon_Base bestWpn = Weapon_Base.Cast(best);
 		if (bestWpn && bestWpn.IsJammed())
 			bestWpn.SetJammed(false);
-		EnsureHandsFree(best);
+		if (!EnsureHandsFree(best))
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = HandsBlockedDetail();
+			return;
+		}
 		m_Npc.eAI_TakeItemToHands(best, true);
 		// NICHT sofort "done" melden: eAI_TakeItemToHands gibt true zurueck, sobald
 		// die Aktion ANGENOMMEN ist - NICHT wenn die Waffe wirklich in der Hand
@@ -2461,23 +2707,60 @@ class IsuBridge
 			return;
 		}
 
-		string tried = "";
+		// Waffen, deren eigene FSM gerade laedt/repetiert (Expansion laedt im
+		// Kampf selbst nach), NICHT anfassen: ReloadWeaponFromPiles setzt am
+		// Ende per RandomizeFSMState den Zustand hart zurueck und brach damit
+		// einen laufenden Kammer-Vorgang ab (6 von 12 reload-done am 24.10.
+		// mit NULL m_player in ChamberMultiBullet/WeaponChambering.OnExit).
+		string busy = "";
+		string reasons = "";
 		foreach (Weapon_Base w : cands)
 		{
+			if (IsWeaponBusy(w))
+			{
+				if (busy != "")
+					busy = busy + ", ";
+				busy = busy + w.GetType();
+				continue;
+			}
 			string note = "";
 			int loaded = ReloadWeaponFromPiles(w, items, piles, note);
 			if (loaded > 0)
 			{
 				m_CmdStatus = "done";
 				m_CmdDetail = note;
+				if (busy != "")
+					m_CmdDetail = m_CmdDetail + "; " + busy + " laedt gerade selbst nach (nicht angefasst)";
 				return;
 			}
-			if (tried != "")
-				tried = tried + ", ";
-			tried = tried + w.GetType();
+			if (reasons != "")
+				reasons = reasons + "; ";
+			reasons = reasons + note;
 		}
 		m_CmdStatus = "failed";
-		m_CmdDetail = "nichts umgeladen: lose Munition passt zu keiner Waffe (" + tried + ") oder alles ist schon voll";
+		if (busy != "" && reasons == "")
+			m_CmdDetail = "Waffe laedt gerade selbst nach: " + busy + " - das ist kein Munitionsproblem, in 3 s erneut reload";
+		else if (busy != "")
+			m_CmdDetail = "nichts umgeladen: " + reasons + "; " + busy + " laedt gerade selbst nach - in 3 s erneut reload";
+		else
+			m_CmdDetail = "nichts umgeladen: " + reasons;
+	}
+
+	// Waffen-FSM mitten in einem eigenen Vorgang (Laden/Kammern/Repetieren)?
+	// IsIdle = FSM laeuft UND stabiler Zustand (vanilla weapon_base.c:286,
+	// weaponstablestate.c:95) - gilt auch fuer Waffen im Cargo. Fuer die
+	// Handwaffe zusaetzlich der laufende WeaponManager (weaponmanager.c:874).
+	private bool IsWeaponBusy(Weapon_Base w)
+	{
+		if (!w.IsIdle())
+			return true;
+		if (w == m_Npc.GetHumanInventory().GetEntityInHands())
+		{
+			WeaponManager wm = m_Npc.GetWeaponManager();
+			if (wm && wm.IsRunning())
+				return true;
+		}
+		return false;
 	}
 
 	// EINE Waffe aus losen Stapeln befuellen. Phase A: Magazine (lose und
@@ -2490,6 +2773,31 @@ class IsuBridge
 	{
 		string wtype = wpn.GetType();
 		note = "";
+
+		// Nie in einen laufenden eigenen Lade-/Kammer-Vorgang greifen (CmdReload
+		// filtert das schon vorher, hier nur als Absicherung fuer andere Aufrufer)
+		if (!wpn.IsIdle())
+		{
+			note = wtype + " laedt gerade selbst nach";
+			return 0;
+		}
+
+		// FSM-Zustand an den echten Kammer-/Magazinzustand angleichen, bevor wir
+		// laden (vanilla weapon_base.c:1086 -> weaponfsm.c:453, repariert nur
+		// stabile Zustaende; Vanilla ruft es selbst bei OnInventoryEnter).
+		// Script-Log 24.10. 19:03:19: "ChamberFiredRepair - DoubleBarrelLoaded-
+		// Loaded - state: 0 != weapon: 1" - mit so einem Desync nahm die Izh43
+		// keine Patrone an und reload meldete "passt zu keiner Waffe".
+		wpn.ValidateAndRepair();
+
+		// Diagnose fuer den Fehlschlag: gab es freien Platz, gab es passende
+		// Munition, hat eine Kammer verweigert? Frueher pauschal "passt zu
+		// keiner Waffe oder alles ist schon voll" - Viktor schloss daraus, seine
+		// Izh43 sei einlaeufig und der Schrot passe nicht.
+		bool hadSpace = false;
+		bool hadFit = false;
+		bool foundMag = false;
+		string chamberDiag = "";
 
 		// Phase A: kompatible Magazine der Waffe fuellen (loses UND gestecktes)
 		TStringArray wmags = new TStringArray();
@@ -2514,9 +2822,11 @@ class IsuBridge
 				}
 				if (!fits)
 					continue;
+				foundMag = true;
 				int space = mg.GetAmmoMax() - mg.GetAmmoCount();
 				if (space <= 0)
 					continue;
+				hadSpace = true;
 				TStringArray accepts = new TStringArray();
 				mg.ConfigGetTextArray("ammoItems", accepts);
 				foreach (Magazine pile : piles)
@@ -2534,6 +2844,7 @@ class IsuBridge
 					}
 					if (!ok)
 						continue;
+					hadFit = true;
 					int take = space;
 					if (pile.GetAmmoCount() < take)
 						take = pile.GetAmmoCount();
@@ -2556,6 +2867,8 @@ class IsuBridge
 			TStringArray chAmmo = new TStringArray();
 			GetGame().ConfigGetTextArray("CfgWeapons " + wtype + " chamberableFrom", chAmmo);
 			int spaceInt = wpn.GetInternalMagazineMaxCartridgeCount(0) - wpn.GetInternalMagazineCartridgeCount(0);
+			if (spaceInt > 0)
+				hadSpace = true;
 			foreach (Magazine pile2 : piles)
 			{
 				if (spaceInt <= 0)
@@ -2571,6 +2884,7 @@ class IsuBridge
 				}
 				if (!okc)
 					continue;
+				hadFit = true;
 				string bullet = "";
 				if (!AmmoTypesAPI.MagazineTypeToAmmoType(pt3, bullet))
 					continue;
@@ -2602,16 +2916,23 @@ class IsuBridge
 		TStringArray chAmmo2 = new TStringArray();
 		GetGame().ConfigGetTextArray("CfgWeapons " + wtype + " chamberableFrom", chAmmo2);
 		int muzzles = wpn.GetMuzzleCount();
+		bool pushRefused = false;
+		int barrelNo = 0;
 		for (int mi = 0; mi < muzzles; mi++)
 		{
+			barrelNo = mi + 1;
 			if (wpn.IsChamberFiredOut(mi))
 			{
 				float spentDmg;
 				string spentType;
 				wpn.EjectCartridge(mi, spentDmg, spentType);
+				if (wpn.IsChamberFiredOut(mi))
+					chamberDiag = chamberDiag + "Lauf " + barrelNo.ToString() + ": Huelse klemmt; ";
 			}
 			if (!wpn.IsChamberEmpty(mi))
 				continue;
+			hadSpace = true;
+			pushRefused = false;
 			foreach (Magazine pile3 : piles)
 			{
 				if (!pile3 || pile3.GetAmmoCount() <= 0)
@@ -2625,26 +2946,60 @@ class IsuBridge
 				}
 				if (!okc2)
 					continue;
+				hadFit = true;
 				string bullet2 = "";
 				if (!AmmoTypesAPI.MagazineTypeToAmmoType(pt4, bullet2))
 					continue;
 				if (!wpn.PushCartridgeToChamber(mi, 0.0, bullet2))
+				{
+					pushRefused = true;
 					continue;
+				}
+				pushRefused = false;
 				pile3.ServerSetAmmoCount(pile3.GetAmmoCount() - 1);
 				loadedCh++;
 				if (pile3.GetAmmoCount() <= 0)
 					GetGame().ObjectDelete(pile3);
 				break;
 			}
+			if (pushRefused)
+				chamberDiag = chamberDiag + "Lauf " + barrelNo.ToString() + ": Kammer nimmt keine Patrone; ";
 		}
 
 		int total = loadedMag + loadedInt + loadedCh;
 		if (total == 0)
+		{
+			// Konkreten Grund nennen statt der alten Pauschalmeldung
+			string acceptList = "";
+			int acceptShown = 0;
+			foreach (string accName : chAmmo2)
+			{
+				if (acceptShown >= 3)
+					break;
+				if (acceptList != "")
+					acceptList = acceptList + ", ";
+				acceptList = acceptList + accName;
+				acceptShown++;
+			}
+			if (chamberDiag != "")
+				note = wtype + ": " + chamberDiag.Trim();
+			else if (!hadSpace && wmags.Count() > 0 && !foundMag && !wpn.HasInternalMagazine(-1))
+				note = wtype + ": kein passendes Magazin zum Befuellen dabei (Patronen in die Kammer nur bei leerer Kammer)";
+			else if (!hadSpace)
+				note = wtype + ": schon voll geladen";
+			else if (!hadFit)
+				note = wtype + ": keine passende lose Munition dabei (nimmt: " + acceptList + ")";
+			else
+				note = wtype + ": Munition passt, wurde aber nicht angenommen";
 			return 0;
+		}
 
 		// FSM/Netz-Zustand an den neuen Munitionsstand angleichen (Muster
-		// SpawnAttachedMagazine), sonst glitcht die Waffe beim Feuern.
-		wpn.RandomizeFSMState();
+		// SpawnAttachedMagazine), sonst glitcht die Waffe beim Feuern. Nur im
+		// stabilen Zustand - RandomizeFSMState terminiert den aktuellen Zustand
+		// ohne Event (NULL m_player in ChamberMultiBullet.OnExit, 24.10.).
+		if (wpn.IsIdle())
+			wpn.RandomizeFSMState();
 		wpn.Synchronize();
 
 		if (loadedMag > 0)
@@ -2668,17 +3023,55 @@ class IsuBridge
 	// Hand freiraeumen, bevor eine Waffe gezogen wird: eAI_TakeItemToHands
 	// bricht bei belegter Hand hart ab (Ursache vieler "fehlgeschlagen"-
 	// Schleifen). Das Hand-Item wandert per eAI_TakeItemToInventory auf einen
-	// freien Slot (Waffen auf Schulter/Ruecken, Rest ins Cargo); klappt das
-	// nicht, wird es notfalls abgelegt.
-	private void EnsureHandsFree(ItemBase keep)
+	// freien Slot (Waffen auf Schulter/Ruecken, Rest ins Cargo; die eAI prueft
+	// dabei schon Attachment-Slots, eAIBase.c:10475-10551).
+	// Seit 24.10.2026: FEUERWAFFEN werden nie mehr stumm abgeworfen (Konrads
+	// CZ75 lag 8 m weg, Viktors Makarov war "verschluckt", Birgits Izh43 ging
+	// auf dem Motorrad verloren) - dann false, der Aufrufer meldet "kein Platz
+	// fuer <Typ>". Andere Hand-Items werden wie bisher abgelegt, der Typ steht
+	// in m_LastHandDrop und landet im Ergebnis ("vorher abgelegt: <Typ>").
+	// Im Fahrzeug wird nichts abgeworfen. ServerSwapEntities bewusst NICHT
+	// (an eAI ungetestet, Hand-Anim-Zustaende).
+	private bool EnsureHandsFree(ItemBase keep)
 	{
 		if (!m_Npc)
-			return;
+			return true;
 		ItemBase inHands = ItemBase.Cast(m_Npc.GetHumanInventory().GetEntityInHands());
 		if (!inHands || inHands == keep)
-			return;
-		if (!m_Npc.eAI_TakeItemToInventory(inHands, false))
-			m_Npc.eAI_DropItem(inHands, true);
+			return true;
+		if (m_Npc.eAI_TakeItemToInventory(inHands, false))
+			return true;
+		string handType = inHands.GetType();
+		if (m_Npc.IsInTransport())
+		{
+			m_HandsBlockedType = handType;
+			return false;
+		}
+		if (Weapon_Base.Cast(inHands))
+		{
+			m_HandsBlockedType = handType;
+			return false;
+		}
+		m_LastHandDrop = handType;
+		m_Npc.eAI_DropItem(inHands, true);
+		Print("[IsuSurvivor] " + m_NpcName + ": Hand-Item abgelegt (kein Platz im Inventar): " + handType);
+		return true;
+	}
+
+	// Fehlertext, wenn EnsureHandsFree die Hand nicht frei bekam
+	private string HandsBlockedDetail()
+	{
+		if (m_Npc && m_Npc.IsInTransport())
+			return "du sitzt in einem Fahrzeug - Waffe ziehen erst nach vehicle_exit";
+		return "kein Platz fuer " + m_HandsBlockedType + " (in der Hand) im Inventar - Feuerwaffen werden nicht abgeworfen; erst Ballast ablegen (drop) oder Platz schaffen, dann erneut";
+	}
+
+	// equip-Ergebnis um ein abgelegtes Hand-Item ergaenzen, damit das Gehirn
+	// es per pickup zurueckholen kann
+	private void AppendHandDropNote()
+	{
+		if (m_LastHandDrop != "")
+			m_CmdDetail = m_CmdDetail + "; vorher abgelegt: " + m_LastHandDrop;
 	}
 
 	private bool TakeToBodySlot(ItemBase item)
@@ -3062,7 +3455,8 @@ class IsuBridge
 	// liegt in der Taktik-Schicht des Daemons)
 	private void CmdEquip(IsuCommand cmd)
 	{
-		if (!NpcReady())
+		// Wie CmdEquipBest: im Fahrzeug sofort klar scheitern statt 16 s Retry
+		if (!NpcReadyOnFoot())
 			return;
 
 		if (cmd.text == "")
@@ -3103,8 +3497,17 @@ class IsuBridge
 		Weapon_Base wantedWpn = Weapon_Base.Cast(wanted);
 		if (wantedWpn && wantedWpn.IsJammed())
 			wantedWpn.SetJammed(false);
-		EnsureHandsFree(wanted);
+		if (!EnsureHandsFree(wanted))
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = HandsBlockedDetail();
+			return;
+		}
 		m_Npc.eAI_TakeItemToHands(wanted, true);
+		// Lock ab jetzt: haelt das Messer, sobald es in der Hand liegt (Guard
+		// prueft die Hand), und laeuft bis zum naechsten Befehl
+		if (m_EquipMeleeLock && wanted.Expansion_IsMeleeWeapon())
+			IsuAgentRegistry.SetMeleeLock(m_Npc, true);
 		m_EquipPendingItem = wanted;
 		m_EquipPendingType = cmd.text;
 		m_EquipPendingTries = 0;
@@ -3117,6 +3520,15 @@ class IsuBridge
 		if (!NpcReadyOnFoot())
 			return;
 
+		// Eigene Startzeit: StartWalk setzt m_CmdStartTime bei jedem Nachziehen
+		// neu (Timeout lief gegen wandernde Gegner nie ab) und die Schuss-
+		// Auswertung braucht den echten Kampfbeginn. Schon VOR der Zielsuche,
+		// damit auch "kein Gegner" das C3-Format (|SCHUSS=|HAND=|ESK=) traegt.
+		m_EngageStartTime = GetGame().GetTickTime();
+		m_EngageShotsStart = IsuAgentRegistry.ShotCount(m_Npc);
+		m_EngageEscalated = "";
+		m_EngageMelee = false;
+
 		// Naechster Infizierter wird Ziel: als Target registrieren (Awareness)
 		// UND hinlaufen — erst auf kurze Distanz steigt der Threat-Level genug,
 		// dass das eAI-Kampfsystem uebernimmt.
@@ -3124,7 +3536,7 @@ class IsuBridge
 		if (!target)
 		{
 			m_CmdStatus = "failed";
-			m_CmdDetail = "kein Gegner (Infizierter/Raubtier) in 100 m";
+			m_CmdDetail = EngageResultDetail("kein Gegner (Infizierter/Raubtier) in 100 m");
 			return;
 		}
 
@@ -3135,12 +3547,87 @@ class IsuBridge
 			info.InsertAI(m_Npc);
 
 		m_EngageTarget = target;
+		if (cmd.text == "melee")
+			m_EngageMelee = true;
 
 		if (!StartWalk(target.GetPosition()))
+		{
+			m_EngageTarget = null;
+			ReleaseMeleeLock();
 			return;
+		}
+
+		// Nahkampf-Lock: Expansion darf das Messer nicht gegen die Schusswaffe
+		// tauschen (modded eAIState_TakeItemToHands.Guard), bis Ende/Eskalation
+		if (m_EngageMelee)
+			IsuAgentRegistry.SetMeleeLock(m_Npc, true);
 
 		m_CmdStatus = "running";
 		m_CmdDetail = target.GetType();
+	}
+
+	// Nahkampf aufgeben und Expansion die Waffenwahl zurueckgeben (HP < 50 %
+	// oder 3+ akute Gegner). Der Grund steht im engage-Ergebnis (ESK=...).
+	private void EscalateEngage(string reason)
+	{
+		m_EngageEscalated = reason;
+		ReleaseMeleeLock();
+		Print("[IsuSurvivor] " + m_NpcName + ": Nahkampf-Lock geloest (" + reason + ")");
+	}
+
+	// Classnames der Waffen im Inventar, die seit 'since' gefeuert haben.
+	// Expansion fuehrt pro Waffe serverseitig Weapon_Base.m_eAI_LastFiredTime
+	// (Expansion Weapon_Base.c:23, gesetzt im EEFired-Serverzweig 329-341,
+	// Zeitbasis GetTickTime, hoechstens 1x pro Sekunde aktualisiert).
+	private string Isu_FiredSince(float since)
+	{
+		string fired = "";
+		string firedList = ",";
+		string firedType = "";
+		array<EntityAI> firedItems = new array<EntityAI>();
+		m_Npc.GetInventory().EnumerateInventory(InventoryTraversalType.PREORDER, firedItems);
+		foreach (EntityAI firedEnt : firedItems)
+		{
+			Weapon_Base firedWpn = Weapon_Base.Cast(firedEnt);
+			if (!firedWpn)
+				continue;
+			if (firedWpn.m_eAI_LastFiredTime < since)
+				continue;
+			firedType = firedWpn.GetType();
+			// exakter Listenvergleich (Izh18 ist Teilstring von Izh18Shotgun)
+			if (firedList.IndexOf("," + firedType + ",") > -1)
+				continue;
+			firedList = firedList + firedType + ",";
+			if (fired != "")
+				fired = fired + ",";
+			fired = fired + firedType;
+		}
+		return fired;
+	}
+
+	// engage-Ergebnis im Format der Schnittstelle C3:
+	// "<Text>|SCHUSS=<Waffen seit engage-Start>|HAND=<Hand-Item>|ESK=<Grund>"
+	// Python zerlegt an "|". SCHUSS faellt auf den Schusszaehler zurueck, wenn
+	// m_eAI_LastFiredTime den Schuss wegen der 1-s-Drosselung nicht zeigt oder
+	// die Waffe das Inventar verlassen hat.
+	private string EngageResultDetail(string text)
+	{
+		string fired = "";
+		string handType = "";
+		if (m_Npc)
+		{
+			fired = Isu_FiredSince(m_EngageStartTime);
+			if (fired == "" && IsuAgentRegistry.ShotCount(m_Npc) > m_EngageShotsStart)
+			{
+				fired = IsuAgentRegistry.LastShotWeapon(m_Npc);
+				if (fired == "")
+					fired = "unbekannte Waffe";
+			}
+			EntityAI handEnt = m_Npc.GetHumanInventory().GetEntityInHands();
+			if (handEnt)
+				handType = handEnt.GetType();
+		}
+		return text + "|SCHUSS=" + fired + "|HAND=" + handType + "|ESK=" + m_EngageEscalated;
 	}
 
 	private void CmdFlee(IsuCommand cmd)
@@ -3220,6 +3707,12 @@ class IsuBridge
 			m_CmdDetail = "keine lebende eAI auf dem Server";
 			return;
 		}
+
+		// Wie CmdSpawn: Remove fuer den alten Koerper sofort funken und den
+		// koerpergebundenen Zustand nicht auf den neuen uebernehmen
+		if (m_Npc && m_Npc != nearest)
+			SendNametagRemove(m_Npc, m_NpcName);
+		ResetBodyState();
 
 		m_Npc = nearest;
 		IsuAgentRegistry.Register(nearest, m_NpcName);
@@ -3414,7 +3907,10 @@ class IsuBridge
 	// 3=geht 4=wartet. Der Client mappt die Id auf den Anzeigetext.
 	int ActionLabelId()
 	{
-		if (m_CmdAction == "engage")
+		// "kaempft" nur bei LAUFENDEM engage - m_CmdAction bleibt nach dem Ende
+		// stehen, bis der naechste Befehl kommt (wait() schickt keinen), das
+		// Label klebte sonst minutenlang auf "kaempft".
+		if (m_CmdAction == "engage" && m_CmdStatus == "running")
 			return 0;
 		if (m_CmdStatus == "running" && (m_CmdAction == "loot_corpse" || m_CmdAction == "loot_container" || m_CmdAction == "pickup" || m_CmdAction == "harvest"))
 			return 1;
@@ -3444,30 +3940,18 @@ class IsuBridge
 		}
 		if (dead.Count() > 0)
 		{
-			array<Man> rplayers = new array<Man>();
-			GetGame().GetPlayers(rplayers);
 			foreach (eAIBase d : dead)
 			{
 				string dname = IsuAgentRegistry.AgentName(d);
 				if (s_MarkerModule)
 					s_MarkerModule.RemoveServerMarker("isu_agent_" + dname);
-				// Client: Namensschild der Leiche entfernen (packed = -1 = remove),
-				// sonst klebt es an der Leiche, bis sie despawnt, statt auf den
-				// Respawn ueberzugehen.
+				// Client: Namensschild der Leiche entfernen, sonst klebt es an
+				// der Leiche, bis sie despawnt, statt auf den Respawn ueberzugehen.
 				if (d)
 				{
-					int dlow, dhigh;
-					d.GetNetworkID(dlow, dhigh);
-					if (!(dlow == 0 && dhigh == 0))
-					{
-						Param5<int, int, string, int, int> rm = new Param5<int, int, string, int, int>(dlow, dhigh, dname, -1, 4);
-						foreach (Man rman : rplayers)
-						{
-							PlayerBase rpb = PlayerBase.Cast(rman);
-							if (rpb && rpb.GetIdentity())
-								GetGame().RPCSingleParam(rpb, RPC_NAMETAG, rm, true, rpb.GetIdentity());
-						}
-					}
+					SendNametagRemove(d, dname);
+					// Nahkampf-Lock, Schusszaehler & Co. des toten Koerpers mit weg
+					IsuAgentRegistry.ForgetBody(d);
 				}
 				IsuAgentRegistry.s_Npcs.Remove(d);
 			}
@@ -3531,13 +4015,19 @@ class IsuBridge
 
 			Param5<int, int, string, int, int> data = new Param5<int, int, string, int, int>(low, high, name, packed, actionId);
 
-			// Gedanken-HUD: Absicht (falls gesetzt) zusaetzlich per RPC_INTENT
-			string intentLine = "";
-			if (inst)
-				intentLine = inst.m_Intent;
+			// Gedanken-HUD: Absicht per RPC_INTENT - AUCH leer, damit der
+			// Client eine geleerte Absicht (run_agent-Start, Respawn) loescht.
+			// Frueher wurde nur Nicht-Leeres gefunkt und die alte Zeile blieb.
 			Param3<int, int, string> intentData = null;
-			if (intentLine != "")
-				intentData = new Param3<int, int, string>(low, high, intentLine);
+			if (inst)
+				intentData = new Param3<int, int, string>(low, high, inst.m_Intent);
+
+			// Squad-HUD: Position separat funken - der Client kennt Agenten
+			// ausserhalb seiner Netzwerk-Bubble (~1 km) nicht als Objekt und
+			// liess sie sonst aus dem Panel fallen (Birgit 24.10. nach dem
+			// Respawn, 1,0-1,6 km entfernt). Ungarantiert: alle 3 s kommt ein
+			// neuer Wert; ein alter Client ignoriert die unbekannte RPC-Id.
+			Param3<int, int, vector> posData = new Param3<int, int, vector>(low, high, ai.GetPosition());
 
 			foreach (Man man : players)
 			{
@@ -3547,8 +4037,34 @@ class IsuBridge
 				GetGame().RPCSingleParam(pb, RPC_NAMETAG, data, true, pb.GetIdentity());
 				if (intentData)
 					GetGame().RPCSingleParam(pb, RPC_INTENT, intentData, true, pb.GetIdentity());
+				GetGame().RPCSingleParam(pb, RPC_AGENTPOS, posData, false, pb.GetIdentity());
 			}
 		}
+	}
+
+	// Namensschild eines (toten/abgeloesten) Koerpers bei allen Clients
+	// entfernen: RPC_NAMETAG mit packed = -1. Aus BroadcastNametags (Tick-Weg)
+	// UND direkt aus CmdSpawn/CmdAdoptNearest, bevor Register() den alten
+	// Koerper still aus der Registry wirft (sonst verpasste der Client das
+	// Remove, wenn der Respawn dem naechsten 3-s-Tick zuvorkam).
+	static void SendNametagRemove(eAIBase body, string name)
+	{
+		if (!body)
+			return;
+		int dlow, dhigh;
+		body.GetNetworkID(dlow, dhigh);
+		if (dlow == 0 && dhigh == 0)
+			return;
+		Param5<int, int, string, int, int> rm = new Param5<int, int, string, int, int>(dlow, dhigh, name, -1, 4);
+		array<Man> rplayers = new array<Man>();
+		GetGame().GetPlayers(rplayers);
+		foreach (Man rman : rplayers)
+		{
+			PlayerBase rpb = PlayerBase.Cast(rman);
+			if (rpb && rpb.GetIdentity())
+				GetGame().RPCSingleParam(rpb, RPC_NAMETAG, rm, true, rpb.GetIdentity());
+		}
+		Print("[IsuSurvivor] Nametag-Remove " + name + " (" + dlow.ToString() + "/" + dhigh.ToString() + ")");
 	}
 
 	// Supervisor-Status (arena_status.txt, geschrieben von
@@ -3804,6 +4320,22 @@ class IsuBridge
 		EntityAI created = m_Npc.GetInventory().CreateInInventory(cmd.text);
 		if (!created)
 		{
+			// Boden-Fallback (Schnittstelle C7): passt das Item nicht mehr ins
+			// Inventar, neben dem NPC ablegen statt es zu verlieren (Birgit
+			// 24.10.: 13 Items "verloren", darunter Crowbar und SteakKnife).
+			// run_agent zaehlt "am Boden: " separat und nennt es im Weckruf.
+			Object groundObj = GetGame().CreateObjectEx(cmd.text, m_Npc.GetPosition(), ECE_PLACE_ON_SURFACE);
+			ItemBase groundItem = ItemBase.Cast(groundObj);
+			if (groundItem)
+			{
+				// wie drop: 4 h statt der kurzen Boden-Lifetime
+				groundItem.SetLifetime(14400);
+				m_CmdStatus = "done";
+				m_CmdDetail = "am Boden: " + cmd.text;
+				return;
+			}
+			if (groundObj)
+				GetGame().ObjectDelete(groundObj);
 			m_CmdStatus = "failed";
 			m_CmdDetail = "kein Platz oder unbekannt: " + cmd.text;
 			return;
@@ -3892,26 +4424,58 @@ class IsuBridge
 			return;
 		}
 
+		// Nur LOSE Items aus Cargo (Rucksack/Weste/Hose ...) uebergeben. Der alte
+		// Filter !GetHierarchyParent() schloss JEDES Inventar-Item aus (alles im
+		// Inventar hat einen Parent) - 14 give_to am 24.10., 0 Erfolge, Viktor
+		// lernte daraus eine falsche Regel. Hand-Items bewusst NICHT: die
+		// Uebergabe liefe ueber Hand-Anim/WeaponManager des EMPFAENGERS
+		// (eAI_TakeItemToLocation, eAIBase.c:10604-10630). Getragenes und in
+		// Waffen Gestecktes ebenfalls nicht.
 		ItemBase wanted = null;
+		bool seenNotLoose = false;
 		array<EntityAI> items = new array<EntityAI>();
 		m_Npc.GetInventory().EnumerateInventory(InventoryTraversalType.PREORDER, items);
 		foreach (EntityAI ent : items)
 		{
 			ItemBase it = ItemBase.Cast(ent);
-			if (it && it.GetType() == wantedType && !it.GetHierarchyParent())
+			if (!it || it.GetType() != wantedType)
+				continue;
+			if (Weapon_Base.Cast(it.GetHierarchyParent()))
 			{
-				wanted = it;
-				break;
+				seenNotLoose = true;
+				continue;
 			}
+			InventoryLocation hoLoc = new InventoryLocation();
+			if (!it.GetInventory().GetCurrentInventoryLocation(hoLoc))
+				continue;
+			if (hoLoc.GetType() != InventoryLocationType.CARGO)
+			{
+				seenNotLoose = true;
+				continue;
+			}
+			wanted = it;
+			break;
 		}
 		if (!wanted)
 		{
 			m_CmdStatus = "failed";
-			m_CmdDetail = "nicht (frei) im Inventar: " + wantedType;
+			if (seenNotLoose)
+				m_CmdDetail = wantedType + " ist in der Hand, am Koerper oder steckt in einer Waffe - erst aus der Hand nehmen bzw. ausziehen/abbauen, dann give_to";
+			else
+				m_CmdDetail = "nicht im Rucksack/Cargo: " + wantedType;
 			return;
 		}
 
-		if (receiver.eAI_TakeItemToInventory(wanted, false))
+		// Kleidung NICHT ueber eAI_TakeItemToInventory: dessen IsClothing-Zweig
+		// wuerde beim Empfaenger das getragene Stueck abwerfen und tauschen
+		// (eAIBase.c:10496-10541). Stattdessen direkt in dessen Cargo.
+		bool given = false;
+		if (wanted.IsClothing())
+			given = receiver.GetInventory().TakeEntityToInventory(InventoryMode.SERVER, FindInventoryLocationType.CARGO, wanted);
+		else
+			given = receiver.eAI_TakeItemToInventory(wanted, false);
+
+		if (given)
 		{
 			m_CmdStatus = "done";
 			m_CmdDetail = wantedType + " an " + targetName + " uebergeben";
@@ -3972,20 +4536,51 @@ class IsuBridge
 	// Zur aktuellen Position des gefolgten Spielers laufen (gegen
 	// Koordinaten-Tippfehler). Nimmt den menschlichen Gruppenleader, sonst
 	// den im Namen genannten / naechsten Spieler.
+	// Seit 24.10.2026 auch zu KAMERADEN per Name (regroup Igor): frueher nahm
+	// es stur den menschlichen Gruppenleader bzw. suchte nur echte Spieler
+	// ("kein Spieler zum Sammeln gefunden", Konrad landete beim Spieler statt
+	// bei Viktor). Der Name kommt als String mit - NIE GetIdentity() auf eine
+	// eAI aufrufen, die hat keine Identity (NULL-Pointer im Server-Tick).
+	// Das Ziel wird in UpdateWalk alle 5 s nachgefuehrt (300-s-Deckel).
 	private void CmdRegroup(IsuCommand cmd)
 	{
 		if (!NpcReadyOnFoot())
 			return;
 
 		PlayerBase target = null;
+		string targetName = "";
+		string missNote = "";
+
+		// 1) Kamerad mit genau diesem Namen (lebend, nicht man selbst)
+		if (cmd.text != "")
+		{
+			eAIBase mate = IsuAgentRegistry.FindByName(cmd.text);
+			if (mate && mate != m_Npc && mate.IsAlive())
+			{
+				target = mate;
+				targetName = cmd.text;
+			}
+		}
+
+		// 2) Menschlicher Gruppenleader - ohne Namen oder wenn er gemeint ist
+		PlayerBase leader = null;
 		eAIGroup group = m_Npc.GetGroup();
 		if (group)
 		{
-			PlayerBase leader = PlayerBase.Cast(group.GetLeader());
-			if (leader && leader.GetIdentity() && leader != m_Npc)
+			PlayerBase groupLeader = PlayerBase.Cast(group.GetLeader());
+			if (groupLeader && groupLeader.GetIdentity() && groupLeader != m_Npc)
+				leader = groupLeader;
+		}
+		if (!target && leader)
+		{
+			if (cmd.text == "" || leader.GetIdentity().GetName() == cmd.text)
+			{
 				target = leader;
+				targetName = leader.GetIdentity().GetName();
+			}
 		}
 
+		// 3) Echter Spieler (mit Identity) per Name bzw. der naechste
 		if (!target)
 		{
 			float nearest = 100000.0;
@@ -4003,28 +4598,51 @@ class IsuBridge
 				{
 					nearest = d;
 					target = pb;
+					targetName = pb.GetIdentity().GetName();
 				}
 			}
+		}
+
+		// 4) Name passt auf niemanden (tot, vertippt, Funk-Alias): wie frueher
+		// zum menschlichen Leader - aber ehrlich mit Hinweis im Ergebnis
+		if (!target && leader)
+		{
+			target = leader;
+			targetName = leader.GetIdentity().GetName();
+			missNote = " ('" + cmd.text + "' nicht gefunden)";
 		}
 
 		if (!target)
 		{
 			m_CmdStatus = "failed";
-			m_CmdDetail = "kein Spieler zum Sammeln gefunden";
+			if (cmd.text != "")
+				m_CmdDetail = "weder Kamerad noch Spieler '" + cmd.text + "' zum Sammeln gefunden";
+			else
+				m_CmdDetail = "kein Spieler zum Sammeln gefunden";
 			return;
 		}
 
 		if (Dist2D(m_Npc.GetPosition(), target.GetPosition()) <= 4.0)
 		{
 			m_CmdStatus = "done";
-			m_CmdDetail = "schon bei " + target.GetIdentity().GetName();
+			m_CmdDetail = "schon bei " + targetName + missNote;
 			return;
 		}
 
+		// Ziel VOR StartWalk merken (StartWalk -> EnsureOwnGroup verlaesst die
+		// Spielergruppe, danach waere der Leader nicht mehr auffindbar)
+		m_RegroupTarget = target;
+		m_RegroupTargetName = targetName;
+		m_RegroupStart = GetGame().GetTickTime();
+		m_LastRegroupRetarget = m_RegroupStart;
+
 		if (!StartWalk(target.GetPosition()))
+		{
+			m_RegroupTarget = null;
 			return;
+		}
 		m_CmdStatus = "running";
-		m_CmdDetail = "auf dem Weg zu " + target.GetIdentity().GetName();
+		m_CmdDetail = "auf dem Weg zu " + targetName + missNote;
 	}
 
 	// Naechste Tuer oeffnen oder schliessen. text = "open" (Default) | "close".
@@ -4546,6 +5164,11 @@ class IsuBridge
 			return;
 		}
 
+		// Stueckzahl VOR dem Drop: Hand-Items legt Expansion als KLON ab
+		// (Expansion_CloneItemToLocation), das Original haengt bis Frame-Ende
+		// noch am NPC - die Erfolgspruefung zaehlt darum per Classname.
+		int countBefore = CountItemType(cmd.text);
+
 		if (m_Npc.eAI_DropItem(wanted, true))
 		{
 			// Verifizieren: liegt das Item noch im NPC, war der Drop nur
@@ -4562,14 +5185,34 @@ class IsuBridge
 			}
 			if (wanted && wanted.GetHierarchyRootPlayer() == m_Npc)
 			{
-				m_CmdStatus = "failed";
-				m_CmdDetail = cmd.text + " haengt im Inventar fest (Reservierung)";
+				// NICHT sofort "failed": der Drop laeuft oft erst im naechsten
+				// Frame durch (asynchrone Action bzw. Klon). Frueher meldete
+				// drop "haengt fest", obwohl das Item 17 ms spaeter am Boden lag
+				// (Viktor Izh18, Birgit Derringer 24.10.) - ohne Ablage-Marke
+				// sammelte loot_area es wieder ein. UpdateDropRetry prueft bis
+				// zu 3 Ticks (Muster UpdateEquipRetry).
+				m_DropPendingItem = wanted;
+				m_DropPendingType = cmd.text;
+				m_DropPendingCount = countBefore;
+				m_DropPendingTries = 0;
+				m_CmdStatus = "running";
+				m_CmdDetail = cmd.text + " wird abgelegt...";
 				return;
 			}
 			// Bot-Drops bekommen sonst nur 300 s Lifetime und despawnen mitten
-			// in der Uebergabe - auf 4 h anheben, damit Depots/Uebergaben halten
+			// in der Uebergabe - auf 4 h anheben, damit Depots/Uebergaben halten.
+			// Ist der Zeiger weg (Hand-Item als Klon abgelegt), den Klon am
+			// Boden per exaktem Classname suchen.
 			if (wanted)
+			{
 				wanted.SetLifetime(14400);
+			}
+			else
+			{
+				ItemBase dropClone = FindNearestGroundItem(cmd.text, 3.0);
+				if (dropClone && dropClone.GetType() == cmd.text)
+					dropClone.SetLifetime(14400);
+			}
 			m_CmdStatus = "done";
 			m_CmdDetail = cmd.text + " abgelegt";
 		}
@@ -4577,6 +5220,58 @@ class IsuBridge
 		{
 			m_CmdStatus = "failed";
 			m_CmdDetail = "eAI_DropItem fehlgeschlagen: " + cmd.text;
+		}
+	}
+
+	// drop: Ablage ueber bis zu 3 Ticks verifizieren. Erfolg = weniger Stueck
+	// dieses Classnames im Inventar als vorher ODER das Original haengt nicht
+	// mehr am NPC. Dann SetLifetime auf das Bodenobjekt (bei einem Klon per
+	// Classname in 3 m gesucht). Nach 3 Ticks ohne Wirkung -> failed mit dem
+	// bisherigen Text (dayz_mcp prueft "haengt im Inventar fest").
+	private void UpdateDropRetry()
+	{
+		if (!m_Npc || !m_Npc.IsAlive())
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "npc gestorben";
+			m_DropPendingItem = null;
+			m_DropPendingType = "";
+			return;
+		}
+
+		bool dropOk = false;
+		if (CountItemType(m_DropPendingType) < m_DropPendingCount)
+			dropOk = true;
+		if (!dropOk && m_DropPendingItem && m_DropPendingItem.GetHierarchyRootPlayer() != m_Npc)
+			dropOk = true;
+
+		if (dropOk)
+		{
+			ItemBase dropGround = null;
+			if (m_DropPendingItem && !m_DropPendingItem.GetHierarchyParent())
+				dropGround = m_DropPendingItem;
+			if (!dropGround)
+				dropGround = FindNearestGroundItem(m_DropPendingType, 3.0);
+			// nur den exakten Classname (FindNearestGroundItem faellt sonst auf
+			// Teilstring-Treffer zurueck, z.B. Izh18 -> Izh18Shotgun)
+			if (dropGround && dropGround.GetType() != m_DropPendingType)
+				dropGround = null;
+			if (dropGround)
+				dropGround.SetLifetime(14400);
+			m_CmdStatus = "done";
+			m_CmdDetail = m_DropPendingType + " abgelegt";
+			m_DropPendingItem = null;
+			m_DropPendingType = "";
+			return;
+		}
+
+		m_DropPendingTries++;
+		if (m_DropPendingTries >= 3)
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = m_DropPendingType + " haengt im Inventar fest (Reservierung)";
+			m_DropPendingItem = null;
+			m_DropPendingType = "";
 		}
 	}
 
@@ -4989,6 +5684,8 @@ class IsuBridge
 			UpdateWearRetry();
 		else if (m_CmdAction == "equip_best" || m_CmdAction == "equip")
 			UpdateEquipRetry();
+		else if (m_CmdAction == "drop")
+			UpdateDropRetry();
 	}
 
 	// equip_best: eAI_TakeItemToHands scheitert oft nur, weil die Hand nach
@@ -5008,11 +5705,24 @@ class IsuBridge
 		{
 			m_CmdStatus = "failed";
 			m_CmdDetail = "Equip-Ziel verschwunden: " + m_EquipPendingType + " weder in der Hand noch im Inventar";
+			AppendHandDropNote();
 			m_EquipPendingType = "";
 			return;
 		}
 		if (m_CmdStatus != "running")
 			return;   // ReacquireEquipTarget hat den Klon in der Hand gefunden (done)
+		// Erst NACH dem Start eingestiegen (Expansion-Gruppenfolge setzt
+		// Mitfahrer aufs Fahrzeug des Leaders): sofort klar abbrechen statt 16
+		// Ticks bis "Hand blockiert?" (Birgit 24.10. auf dem Motorrad-Sozius)
+		if (m_Npc && m_Npc.IsInTransport())
+		{
+			m_CmdStatus = "failed";
+			m_CmdDetail = "du sitzt in einem Fahrzeug - Waffe ziehen erst nach vehicle_exit";
+			AppendHandDropNote();
+			m_EquipPendingItem = null;
+			m_EquipPendingType = "";
+			return;
+		}
 		// NPC nur KURZ nicht bereit (frisch gespawnt/animiert direkt nach loot):
 		// NICHT faelschlich als "verschwunden" abbrechen, sondern ein paar Ticks
 		// warten - genau das liess Konrads vorhandene CZ527 (Logs 20:28) als
@@ -5024,6 +5734,7 @@ class IsuBridge
 			{
 				m_CmdStatus = "failed";
 				m_CmdDetail = "NPC wurde nicht rechtzeitig bereit fuers Waffe-Ziehen";
+				AppendHandDropNote();
 				m_EquipPendingItem = null;
 			}
 			return;
@@ -5038,6 +5749,7 @@ class IsuBridge
 			SlingSecondaryWeapons(inHands);
 			m_CmdStatus = "done";
 			m_CmdDetail = inHands.GetType();
+			AppendHandDropNote();
 			m_EquipPendingItem = null;
 			m_EquipPendingType = "";
 			return;
@@ -5049,7 +5761,15 @@ class IsuBridge
 		// staendig neu zu starten - genau das liess Konrads CZ527 nie in die Hand.
 		if (m_EquipPendingTries % 3 == 0)
 		{
-			EnsureHandsFree(m_EquipPendingItem);
+			if (!EnsureHandsFree(m_EquipPendingItem))
+			{
+				m_CmdStatus = "failed";
+				m_CmdDetail = HandsBlockedDetail();
+				AppendHandDropNote();
+				m_EquipPendingItem = null;
+				m_EquipPendingType = "";
+				return;
+			}
 			m_Npc.eAI_TakeItemToHands(m_EquipPendingItem, true);
 		}
 
@@ -5059,6 +5779,7 @@ class IsuBridge
 		{
 			m_CmdStatus = "failed";
 			m_CmdDetail = "Waffe liess sich nicht in die Hand nehmen (Hand blockiert?): " + m_EquipPendingItem.GetType();
+			AppendHandDropNote();
 			m_EquipPendingItem = null;
 		}
 	}
@@ -5076,6 +5797,7 @@ class IsuBridge
 			SlingSecondaryWeapons(inHands);
 			m_CmdStatus = "done";
 			m_CmdDetail = m_EquipPendingType;
+			AppendHandDropNote();
 			m_EquipPendingItem = null;
 			m_EquipPendingType = "";
 			return true;
@@ -5128,25 +5850,47 @@ class IsuBridge
 	{
 		if (!m_Npc || !m_Npc.IsAlive())
 		{
+			ReleaseMeleeLock();
 			m_CmdStatus = "failed";
 			m_CmdDetail = "npc gestorben";
+			m_EngageTarget = null;
 			return;
 		}
+
+		// Nahkampf-Eskalation MUSS vor dem Fighting-FSM-Return stehen, sonst
+		// liefe sie waehrend des Kampfes nie. Schwellen bewusst konservativ:
+		// angeschlagen (HP < 50 %) oder 3+ akute Gegner -> Expansion darf zur
+		// Schusswaffe greifen. m_eAI_AcuteDangerTargetCount zaehlt Infizierte/
+		// Kreaturen in akuter Naehe (eAIBase.c:87, gepflegt in 1990-2002),
+		// GetHealth01("", "") wie Expansions eigenes preferMelee-Kriterium
+		// (object.c:997, eaistate_takeitemtohands.c:120).
+		if (m_EngageMelee && m_Npc.GetHealth01("", "") < 0.5)
+			EscalateEngage("HP unter 50 %");
+		if (m_EngageMelee && m_Npc.m_eAI_AcuteDangerTargetCount >= 3)
+			EscalateEngage("3+ Gegner nah");
 
 		if (!m_EngageTarget || !m_EngageTarget.IsAlive())
 		{
+			// "Ziel eliminiert" heisst nur: das Ziel lebt nicht mehr - wer es
+			// getoetet hat, prueft der Mod nicht (Spieler/Kameraden schiessen mit).
+			// SCHUSS/HAND/ESK verraten, ob DIESER NPC geschossen hat.
 			m_CmdStatus = "done";
-			m_CmdDetail = "Ziel eliminiert";
+			m_CmdDetail = EngageResultDetail("Ziel eliminiert");
 			m_EngageTarget = null;
+			ReleaseMeleeLock();
 			return;
 		}
 
+		// Timeout ueber die eigene Startzeit (nicht m_CmdStartTime, das jedes
+		// Nachziehen per StartWalk zuruecksetzt); 175 s, knapp unter dem
+		// Python-Timeout von 180 s, damit der Mod das Ergebnis zuerst meldet.
 		float now = GetGame().GetTickTime();
-		if (now - m_CmdStartTime > 180)
+		if (now - m_EngageStartTime > 175)
 		{
 			m_CmdStatus = "failed";
-			m_CmdDetail = "Ziel lebt nach 180s noch";
+			m_CmdDetail = EngageResultDetail("Ziel lebt nach 175s noch");
 			m_EngageTarget = null;
+			ReleaseMeleeLock();
 			return;
 		}
 
@@ -5189,12 +5933,48 @@ class IsuBridge
 			return;
 		}
 
+		// regroup: Ziel nachfuehren (Spieler im Fahrzeug / laufender Kamerad).
+		// Frueher lief der NPC 4 min zu einem eingefrorenen Punkt ("Laeuft noch
+		// 672 m", Birgit 24.10.). Alle 5 s neu setzen, wenn das Ziel > 10 m vom
+		// Wegpunkt weg ist. StartWalk setzt m_CmdStartTime/m_LastProgressTime
+		// zurueck - darum ein eigener 300-s-Deckel ueber m_RegroupStart.
+		// Den Fortschritts-Zeitstempel ueber das Nachfuehren hinweg erhalten:
+		// sonst setzt jedes Retarget (alle 5 s bei bewegtem Ziel) die 20-s-
+		// Selbstheilung und den 45-s-Abbruch zurueck, und ein an Geometrie
+		// haengender NPC rennt bis zum 300-s-Deckel gegen die Wand. m_BestDist
+		// misst danach gegen den neuen Wegpunkt; m_TriedUnstick bleibt unberuehrt.
+		// Eigene Variable rnow, 'now' wird unten in derselben Funktion deklariert.
+		if (m_CmdAction == "regroup" && m_RegroupTarget)
+		{
+			float rnow = GetGame().GetTickTime();
+			if (rnow - m_RegroupStart > 300)
+			{
+				int regroupLeft = Math.Round(Dist2D(m_Npc.GetPosition(), m_RegroupTarget.GetPosition()));
+				m_CmdStatus = "failed";
+				m_CmdDetail = m_RegroupTargetName + " nach 300s nicht erreicht (Distanz " + regroupLeft.ToString() + " m)";
+				m_RegroupTarget = null;
+				RestoreSpeed();
+				return;
+			}
+			if (rnow - m_LastRegroupRetarget > 5.0 && Dist2D(m_RegroupTarget.GetPosition(), m_MoveTarget) > 10.0)
+			{
+				float rKeepProgress = m_LastProgressTime;
+				m_LastRegroupRetarget = rnow;
+				StartWalk(m_RegroupTarget.GetPosition());
+				m_LastProgressTime = rKeepProgress;
+				return;
+			}
+		}
+
 		float now = GetGame().GetTickTime();
 		float dist = Dist2D(m_Npc.GetPosition(), m_MoveTarget);
 
+		// pickup/fetch: Ankunft bei 1,4 m (2D), damit die anschliessende 3D-
+		// Reichweitenpruefung (2 m, DoTakePickupItem) Hang/Tisch noch schafft;
+		// bei 2,0 m 2D scheiterte der Griff knapp ("ausser Reichweite").
 		float arriveDist = 3.0;
 		if (m_CmdAction == "pickup" || m_CmdAction == "fetch")
-			arriveDist = 2.0;
+			arriveDist = 1.4;
 
 		if (dist < arriveDist)
 		{
@@ -5263,6 +6043,13 @@ class IsuBridge
 			return;
 		}
 
+		// regroup: klare Ankunftsmeldung statt "auf dem Weg zu ..." im done-Text
+		if (m_CmdAction == "regroup" && m_RegroupTargetName != "")
+		{
+			m_CmdDetail = "bei " + m_RegroupTargetName + " angekommen";
+			m_RegroupTarget = null;
+		}
+
 		m_CmdStatus = "done";
 	}
 
@@ -5281,7 +6068,9 @@ class IsuBridge
 		IsuState state = new IsuState();
 		state.seq = m_Seq;
 		state.uptime = GetGame().GetTickTime();
-		state.bridge_version = "0.9.0";
+		// 0.10.0 (24.10.2026): engage-Detail mit |SCHUSS=|HAND=|ESK=, npc.shots,
+		// side_command, Magazine mit echter Patronenzahl
+		state.bridge_version = "0.10.0";
 
 		if (m_Npc)
 		{
@@ -5304,7 +6093,21 @@ class IsuBridge
 				state.npc.stomach_volume = m_Npc.GetStomach().GetStomachVolume();
 			if (m_Npc.GetStatWet())
 				state.npc.wet = m_Npc.GetStatWet().Get();
-			state.npc.fighting = m_Npc.m_eAI_IsFightingFSM;
+			// "im Kampf" nur, wenn die Fighting-FSM laeuft UND das Ziel kein
+			// Item ist: Expansion nutzt die Fighting-FSM auch zum Ansteuern von
+			// Loot (eAI_SetIsFightingFSM behandelt target.IsItem() eigens,
+			// eAIBase.c:8702-8712; eAITarget.IsItem eAITarget.c:184). Das rohe
+			// Flag meldete direkt nach dem Spawn alle drei NPCs "im KAMPF".
+			// TargetCount() vorab (eAIBase.c:1922), weil GetTarget() blind
+			// m_eAI_Targets[0] liest (eAIBase.c:1927-1930).
+			bool isuFightFlag = false;
+			if (m_Npc.m_eAI_IsFightingFSM && m_Npc.TargetCount() > 0)
+			{
+				eAITarget isuFightTgt = m_Npc.GetTarget();
+				if (isuFightTgt && !isuFightTgt.IsItem())
+					isuFightFlag = true;
+			}
+			state.npc.fighting = isuFightFlag;
 			state.npc.name = m_NpcName;
 			state.npc.following = m_Following;
 			state.npc.unconscious = m_Npc.IsUnconscious();
@@ -5313,6 +6116,10 @@ class IsuBridge
 			// er blutet (run_agent macht daraus den DU-BLUTEST-Weckruf).
 			state.npc.bleeding = m_Npc.IsBleeding();
 			state.npc.auto_bandages = m_AutoBandages;
+			// Schusszaehler dieses Koerpers (modded Weapon_Base.EEFired in
+			// IsuEAIPatches.c) - run_agent macht daraus die Info-Zeile SCHUESSE
+			state.npc.shots = IsuAgentRegistry.ShotCount(m_Npc);
+			state.npc.last_shot_weapon = IsuAgentRegistry.LastShotWeapon(m_Npc);
 
 			EntityAI inHands = m_Npc.GetHumanInventory().GetEntityInHands();
 			if (inHands)
@@ -5331,6 +6138,13 @@ class IsuBridge
 		state.command.detail = m_CmdDetail;
 		if (m_CmdStatus == "running" && m_Npc)
 			state.command.dist_to_target = Dist2D(m_Npc.GetPosition(), m_MoveTarget);
+
+		// Neben-Befehl (C6): bridge.wait_status akzeptiert fuer die eigene
+		// cmd_id auch diesen Block
+		state.side_command.id = m_SideCmdId;
+		state.side_command.action = m_SideCmdAction;
+		state.side_command.status = m_SideCmdStatus;
+		state.side_command.detail = m_SideCmdDetail;
 
 		state.chat = m_Chat;
 		state.errors = m_Errors;
@@ -5357,6 +6171,12 @@ class IsuBridge
 			IsuItemInfo info = new IsuItemInfo();
 			info.classname = item.GetType();
 			info.quantity = item.GetQuantity();
+			// Magazine und Ammo-Stapel (Ammo_* sind Magazine-Unterklassen):
+			// echte Patronenzahl statt der generischen ItemBase-Menge, die immer
+			// 1.0 meldete ("x1" -> Viktor glaubte, nur eine Patrone zu haben).
+			Magazine magInfo = Magazine.Cast(item);
+			if (magInfo)
+				info.quantity = magInfo.GetAmmoCount();
 			info.health = item.GetHealth("", "");
 			info.in_hands = (ent == inHands);
 			info.kind = ClassifyItem(item);

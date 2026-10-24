@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""IsuSurvivor Taktik-Schicht — Loot-Urteilsvermoegen und Ausruestungs-Logik.
+"""IsuSurvivor Taktik-Schicht — Loot-Urteilsvermögen und Ausrüstungs-Logik.
 
 Komponiert die dummen Mod-Primitive (pickup, equip) zu schlauem Verhalten.
-Wird vom MCP-Server genutzt; fuer Tests auch direkt aufrufbar:
+Wird vom MCP-Server genutzt; für Tests auch direkt aufrufbar:
 
   python tactics.py loot           # Umgebung looten
   python tactics.py equip          # beste Waffe in die Hand
@@ -141,15 +141,22 @@ WEAPON_TIERS = [
     ("M4A1", 90), ("AKM", 88), ("AK101", 86), ("AK74", 84), ("FAL", 92),
     ("SCARH", 91),   # SCR17 aus 1.29 "Road to Badlands" (7.62x51, 20-Schuss)
     ("SVD", 95), ("VSS", 85), ("ASVAL", 85), ("Aug", 82), ("FAMAS", 82),
-    ("Pioneer", 78), ("SKS", 72),   # haeufige Vanilla-Halbautomaten (fehlten:
+    ("Pioneer", 78), ("SKS", 72),   # häufige Vanilla-Halbautomaten (fehlten:
     ("Repeater", 66),               # Score 0 = wurden nie gelootet/equippt)
     ("Mosin", 70), ("Winchester", 68), ("Blaze", 66), ("CZ527", 64),
     ("CZ550", 72), ("SSG82", 65), ("Vaiga", 60), ("Saiga", 60),
     ("BK43", 45), ("BK18", 35), ("Mp133", 50), ("UMP", 58), ("MP5", 56),
     # Izh18-Familie fehlte (Score 0): loot_area meldete "Nichts Lohnendes",
     # obwohl die Flinte 37 m entfernt lag (Viktor 08.09.). Shotgun VOR Izh18,
-    # der erste Treffer zaehlt (Substring-Match).
+    # der erste Treffer zählt (Substring-Match).
     ("Izh18Shotgun", 40), ("Izh18", 30),
+    # Izh43 (Doppelflinte) und Ruger1022 fehlten (Score 0): loot_area wertete
+    # sie nie als Upgrade, Python- und Mod-Ranking widersprachen sich (MOD-5,
+    # 24.10.). Die P1 steht NICHT hier: der Teilstring "p1" träfe Mp133 und
+    # PP19 - classify_weapon prüft sie exakt per Classname. Bekommt die Mod
+    # eine eigene Rangliste für CmdEquipBest (MOD-5-Vorschlag IsuWeaponScore),
+    # beide Tabellen synchron halten.
+    ("Izh43", 42), ("Ruger1022", 25),
     ("Bizon", 54), ("CZ61", 48), ("PP19", 54),
     ("FNX", 30), ("Glock", 28), ("Mkii", 22), ("IJ70", 20), ("Makarov", 20),
     ("CZ75", 26), ("Deagle", 34), ("Magnum", 32), ("Longhorn", 24),
@@ -157,13 +164,14 @@ WEAPON_TIERS = [
 ]
 
 # Waffenfamilie -> Magazin-Namensbestandteile, wenn der Waffenname NICHT im
-# Magazinnamen steckt (M4A1 laedt STANAG/CMAG usw.). Fuer alle anderen greift
+# Magazinnamen steckt (M4A1 lädt STANAG/CMAG usw.). Für alle anderen greift
 # der Namens-Match (Mag_AKM_* zu AKM).
 MAG_ALIASES = {
     "m4a1": ("stanag", "cmag"),
     "asval": ("val",),
     "vaiga": ("saiga",),
     "pp19": ("pp19", "bizon"),
+    "aks74u": ("ak74", "aks74u"),   # AKS74U lädt die AK74-Magazine
 }
 
 MELEE_PATTERNS = [
@@ -172,7 +180,17 @@ MELEE_PATTERNS = [
     ("KitchenKnife", 16), ("SteakKnife", 12), ("BaseballBat", 20),
     ("NailedBaseballBat", 28), ("Crowbar", 22), ("PipeWrench", 18),
     ("Shovel", 20), ("FieldShovel", 22), ("Pickaxe", 20), ("SledgeHammer", 26),
+    ("Kukri", 30),   # fehlte: Viktor hielt 24.10. ein Kukri, Score 0 (MOD-5)
 ]
+
+# Fahrzeug-Sperre (C8/DR-3): Im Fahrzeug greift eAI_TakeItemToHands nicht -
+# equip lief 16 Retry-Ticks bis "Hand blockiert?", engage meldete "nichts in
+# der Hand" (Birgit 24.10. auf dem Motorrad des Spielers, 35 s verbrannt, dann tot).
+# Die MCP-Tools geben im Fahrzeug sofort diesen Text zurück, ohne Mod-Befehl.
+VEHICLE_BLOCK_TEXT = (
+    "ABGEBROCHEN: Du sitzt als MITFAHRER in einem Fahrzeug - Waffe ziehen, "
+    "kämpfen, laufen und looten geht dort nicht. Bleib sitzen, der Fahrer "
+    "bringt dich weg, oder steig mit vehicle_exit aus, wenn das Fahrzeug steht.")
 
 MEDICAL_PATTERNS = ["Bandage", "Rag", "Morphine", "Epinephrine", "SalineBag",
                     "BloodBag", "TetracyclineAntibiotics", "CharcoalTablets",
@@ -201,9 +219,9 @@ FOOD_PATTERNS = ["Apple", "Pear", "Plum", "Tomato", "Potato", "Zucchini",
 
 # Anbauteile tragen den Waffennamen als Substring (SSG82Optic, AK74_WoodBttstck)
 # - das sind KEINE Waffen. Ohne diesen Filter heben sich die Bots gegenseitig
-# ihre weggeworfenen Optiken/Schaefte auf und tanzen umeinander.
-# "Light"/"Rail" bewusst NICHT: faengt sonst Chemlight/Flashlight (sollen
-# aufgehoben werden). Waffenlampe gezielt ueber "TLRLight".
+# ihre weggeworfenen Optiken/Schäfte auf und tanzen umeinander.
+# "Light"/"Rail" bewusst NICHT: fängt sonst Chemlight/Flashlight (sollen
+# aufgehoben werden). Waffenlampe gezielt über "TLRLight".
 ATTACHMENT_MARKERS = ("Optic", "Bttstck", "Hndgrd", "Buttstock", "Handguard",
                       "Suppressor", "Compensator", "Bayonet", "TLRLight",
                       "Mag_", "Ammo")
@@ -214,6 +232,9 @@ def classify_weapon(classname: str) -> int:
         return 0
     if any(m in classname for m in ATTACHMENT_MARKERS):
         return 0
+    # P1 exakt (MOD-5): als Teilstring-Muster träfe "p1" auch Mp133/PP19.
+    if classname.lower() == "p1":
+        return 24
     for pattern, score in WEAPON_TIERS:
         if pattern.lower() in classname.lower():
             return score
@@ -229,9 +250,9 @@ def classify_melee(classname: str) -> int:
 
 # Reine Bau-/Grab-/Farm-Werkzeuge: taugen als Notnagel-Melee, sollen aber NICHT
 # als "beste Waffe" gelten (sonst stand der NPC mit einer Pickaxe am Lager rum
-# und equip_best meldete faelschlich "schon bewaffnet", statt sich ein Gewehr/
-# Messer zu holen). Aus der Waffen-/Melee-WAHL ausschliessen; Looten/Bauen
-# bleibt davon unberuehrt (classify_melee aendert sich nicht).
+# und equip_best meldete fälschlich "schon bewaffnet", statt sich ein Gewehr/
+# Messer zu holen). Aus der Waffen-/Melee-WAHL ausschließen; Looten/Bauen
+# bleibt davon unberührt (classify_melee ändert sich nicht).
 TOOL_PATTERNS = ("Pickaxe", "Shovel", "FieldShovel", "Hoe")
 
 
@@ -239,36 +260,80 @@ def is_tool(classname: str) -> bool:
     return any(t.lower() in classname.lower() for t in TOOL_PATTERNS)
 
 
-def score_ground_item(entry: dict, inventory: list[dict]) -> int:
-    """Wie lohnend ist ein Bodenitem? 0 = liegen lassen."""
+def mag_fits_weapon(mag_cn: str, weapon_cn: str) -> bool:
+    """Passt das Magazin zur Waffe? Gleiche Namenslogik wie pick_best_weapon
+    (Waffenfamilie im Magazinnamen, M4/STANAG usw. über MAG_ALIASES), dazu
+    der umgekehrte Fall: Magazin-Kürzel als Anfang des Waffennamens
+    (Mag_Glock_15Rnd zu Glock19, Mag_MP5_30Rnd zu MP5K) bzw. als längeres
+    Teilstück darin (Mag_IJ70_8Rnd zu MakarovIJ70)."""
+    mag_l = (mag_cn or "").lower()
+    family = (weapon_cn or "").split("_")[0].lower()
+    if not mag_l.startswith("mag_") or not family:
+        return False
+    fams = MAG_ALIASES.get(family, (family,))
+    if any(f in mag_l for f in fams):
+        return True
+    parts = mag_l.split("_")
+    tok = parts[1] if len(parts) > 1 else ""
+    if not tok:
+        return False
+    if family.startswith(tok):
+        return True
+    # Kurze Kürzel ("p1") nur am Wortanfang - sonst passte Mag_P1 zur Mp133.
+    return len(tok) >= 4 and tok in family
+
+
+def score_ground_item(entry: dict, inventory: list[dict],
+                      human_near: bool = False) -> int:
+    """Wie lohnend ist ein Bodenitem? 0 = liegen lassen.
+
+    human_near: ein menschlicher Spieler steht <= 10 m vom NPC (vom Aufrufer
+    aus dem Snapshot bestimmt). Nur dann gilt Kleidung direkt vor den Füßen
+    als Übergabe. Optional, damit survival.py und der score-Testmodus
+    unverändert weiterlaufen."""
     cn = entry.get("classname", "")
     kind_guess = ""
 
     # Liegt das Item bei einem ANDEREN Bot (>5 m entfernt), ist es wohl dessen
-    # frische Ablage (die Mod markiert das in 'near') - nicht drum kaempfen.
-    # Direkt vor den eigenen Fuessen (<=5 m) aber NICHT unterdruecken: das ist
-    # meist eine Spieler-Uebergabe am Lager, die sonst faelschlich als "fremde
-    # Ablage" gewertet und nie aufgehoben wuerde.
+    # frische Ablage (die Mod markiert das in 'near') - nicht drum kämpfen.
+    # Direkt vor den eigenen Füßen (<=5 m) aber NICHT unterdrücken: das ist
+    # meist eine Spieler-Übergabe am Lager, die sonst fälschlich als "fremde
+    # Ablage" gewertet und nie aufgehoben würde.
     if entry.get("near") and entry.get("distance", 99) > 5.0:
         return 0
     # Anbauteile, die die Mod als solche erkannt hat, gar nicht erst werten
     if entry.get("item_kind") == "attachment":
         return 0
-    # Kleidung am Boden (Mod-Klassifikation item_kind="clothing"): fiel bisher
-    # durch auf 0 und wurde NIE aufgehoben - genau der Fall "Spieler legt
-    # Klamotten hin, NPC nimmt sie nicht". Nahe Kleidung einsammeln (Uebergabe),
-    # weit entfernte liegen lassen (kein map-weites Horten).
-    if entry.get("item_kind") == "clothing" and entry.get("distance", 99) <= 20.0:
-        return 30
+    # Kleidung am Boden (Mod-Klassifikation item_kind="clothing"): NUR noch
+    # als Spieler-Übergabe einsammeln - ein Mensch steht <= 10 m nah und das
+    # Teil liegt <= 5 m vor den Füßen ("Spieler legt Klamotten hin, NPC nimmt
+    # sie nicht"). Vorher galt jede Kleidung bis 20 m pauschal 30: Viktor
+    # hortete 24.10. 49-51 Teile, scheiterte 10x an "Inventar voll" und warf
+    # dafür Magazine und seine Izh43 weg (TOOL-2). Echte Upgrades erledigt
+    # dress_best (prüft Bodenkleidung in 10 m slotgenau).
+    if entry.get("item_kind") == "clothing":
+        if human_near and entry.get("distance", 99) <= 5.0:
+            return 30
+        return 0
 
     weapon = classify_weapon(cn)
     if weapon:
         best_owned = max([classify_weapon(i.get("classname", "")) for i in inventory] or [0])
         if weapon > best_owned:
-            return 100 + weapon  # Upgrade: hoechste Prioritaet
+            return 100 + weapon  # Upgrade: höchste Priorität
         return 0  # schlechtere Waffe: liegen lassen
 
-    if cn.startswith("Mag_") or cn.startswith("Ammo"):
+    if cn.startswith("Mag_"):
+        # Magazine nur hoch werten, wenn eine passende Waffe dabei ist (Viktor
+        # sammelte zwei Mag_Glock ohne Glock: "Munition für Waffen, die ich
+        # nicht habe"). Lose Munition bleibt 80 - die Kaliberzuordnung kennt
+        # nur die Mod.
+        guns = [i.get("classname", "") for i in inventory
+                if classify_weapon(i.get("classname", ""))]
+        if any(mag_fits_weapon(cn, g) for g in guns):
+            return 80
+        return 10
+    if cn.startswith("Ammo"):
         return 80
 
     melee = classify_melee(cn)
@@ -298,11 +363,11 @@ def score_ground_item(entry: dict, inventory: list[dict]) -> int:
 
 def loot_area(bridge: Bridge, max_items: int = 6, time_budget: float = 180.0,
               log=print) -> dict:
-    """Sichtbare lohnende Bodenitems einsammeln (naechstes/bestes zuerst).
+    """Sichtbare lohnende Bodenitems einsammeln (nächstes/bestes zuerst).
 
-    Bricht ab bei Gefahr in der Naehe (Infizierter/Raubtier < 40 m) und bei
+    Bricht ab bei Gefahr in der Nähe (Infizierter/Raubtier < 40 m) und bei
     Spieler-Funk (interruptible) - vorher sammelte der NPC bis zu 240 s stur
-    weiter und war fuer den Spieler taub."""
+    weiter und war für den Spieler taub."""
     deadline = time.monotonic() + time_budget
     haul: list[str] = []
     failed: set[str] = set()
@@ -331,6 +396,9 @@ def loot_area(bridge: Bridge, max_items: int = 6, time_budget: float = 180.0,
             log("  " + aborted)
             break
 
+        # Mensch <= 10 m: nur dann zählt Kleidung vor den Füßen als Übergabe.
+        human_near = any(e.get("kind") == "player" and e.get("distance", 99) <= 10.0
+                         for e in state.get("nearby", []))
         candidates = []
         for e in state.get("nearby", []):
             if e.get("kind") != "item":
@@ -341,7 +409,7 @@ def loot_area(bridge: Bridge, max_items: int = 6, time_budget: float = 180.0,
             if is_own_drop(e, drops, npc):
                 ignored.add(cn)
                 continue
-            score = score_ground_item(e, inventory)
+            score = score_ground_item(e, inventory, human_near=human_near)
             if score > 0:
                 candidates.append((score, e.get("distance", 99), cn))
 
@@ -358,7 +426,7 @@ def loot_area(bridge: Bridge, max_items: int = 6, time_budget: float = 180.0,
         if result.get("status") == "done":
             haul.append(target)
             # Aufnahme-Animation + 1-Hz-State abwarten, sonst sieht die
-            # naechste Iteration das Item noch am Boden (Doppelzaehlung)
+            # nächste Iteration das Item noch am Boden (Doppelzählung)
             time.sleep(3.0)
         elif result.get("status") == "interrupted":
             aborted = "Looten sofort abgebrochen: " + interrupt_reason(result)
@@ -371,14 +439,22 @@ def loot_area(bridge: Bridge, max_items: int = 6, time_budget: float = 180.0,
             "ignored": sorted(ignored)}
 
 
-def equip_by_classname(bridge: Bridge, classname: str) -> dict:
+def equip_by_classname(bridge: Bridge, classname: str,
+                       action: str = "equip") -> dict:
     """Mod-equip mit Klon-Nachprüfung. Expansions eAI_TakeItemToHandsImpl
     KLONT die Waffe in die Hand und löscht das Original; ältere Mod-Builds
     verlieren damit ihren Zeiger und melden "Equip-Ziel verschwunden",
     obwohl die Waffe schon in der Hand liegt (Igor/Konrad 08.09.). Darum bei
     dieser Meldung kurz warten, den Handinhalt prüfen und erst dann einmal
-    neu versuchen. Liefert das (ggf. korrigierte) Bridge-Ergebnis."""
-    result = bridge.run("equip", text=classname, timeout=30)
+    neu versuchen. Liefert das (ggf. korrigierte) Bridge-Ergebnis.
+    action="equip_melee_lock" (engage mode="melee") setzt im Mod zusätzlich
+    sofort den Nahkampf-Lock; ein älterer Mod-Build kennt die Aktion nicht,
+    dann einmal mit dem normalen "equip" weiter."""
+    result = bridge.run(action, text=classname, timeout=30)
+    if (action != "equip" and result.get("status") != "done"
+            and "unbekannte action" in str(result.get("detail") or "")):
+        action = "equip"
+        result = bridge.run(action, text=classname, timeout=30)
     if result.get("status") == "done":
         return result
     if "verschwunden" not in str(result.get("detail") or "").lower():
@@ -387,7 +463,7 @@ def equip_by_classname(bridge: Bridge, classname: str) -> dict:
     hands = (bridge.read_state() or {}).get("npc", {}).get("in_hands", "")
     if hands == classname:
         return {"id": result.get("id"), "status": "done", "detail": classname}
-    return bridge.run("equip", text=classname, timeout=30)
+    return bridge.run(action, text=classname, timeout=30)
 
 
 def pick_best_weapon(inventory: list[dict]) -> str:
@@ -406,8 +482,8 @@ def pick_best_weapon(inventory: list[dict]) -> str:
         if not score:
             continue
         # Geladen (quantity = echte Munition aus der Mod) oder Magazin der
-        # gleichen Waffenfamilie im Gepaeck? (Mag_AKM_* zu AKM; M4/STANAG
-        # u.ae. ueber MAG_ALIASES, sonst galt die M4 immer als leer)
+        # gleichen Waffenfamilie im Gepäck? (Mag_AKM_* zu AKM; M4/STANAG
+        # u.ä. über MAG_ALIASES, sonst galt die M4 immer als leer)
         family = cn.split("_")[0].lower()
         fams = MAG_ALIASES.get(family, (family,))
         has_mag = any(f in m.lower() for f in fams for m in mags)
@@ -434,11 +510,11 @@ def pick_best_weapon(inventory: list[dict]) -> str:
         if score > melee_score:
             melee_cn, melee_score = cn, score
 
-    # Echte Nahkampfwaffe schlaegt leere Feuerwaffe: mit einer AKM ohne
+    # Echte Nahkampfwaffe schlägt leere Feuerwaffe: mit einer AKM ohne
     # Magazin rumstehen statt zuzuschlagen hat im Battle Royale Leben gekostet
     if melee_cn:
         return melee_cn
-    return best_cn  # leere Waffe schlaegt blanke Faeuste
+    return best_cn  # leere Waffe schlägt blanke Fäuste
 
 
 def equip_best(bridge: Bridge, log=print) -> str:
@@ -459,9 +535,9 @@ def equip_best(bridge: Bridge, log=print) -> str:
 
 
 def pick_best_melee(inventory: list[dict]) -> str:
-    """Beste NAHKAMPFWAFFE im Inventar (Machete, Axt, Messer ...), UNABHAENGIG
-    davon, ob eine geladene Feuerwaffe da ist. Fuer den Solo-Modus gegen
-    Infizierte: leise zuschlagen statt schiessen (spart Muni, lockt keine Horde)."""
+    """Beste NAHKAMPFWAFFE im Inventar (Machete, Axt, Messer ...), UNABHÄNGIG
+    davon, ob eine geladene Feuerwaffe da ist. Für den Solo-Modus gegen
+    Infizierte: leise zuschlagen statt schießen (spart Muni, lockt keine Horde)."""
     usable = [i for i in inventory if i.get("health", 100.0) > 5.0]
     melee_cn, melee_score = "", 0
     for item in usable:
@@ -474,28 +550,40 @@ def pick_best_melee(inventory: list[dict]) -> str:
     return melee_cn
 
 
-def equip_melee(bridge: Bridge, log=print) -> str:
+def equip_melee(bridge: Bridge, log=print, lock: bool = False) -> str:
     """Gezielt die beste Nahkampfwaffe ziehen, auch wenn eine geladene
-    Feuerwaffe vorhanden waere - das Gegenstueck zu equip_best fuer den
-    leisen Solo-Kampf gegen einzelne Infizierte."""
+    Feuerwaffe vorhanden wäre - das Gegenstück zu equip_best für den
+    leisen Solo-Kampf gegen einzelne Infizierte. Nutzt auch dayz_mcp.engage
+    (mode="melee") - dessen Prüfung erwartet die Präfixe "Nahkampfwaffe
+    gezogen" bzw. "Nahkampfwaffe ist schon" als Erfolg.
+    lock=True (nur engage mode="melee"): Mod-Aktion equip_melee_lock setzt
+    den Nahkampf-Lock schon beim Ziehen. Ohne ihn griff Expansion in den 1-2 s
+    bis zum engage-Befehl (noch kein Ziel) wieder zur Schusswaffe - auch wenn
+    das Messer schon in der Hand liegt, darum dann trotzdem einmal senden."""
     state = bridge.read_state() or {}
     inventory = state.get("inventory", [])
-    in_hands = state.get("npc", {}).get("in_hands", "")
+    npc = state.get("npc", {})
+    in_hands = npc.get("in_hands", "")
+    if npc.get("in_vehicle"):
+        return VEHICLE_BLOCK_TEXT   # C8: im Fahrzeug kein Mod-equip
 
     melee = pick_best_melee(inventory)
     if not melee:
         return ("Keine Nahkampfwaffe im Inventar - notfalls equip_best "
                 "(Schusswaffe) oder flee.")
+    action = "equip_melee_lock" if lock else "equip"
     if melee == in_hands:
+        if lock:
+            equip_by_classname(bridge, melee, action=action)
         return f"Nahkampfwaffe ist schon in der Hand: {melee}"
 
-    result = equip_by_classname(bridge, melee)
+    result = equip_by_classname(bridge, melee, action=action)
     if result.get("status") == "done":
         return f"Nahkampfwaffe gezogen: {melee} (vorher: {in_hands or 'leer'})"
     return f"Ausrüsten fehlgeschlagen: {result.get('detail')}"
 
 
-# Materialien, deren quantity = Stueckzahl ist (Piles)
+# Materialien, deren quantity = Stückzahl ist (Piles)
 PILE_MATS = {"WoodenStick", "LongWoodenStick", "Rag", "SmallStone", "Stone",
              "Paper", "Bark_Oak", "Bark_Birch", "Nail"}
 
@@ -560,7 +648,7 @@ def craft(bridge: Bridge, recipe_name: str, log=print) -> str:
     recipes_map = all_recipes()
     recipe = recipes_map.get(recipe_name)
     if not recipe:
-        return ("Unbekanntes Rezept '" + recipe_name + "'. Verfuegbar: "
+        return ("Unbekanntes Rezept '" + recipe_name + "'. Verfügbar: "
                 + ", ".join(sorted(recipes_map)))
 
     state = bridge.read_state() or {}
@@ -570,7 +658,7 @@ def craft(bridge: Bridge, recipe_name: str, log=print) -> str:
         if counts.get(mat, 0) < needed:
             missing.append(f"{needed - counts.get(mat, 0)}x {mat}")
     if missing:
-        return "Fehlt fuer " + recipe_name + ": " + ", ".join(missing)
+        return "Fehlt für " + recipe_name + ": " + ", ".join(missing)
 
     for mat, needed in recipe["mats"].items():
         result = bridge.run("consume_item", text=mat, y=needed, timeout=20)
@@ -624,7 +712,7 @@ def _retreat_from_fire(bridge: Bridge, dist: float = 6.0) -> None:
 
 
 def cook_meal(bridge: Bridge, log=print) -> str:
-    """Komplette Koch-Kette: Feuer finden/bauen/anzuenden, dann garen."""
+    """Komplette Koch-Kette: Feuer finden/bauen/anzünden, dann garen."""
     steps: list[str] = []
     state = bridge.read_state() or {}
     nearby = state.get("nearby", [])
@@ -657,7 +745,7 @@ def cook_meal(bridge: Bridge, log=print) -> str:
     result = bridge.run("cook", timeout=30)
     if result.get("status") == "done":
         steps.append("Gegart: " + (result.get("detail") or ""))
-        # Vom Feuer zuruecktreten - es verbrennt, und die eAI bleibt sonst drin
+        # Vom Feuer zurücktreten - es verbrennt, und die eAI bleibt sonst drin
         # stehen (2 NPCs starben so am 2026-06-16).
         _retreat_from_fire(bridge)
         steps.append("Vom Feuer zurueckgetreten. WARNUNG: Feuer verbrennt - "
@@ -681,7 +769,7 @@ def _has_raw_food(state: dict) -> bool:
 def hunt(bridge: Bridge, animal: str = "", log=print) -> str:
     """Jagd-Folgekette: Waffe bereit machen -> Tier anpirschen und erlegen
     (Mod-Kommando hunt) -> Kadaver zerlegen (harvest). Mit schussbereiter
-    Feuerwaffe faellt das Tier auf 35 m; ohne muss der NPC auf 4 m heran,
+    Feuerwaffe fällt das Tier auf 35 m; ohne muss der NPC auf 4 m heran,
     was nur bei Huhn/Hase realistisch klappt."""
     state = bridge.read_state() or {}
     prey = [e for e in state.get("nearby", [])
@@ -746,7 +834,7 @@ def hunt(bridge: Bridge, animal: str = "", log=print) -> str:
 
 def process_food(bridge: Bridge, log=print) -> str:
     """Nahrungs-Verarbeitungs-Kette: alle Tierkadaver in 50 m zerlegen
-    (harvest), dann alles Rohe am Feuer garen (cook_meal baut/zuendet das
+    (harvest), dann alles Rohe am Feuer garen (cook_meal baut/zündet das
     Feuer selbst). Der eine Aufruf nach Jagd oder Angeln."""
     steps: list[str] = []
     for _ in range(3):
@@ -776,15 +864,15 @@ def process_food(bridge: Bridge, log=print) -> str:
     return "\n".join(steps)
 
 
-# Koerper-Slots, die die Kleidungswahl systematisch besetzt. Schulter/Waffe
-# und Deko-Slots (Armband, Eyewear) bleiben aussen vor.
+# Körper-Slots, die die Kleidungswahl systematisch besetzt. Schulter/Waffe
+# und Deko-Slots (Armband, Eyewear) bleiben außen vor.
 CLOTHING_SLOTS = ("Body", "Legs", "Feet", "Headgear", "Gloves", "Vest", "Back")
 
 
 def _clothing_score(item: dict, freezing: bool) -> float:
-    """Wert eines Kleidungsstuecks nach Lage: beim Frieren zaehlt Waerme
+    """Wert eines Kleidungsstücks nach Lage: beim Frieren zählt Wärme
     (heatIsolation aus der Mod), sonst Stauraum (Cargo-Slots). Der jeweils
-    andere Faktor bleibt als Tiebreaker drin. Ruinierte Stuecke zaehlen nicht."""
+    andere Faktor bleibt als Tiebreaker drin. Ruinierte Stücke zählen nicht."""
     if item.get("health", 100.0) <= 5.0:
         return -1.0
     warmth = float(item.get("warmth", 0.0) or 0.0)
@@ -824,10 +912,10 @@ def rescue_wear_leftovers(bridge: Bridge, detail: str, old_classname: str = "") 
 
 
 def dress_best(bridge: Bridge, log=print) -> str:
-    """Kleidungs-Folgekette: pro Koerper-Slot (Body/Legs/Feet/Kopf/Handschuhe/
-    Weste/Rucksack) das beste verfuegbare Stueck anziehen. FRIERT der NPC
-    (heat_comfort unter -0.15), zaehlt Waerme (heatIsolation); ist die Lage
-    moderat, zaehlt Stauraum (Cargo-Slots). Kandidaten: unangelegte Kleidung
+    """Kleidungs-Folgekette: pro Körper-Slot (Body/Legs/Feet/Kopf/Handschuhe/
+    Weste/Rucksack) das beste verfügbare Stück anziehen. FRIERT der NPC
+    (heat_comfort unter -0.15), zählt Wärme (heatIsolation); ist die Lage
+    moderat, zählt Stauraum (Cargo-Slots). Kandidaten: unangelegte Kleidung
     im Inventar UND am Boden in 10 m (wear holt sie selbst)."""
     state = bridge.read_state() or {}
     npc = state.get("npc", {})
@@ -909,7 +997,7 @@ def dress_best(bridge: Bridge, log=print) -> str:
 
 
 def combine_items(bridge: Bridge, a: str, b: str, log=print) -> str:
-    """Zwei Gegenstaende kombinieren: sucht das Rezept, dessen Materialliste
+    """Zwei Gegenstände kombinieren: sucht das Rezept, dessen Materialliste
     genau aus den beiden Classnames besteht, und craftet es. Kennt kein
     Rezept die Kombination, werden passende Rezepte mit einem der beiden
     Materialien vorgeschlagen."""
@@ -930,13 +1018,13 @@ def combine_items(bridge: Bridge, a: str, b: str, log=print) -> str:
         return craft(bridge, exact[0], log)
     if len(exact) > 1:
         # Mehrere Rezepte aus demselben Materialpaar (Stick+Rag = Fackel,
-        # Schiene ODER Feuerstelle) - Entscheidung gehoert dem Gehirn.
+        # Schiene ODER Feuerstelle) - Entscheidung gehört dem Gehirn.
         opts = []
         for name in sorted(exact):
             r = recipes_map[name]
             mats_text = ", ".join(f"{n}x {m}" for m, n in r["mats"].items())
             opts.append(f"{name} ({mats_text} -> {r['result']}, {r['desc']})")
-        return ("Aus diesen beiden Teilen geht MEHRERES - waehle mit "
+        return ("Aus diesen beiden Teilen geht MEHRERES - wähle mit "
                 "craft(recipe=...): " + "; ".join(opts))
     related = []
     for name, r in sorted(recipes_map.items()):
@@ -953,7 +1041,7 @@ def combine_items(bridge: Bridge, a: str, b: str, log=print) -> str:
 
 
 def water_run(bridge: Bridge, log=print) -> str:
-    """Zum naechsten sichtbaren Brunnen laufen, trinken, Flasche fuellen."""
+    """Zum nächsten sichtbaren Brunnen laufen, trinken, Flasche füllen."""
     state = bridge.read_state() or {}
     npc = state.get("npc", {})
     wells = [e for e in state.get("nearby", []) if e.get("kind") == "water"]
@@ -1007,7 +1095,7 @@ def find_item(bridge: Bridge, pattern: str) -> str:
 
 
 def explore_step(bridge: Bridge, log=print) -> str:
-    """Ein Such-Schritt: in eine zufaellige Richtung ~100 m, dort looten."""
+    """Ein Such-Schritt: in eine zufällige Richtung ~100 m, dort looten."""
     state = bridge.read_state() or {}
     npc = state.get("npc", {})
     x, z = npc.get("pos_x", 0.0), npc.get("pos_z", 0.0)

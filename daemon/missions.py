@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
-"""IsuSurvivor Missions-Engine - laedt Skript-Missionen aus arena/missions/<id>.json
-und faehrt ihre Events/Erfolgspruefung als Supervisor-Thread.
+"""IsuSurvivor Missions-Engine - lädt Skript-Missionen aus arena/missions/<id>.json
+und fährt ihre Events/Erfolgsprüfung als Supervisor-Thread.
 
 Bisher war die einzige Mission ("birgit") hart im arena_supervisor codiert.
-Jetzt sind Missionen Daten: das In-Game-Menue schickt weiterhin "mission:<id>"
-ueber den bestehenden Kanal, der Supervisor holt sich die Definition hier ab.
+Jetzt sind Missionen Daten: das In-Game-Menü schickt weiterhin "mission:<id>"
+über den bestehenden Kanal, der Supervisor holt sich die Definition hier ab.
 WICHTIG (Konvention wie s_LangCodes == LANG_NAMES): die Missions-Liste im Mod-
-Menue muss 1:1 der Dateiliste in arena/missions/ entsprechen (v1: birgit, horde).
+Menü muss 1:1 der Dateiliste in arena/missions/ entsprechen (v1: birgit, horde).
 
 Schema (tolerant gelesen - unbekannte Felder werden ignoriert):
   {
     "id": "horde", "name": "...", "map": "" | "enoch" | ...,
-    "camp": [x, z] | null,          # null = Lagerpunkt aus dem Menue
+    "camp": [x, z] | null,          # null = Lagerpunkt aus dem Menü
     "rally": [x, z] | null,
     "briefing": "...",              # --mission-Text ({tx}/{tz} = Zielkoords)
     "role_briefings": {"captive": "...", "freed": "..."},
-    "patrols": [ ...AIPatrolSettings-Eintraege... ],   # optional, injiziert
+    "patrols": [ ...AIPatrolSettings-Einträge... ],   # optional, injiziert
     "objective": {"type": "rescue"|"defend", ...},
     "events": [{"at_sec": 30, "type": "broadcast"|"spawn_infected", ...}],
     "success": {"type": "captive_released"|"all_infected_dead", ...},
     "on_success_broadcast": "...", "on_fail_broadcast": "..."
   }
 
-Die Rettungslogik (Gefangene erscheint erst nach der Saeuberung) bleibt im
+Die Rettungslogik (Gefangene erscheint erst nach der Säuberung) bleibt im
 Supervisor (Arena.check_birgit_release) - sie braucht dessen Prozessverwaltung.
-Dieser Thread hier faehrt die zeitgesteuerten Events (Horde-Wellen) und die
-Erfolgspruefung "alle Infizierten tot" - als BEOBACHTER/Spielleiter, er befiehlt
+Dieser Thread hier fährt die zeitgesteuerten Events (Horde-Wellen) und die
+Erfolgsprüfung "alle Infizierten tot" - als BEOBACHTER/Spielleiter, er befiehlt
 den NPCs nichts (Benchmark-Charakter bleibt, wie beim Orchestrator).
 """
 
@@ -49,20 +49,22 @@ MISSION_DIRS = {
     "enoch": "dayzOffline.enoch",
     "livonia": "dayzOffline.enoch",
     "sakhal": "dayzOffline.sakhal",
+    "nasdara": "dayzOffline.nasdara",
+    "badlands": "dayzOffline.nasdara",
 }
 
 # Absender im Funk (wie orchestrator.RADIO_SENDER) - taucht beim NPC als
 # "FUNK von Lagezentrum: ..." auf.
 RADIO_SENDER = "Lagezentrum"
 
-# Was in nearby als Infizierter zaehlt (wie orchestrator.ZOMBIE_HINTS)
+# Was in nearby als Infizierter zählt (wie orchestrator.ZOMBIE_HINTS)
 ZOMBIE_HINTS = ("zmb", "infected", "zombie")
 
 
 # ------------------------------------------------------------------ Laden
 
 def mission_ids() -> list[str]:
-    """Verfuegbare Missions-IDs = Dateiliste arena/missions/*.json."""
+    """Verfügbare Missions-IDs = Dateiliste arena/missions/*.json."""
     try:
         return sorted(f[:-5] for f in os.listdir(MISSIONS_DIR)
                       if f.endswith(".json"))
@@ -89,7 +91,7 @@ def load(mission_id: str) -> dict | None:
 
 def format_briefing(text: str, tx: float, tz: float) -> str:
     """{tx}/{tz}-Platzhalter einsetzen; Briefings ohne Platzhalter bleiben
-    unveraendert (KeyError/IndexError durch fremde Klammern abfangen)."""
+    unverändert (KeyError/IndexError durch fremde Klammern abfangen)."""
     if not text:
         return ""
     try:
@@ -100,7 +102,7 @@ def format_briefing(text: str, tx: float, tz: float) -> str:
 
 def needs_thread(mission: dict) -> bool:
     """True, wenn die Mission zeitgesteuerte Events oder eine Infizierten-
-    Erfolgspruefung hat (dann startet der Supervisor einen MissionRun)."""
+    Erfolgsprüfung hat (dann startet der Supervisor einen MissionRun)."""
     if mission.get("events"):
         return True
     return ((mission.get("success") or {}).get("type") == "all_infected_dead")
@@ -115,10 +117,10 @@ def agent_home(aid: str) -> str:
 
 
 def broadcast(agent_ids: list[str], text: str, prio: bool = True) -> int:
-    """Eine Funk-Zeile in die voice_inbox ALLER Agenten haengen (run_agent
+    """Eine Funk-Zeile in die voice_inbox ALLER Agenten hängen (run_agent
     weckt das Gehirn als 'FUNK von Lagezentrum: ...'). prio=True unterbricht
-    laufende Maersche (bridge._inbox_should_interrupt). Gibt die Anzahl der
-    erreichten Inboxen zurueck."""
+    laufende Märsche (bridge._inbox_should_interrupt). Gibt die Anzahl der
+    erreichten Inboxen zurück."""
     sent = 0
     entry = {"user": RADIO_SENDER, "text": text, "t": time.time(), "prio": prio}
     line = json.dumps(entry, ensure_ascii=False) + "\n"
@@ -135,8 +137,8 @@ def broadcast(agent_ids: list[str], text: str, prio: bool = True) -> int:
 
 
 def ensure_patrols(amap: str, patrols: list, log=print) -> None:
-    """Optionale AIPatrolSettings-Eintraege der Mission in die Karten-Settings
-    injizieren (idempotent, Match ueber "Name"). Wirkt ab dem naechsten
+    """Optionale AIPatrolSettings-Einträge der Mission in die Karten-Settings
+    injizieren (idempotent, Match über "Name"). Wirkt ab dem nächsten
     Server-Neustart - wie der bestehende set_patrols-Toggle."""
     if not patrols:
         return
@@ -148,7 +150,7 @@ def ensure_patrols(amap: str, patrols: list, log=print) -> None:
     path = os.path.join(MPMISSIONS, mission_dir, "expansion", "settings",
                         "AIPatrolSettings.json")
     if not os.path.exists(path):
-        log(f"Missions-Patrouillen: AIPatrolSettings fuer '{amap}' nicht da - "
+        log(f"Missions-Patrouillen: AIPatrolSettings für '{amap}' nicht da - "
             f"uebersprungen.")
         return
     try:
@@ -182,12 +184,12 @@ def _dist2d(x1: float, z1: float, x2: float, z2: float) -> float:
 # ------------------------------------------------------------- Missions-Lauf
 
 class MissionRun(threading.Thread):
-    """Faehrt die zeitgesteuerten Events einer Mission und prueft den Erfolg.
+    """Fährt die zeitgesteuerten Events einer Mission und prüft den Erfolg.
 
-    Laeuft als Daemon-Thread im Supervisor; stop() beendet ihn sauber (kein
+    Läuft als Daemon-Thread im Supervisor; stop() beendet ihn sauber (kein
     Ergebnis-Broadcast, die Runde wurde ja abgebrochen). Alle Welt-Zugriffe
-    gehen ueber die bestehende File-Bridge des jeweils NAECHSTEN Agenten -
-    kein neuer Kanal, kein Mod-Repack noetig, solange die Mod spawn_infected
+    gehen über die bestehende File-Bridge des jeweils NÄCHSTEN Agenten -
+    kein neuer Kanal, kein Mod-Repack nötig, solange die Mod spawn_infected
     kennt (x/z/count sind optionale neue Felder, Fallback s.u.)."""
 
     def __init__(self, mission: dict, camp: tuple[float, float],
@@ -198,13 +200,13 @@ class MissionRun(threading.Thread):
         self.camp = camp
         self.agent_ids = list(agent_ids)
         self.log = log
-        self.status = status          # Kurzstatus fuers In-Game-Menue (optional)
+        self.status = status          # Kurzstatus fürs In-Game-Menü (optional)
         self.profile_dir = profile_dir
         # NICHT self._stop nennen: threading.Thread hat intern eine
         # _stop()-METHODE (join ruft sie auf) - ein Event dort crasht
         # mit "'Event' object is not callable".
         self._stop_evt = threading.Event()
-        self._spawned = 0             # ueber alle Wellen angeforderte Infizierte
+        self._spawned = 0             # über alle Wellen angeforderte Infizierte
         self._last_wave = 0.0         # monotonic der letzten Spawn-Welle
 
     def stop(self) -> None:
@@ -221,8 +223,8 @@ class MissionRun(threading.Thread):
         return out
 
     def _nearest_alive(self) -> str | None:
-        """Agent, der dem Lagerpunkt am naechsten steht und lebt - sein
-        Bridge-Kanal traegt die spawn_infected-Kommandos."""
+        """Agent, der dem Lagerpunkt am nächsten steht und lebt - sein
+        Bridge-Kanal trägt die spawn_infected-Kommandos."""
         best, best_d = None, 1e12
         for aid, st in self._states().items():
             npc = st.get("npc") or {}
@@ -236,7 +238,7 @@ class MissionRun(threading.Thread):
 
     def _infected_near_camp(self, radius: float) -> int:
         """Anzahl der von IRGENDEINEM Agenten gesehenen lebenden Infizierten
-        im Radius um den Lagerpunkt (Leichen/Items zaehlen nicht)."""
+        im Radius um den Lagerpunkt (Leichen/Items zählen nicht)."""
         seen = 0
         for st in self._states().values():
             for e in st.get("nearby", []):
@@ -269,10 +271,10 @@ class MissionRun(threading.Thread):
         rmax = float(p.get("ring_max_m", max(120.0, rmin)))
         aid = self._nearest_alive()
         if not aid:
-            self.log("MISSION: kein lebender Agent fuer spawn_infected - Welle "
+            self.log("MISSION: kein lebender Agent für spawn_infected - Welle "
                      "uebersprungen.")
             return
-        # Zufaelliger Punkt im Ring um den Lagerpunkt
+        # Zufälliger Punkt im Ring um den Lagerpunkt
         ang = random.uniform(0.0, 2.0 * math.pi)
         r = random.uniform(rmin, rmax)
         sx = self.camp[0] + math.sin(ang) * r
@@ -295,8 +297,8 @@ class MissionRun(threading.Thread):
                      f"{sx:.0f}/{sz:.0f} (Ring {rmin:.0f}-{rmax:.0f} m, via {aid}).")
             return
         # Fallback: die Mod kennt x/z/count noch nicht (failed/ignoriert) ->
-        # altes Verhalten (1 Stueck, 25 m voraus) ueber den Kanal des
-        # naechsten Agenten, count-mal.
+        # altes Verhalten (1 Stück, 25 m voraus) über den Kanal des
+        # nächsten Agenten, count-mal.
         ok = 0
         for _ in range(count):
             if self._stop_evt.is_set():
@@ -320,7 +322,7 @@ class MissionRun(threading.Thread):
         mid = m.get("id", "?")
         t0 = time.monotonic()
         self._last_wave = t0
-        self.log(f"MISSION '{mid}': Engine laeuft (Lager "
+        self.log(f"MISSION '{mid}': Engine läuft (Lager "
                  f"{self.camp[0]:.0f}/{self.camp[1]:.0f}, "
                  f"Agenten: {', '.join(self.agent_ids) or '-'}).")
 
@@ -344,14 +346,14 @@ class MissionRun(threading.Thread):
 
         suc = m.get("success") or {}
         if suc.get("type") != "all_infected_dead":
-            return                            # nichts weiter zu pruefen
+            return                            # nichts weiter zu prüfen
 
         timeout_s = float(suc.get("timeout_sec", 900.0))
         radius = float(suc.get("radius_m", 200.0))
         clear_need = float(suc.get("clear_sec", 60.0))
-        # Anlaufzeit nach der letzten Welle: die Infizierten muessen erst in
+        # Anlaufzeit nach der letzten Welle: die Infizierten müssen erst in
         # Sichtweite (nearby = 100 m um den Agenten) kommen, sonst meldet der
-        # erste Poll faelschlich "alles tot".
+        # erste Poll fälschlich "alles tot".
         grace = 90.0
         clear_since: float | None = None
         seen_any = self._spawned > 0
@@ -371,7 +373,7 @@ class MissionRun(threading.Thread):
                 clear_since = now
                 continue
             # Wurde nie ein Infizierter gesehen (Spawn evtl. fehlgeschlagen),
-            # laenger warten, bevor wir Erfolg melden.
+            # länger warten, bevor wir Erfolg melden.
             need = clear_need if seen_any else max(clear_need, 180.0)
             if now - clear_since >= need:
                 self._finish(success=True, reason="keine Infizierten mehr am Lager")

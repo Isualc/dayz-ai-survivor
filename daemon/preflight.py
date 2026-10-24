@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
-"""IsuSurvivor Preflight-Checks - prueft VOR dem Rundenstart, ob Keys, CLI und
-Backends ueberhaupt funktionieren koennen.
+"""IsuSurvivor Preflight-Checks - prüft VOR dem Rundenstart, ob Keys, CLI und
+Backends überhaupt funktionieren können.
 
 Motivation: eine halbe Stunde "NPCs sind stumm/hirntot" hatte bisher fast immer
-eine banale Ursache, die sich in 5 Sekunden haette pruefen lassen (Discord-Token
+eine banale Ursache, die sich in 5 Sekunden hätte prüfen lassen (Discord-Token
 nicht geerbt, cli.js nach npm-Update verschwunden, Fable ohne Konto-Zugriff,
-Router-Port zu). Dieser Check laeuft im Supervisor vor JEDEM Start und ist
-zusaetzlich eigenstaendig aufrufbar:
+Router-Port zu). Dieser Check läuft im Supervisor vor JEDEM Start und ist
+zusätzlich eigenständig aufrufbar:
 
   python daemon\\preflight.py                (Roster-Modelle aus arena/agents.json)
   python daemon\\preflight.py sonnet api/opus openai/gpt-5.5   (explizite Modelle)
 
 Levels: ok / warn / fail. Voice-Keys (Discord, ElevenLabs) sind IMMER nur warn -
-ohne sie laeuft die Runde stumm, aber sie laeuft. fail = die Runde wuerde sicher
+ohne sie läuft die Runde stumm, aber sie läuft. fail = die Runde würde sicher
 Slots verbrennen (fehlender API-Key, kein CLI-Startpfad).
 
-Cloud-Validierung fuer Voice NUR mit ISU_PREFLIGHT_NETWORK=1, Modell-Pings
-NUR mit ISU_PREFLIGHT_PING=1. Beide standardmaessig aus. Ohne diese Flags
-werden nur Installationspfade, Key-Praesenz und lokale Ports geprueft;
-Antigravity wird ausschliesslich lokal mit --version auf Startbarkeit geprueft.
+Cloud-Validierung für Voice NUR mit ISU_PREFLIGHT_NETWORK=1, Modell-Pings
+NUR mit ISU_PREFLIGHT_PING=1. Beide standardmäßig aus. Ohne diese Flags
+werden nur Installationspfade, Key-Präsenz und lokale Ports geprüft;
+Antigravity wird ausschließlich lokal mit --version auf Startbarkeit geprüft.
 
 Nur stdlib (urllib/socket) - keine neuen Dependencies.
 """
@@ -37,14 +37,14 @@ ROSTER_FILE = os.path.join(REPO_DIR, "arena", "agents.json")
 
 # CLI-Startpfad-Autoerkennung - NACHGEBAUT aus run_agent.py (dort Z34ff).
 # Bewusst NICHT importiert: run_agent hat Modul-Seiteneffekte (Pfad-Setup,
-# globale Dateien) und gehoert nicht in einen reinen Check-Prozess.
+# globale Dateien) und gehört nicht in einen reinen Check-Prozess.
 NODE = os.environ.get("ISU_NODE_BIN") or r"C:\Program Files\nodejs\node.exe"
 CLI = os.path.expandvars(r"%APPDATA%\npm\node_modules\@anthropic-ai\claude-code\cli.js")
 CLI_EXE = os.environ.get("ISU_CLAUDE_CLI") or os.path.expandvars(r"%APPDATA%\npm\node_modules\@anthropic-ai\claude-code\bin\claude.exe")
 PROJECT_CLI_EXE = os.path.join(REPO_DIR, ".runtime", "claude-code", "node_modules",
                              "@anthropic-ai", "claude-code", "bin", "claude.exe")
 
-# Ports muessen zu run_agent.resolve_backend / arena_supervisor passen
+# Ports müssen zu run_agent.resolve_backend / arena_supervisor passen
 CCR_PORT = 3456      # claude-code-router: openai/ google/ xai/
 LLAMA_PORT = 8080    # llama-server: local/
 NATIVE_PREFIXES = ("codex/", "gemini-cli/", "antigravity/", "mistral/", "moonshot/")
@@ -55,7 +55,7 @@ NATIVE_CLI_CONFIG = {
 }
 
 # Kurzname -> volle Anthropic-Modell-ID (Kopie aus run_agent.ANTHROPIC_API_ALIASES,
-# nur fuer den optionalen Ping gebraucht)
+# nur für den optionalen Ping gebraucht)
 ANTHROPIC_API_ALIASES = {
     "haiku": "claude-haiku-4-5-20251001",
     "sonnet": "claude-sonnet-4-6",
@@ -201,10 +201,10 @@ def check_anthropic_key(models: list[str]) -> tuple[str, str, str] | None:
 
 
 def check_native_cli(models: list[str], provider: str) -> tuple[str, str, str] | None:
-    """Startpfad bzw. Antigravity --version; keinen Login/Modell-Call ausloesen.
+    """Startpfad bzw. Antigravity --version; keinen Login/Modell-Call auslösen.
 
     Der Worker und der Preflight teilen die Pfadauflosung; damit reicht ein
-    npm-PowerShell-Shim alleine nicht fuer ein irrtuemliches 'ok'.
+    npm-PowerShell-Shim alleine nicht für ein irrtümliches 'ok'.
     """
     if not any(m.startswith(provider + "/") for m in models):
         return None
@@ -249,8 +249,8 @@ def check_direct_api_key(models: list[str], provider: str,
 
 
 def check_retired_moonshot(models: list[str]) -> tuple[str, str, str] | None:
-    # Offizielle Modellliste, geprueft 2026-09-08:
-    # https://platform.kimi.ai/docs/models. Custom-IDs bleiben frei waehlbar.
+    # Offizielle Modellliste, geprüft 2026-09-08:
+    # https://platform.kimi.ai/docs/models. Custom-IDs bleiben frei wählbar.
     retired = {"kimi-k2.5", "kimi-k2-0905-preview", "kimi-k2-0711-preview",
                "kimi-k2-turbo-preview", "kimi-k2-thinking", "kimi-k2-thinking-turbo",
                "kimi-latest", "kimi-thinking-preview"}
@@ -263,7 +263,7 @@ def check_retired_moonshot(models: list[str]) -> tuple[str, str, str] | None:
 
 
 def check_retired_gemini_cli(models: list[str]) -> tuple[str, str, str] | None:
-    """Warnung: Gemini CLI ohne persoenlichen Google-Zugang seit 18.06.2026
+    """Warnung: Gemini CLI ohne persönlichen Google-Zugang seit 18.06.2026
     (UNSUPPORTED_CLIENT bei jedem Zug). Der Supervisor leitet gemini-cli/*
     auf antigravity/default um, solange ISU_GEMINI_CLI_ALLOWED nicht gesetzt
     ist - darum nur warn, kein fail."""
@@ -292,6 +292,73 @@ def check_fable(models: list[str]) -> tuple[str, str, str] | None:
             "biegt auf sonnet um (Zugriff erst bestaetigen, dann Flag setzen)")
 
 
+def cli_launch() -> list[str]:
+    """Startpfad wie run_agent.CLI_LAUNCH (Projekt-Runtime > cli.js > claude.exe)."""
+    if os.path.isfile(PROJECT_CLI_EXE):
+        return [PROJECT_CLI_EXE]
+    if os.path.exists(CLI) and os.path.exists(NODE):
+        return [NODE, CLI]
+    if os.path.exists(CLI_EXE):
+        return [CLI_EXE]
+    return []
+
+
+def claude_auth_status(launch: list[str] | None = None) -> tuple[bool | None, str]:
+    """Lokaler Login-Check per 'claude auth status --json' (kein Modellaufruf,
+    keine Tokens). -> (eingeloggt?, Detail); None = nicht feststellbar.
+
+    Gleiche Env wie der Gehirn-Spawn für Plan-Modelle: ein gesetzter
+    ANTHROPIC_API_KEY bleibt drin, weil die CLI ihn dann statt des OAuth-Logins
+    nimmt. Befund 16.10.: abgelaufener OAuth-Login kam erst im Spiel als
+    Sprechblase "Failed to authenticate: OAuth session expired" an."""
+    launch = launch if launch is not None else cli_launch()
+    if not launch:
+        return None, "kein CLI-Startpfad"
+    env = dict(os.environ)
+    for key in ("CLAUDECODE", "CLAUDE_CODE", "CLAUDE_CODE_ENTRYPOINT"):
+        env.pop(key, None)
+    try:
+        proc = subprocess.run(
+            [*launch, "auth", "status", "--json"], stdin=subprocess.DEVNULL,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=20, check=False, env=env,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0,
+        )
+    except subprocess.TimeoutExpired:
+        return None, "'claude auth status' nach 20 s abgebrochen"
+    except OSError as e:
+        return None, f"'claude auth status' nicht startbar ({e})"
+    out = proc.stdout or ""
+    start, end = out.find("{"), out.rfind("}")
+    try:
+        data = json.loads(out[start:end + 1]) if start >= 0 < end else {}
+    except json.JSONDecodeError:
+        data = {}
+    if "loggedIn" not in data:
+        return None, f"unerwartete Antwort (exit {proc.returncode}): {out.strip()[:100]}"
+    method = data.get("authMethod") or "?"
+    if data.get("loggedIn"):
+        return True, f"eingeloggt ({method})"
+    return False, f"nicht eingeloggt ({method})"
+
+
+LOGIN_HINT = ("Claude-Login fehlt oder ist abgelaufen - neues Terminal: "
+              "'claude auth login' (oder 'claude' und dann /login)")
+
+
+def check_claude_login(models: list[str]) -> tuple[str, str, str] | None:
+    """Plan-Modelle (ohne Präfix) laufen über den OAuth-Login der CLI. Ist er
+    weg, antwortet jedes Gehirn nur mit einem Auth-Fehler -> fail."""
+    if not any(m and "/" not in m for m in models):
+        return None
+    logged_in, detail = claude_auth_status()
+    if logged_in:
+        return ("Claude-Login", "ok", detail)
+    if logged_in is None:
+        return ("Claude-Login", "warn", f"Status unklar: {detail}")
+    return ("Claude-Login", "fail", f"{detail}. {LOGIN_HINT}")
+
+
 def _ping_messages(base_url: str, model: str, headers: dict) -> tuple[str, str]:
     """1-Token-Ping gegen einen /v1/messages-Endpunkt. -> (level, detail)."""
     payload = json.dumps({
@@ -313,11 +380,11 @@ def _ping_messages(base_url: str, model: str, headers: dict) -> tuple[str, str]:
 
 def check_pings(models: list[str]) -> list[tuple[str, str, str]]:
     """Tiefer Modell-Ping (kostet Tokens/Latenz) - NUR mit ISU_PREFLIGHT_PING=1.
-    Pingt pro Backend hoechstens einmal:
+    Pingt pro Backend höchstens einmal:
       api/<x>          -> echte Anthropic-API (braucht ANTHROPIC_API_KEY)
       openai/google/xai -> CCR (nur wenn Port schon offen)
       local/<x>        -> llama-server (nur wenn Port schon offen)
-    Max-Plan-Modelle (ohne Praefix) laufen ueber den CLI-Login und werden hier
+    Max-Plan-Modelle (ohne Präfix) laufen über den CLI-Login und werden hier
     nicht gepingt (kein API-Endpunkt ohne Key)."""
     if not _env_true("ISU_PREFLIGHT_PING"):
         return []
@@ -360,7 +427,7 @@ def check_pings(models: list[str]) -> list[tuple[str, str, str]]:
 # --------------------------------------------------------------- Aggregation
 
 def roster_models() -> list[str]:
-    """Default-Modelle aus arena/agents.json (fuer den Standalone-Aufruf)."""
+    """Default-Modelle aus arena/agents.json (für den Standalone-Aufruf)."""
     try:
         with open(ROSTER_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -371,7 +438,7 @@ def roster_models() -> list[str]:
 
 
 def run_checks(models: list[str] | None = None) -> list[tuple[str, str, str]]:
-    """Alle Checks ausfuehren. models = aktive Modell-Strings der Runde
+    """Alle Checks ausführen. models = aktive Modell-Strings der Runde
     (Kleinschreibung egal); None = Roster-Defaults aus agents.json."""
     if models is None:
         models = roster_models()
@@ -380,7 +447,12 @@ def run_checks(models: list[str] | None = None) -> list[tuple[str, str, str]]:
     # Native Provider laufen ohne Claude; ein rein natives Roster darf deshalb
     # nicht an einer fehlenden Claude-Installation scheitern.
     if any(not m.startswith(NATIVE_PREFIXES) for m in models):
-        results.append(check_cli())
+        cli = check_cli()
+        results.append(cli)
+        # Login nur prüfen, wenn die CLI überhaupt startbar ist.
+        login = check_claude_login(models) if cli[1] == "ok" else None
+        if login:
+            results.append(login)
     results.append(check_discord())
     results.append(check_elevenlabs())
     for provider in NATIVE_CLI_CONFIG:
@@ -402,7 +474,7 @@ def run_checks(models: list[str] | None = None) -> list[tuple[str, str, str]]:
 
 
 def summarize(results: list[tuple[str, str, str]]) -> tuple[int, int, int]:
-    """(ok, warn, fail)-Zaehler."""
+    """(ok, warn, fail)-Zähler."""
     ok = sum(1 for _, lv, _ in results if lv == "ok")
     warn = sum(1 for _, lv, _ in results if lv == "warn")
     fail = sum(1 for _, lv, _ in results if lv == "fail")
@@ -422,7 +494,39 @@ def print_report(results: list[tuple[str, str, str]]) -> None:
     print(f"--- {ok} ok, {warn} warn, {fail} fail " + "-" * 30)
 
 
+def login_main(interactive: bool) -> int:
+    """'preflight.py --login [--fix]': nur den Claude-Login der Roster-Modelle
+    prüfen (Startskript). --fix bietet bei fehlendem Login direkt
+    'claude auth login' an (Browser-Flow, Ein-/Ausgabe in dieser Konsole)."""
+    result = check_claude_login(roster_models())
+    if result is None:
+        print("  [OK  ] Claude-Login: kein Plan-Modell im Roster, nicht nötig")
+        return 0
+    print_report([result])
+    if result[1] != "fail":
+        return 0
+    if not interactive or not sys.stdin.isatty():
+        return 1
+    ans = input("  Claude-Login jetzt starten (Browser öffnet sich)? (J/n) ").strip().lower()
+    if ans not in ("", "j", "y", "ja", "yes"):
+        return 1
+    launch = cli_launch()
+    env = dict(os.environ)
+    for key in ("CLAUDECODE", "CLAUDE_CODE", "CLAUDE_CODE_ENTRYPOINT"):
+        env.pop(key, None)
+    try:
+        subprocess.run([*launch, "auth", "login"], env=env, check=False)
+    except OSError as e:
+        print(f"  'claude auth login' nicht startbar: {e}")
+        return 1
+    result = check_claude_login(roster_models())
+    print_report([result])
+    return 0 if result and result[1] != "fail" else 1
+
+
 def main() -> int:
+    if "--login" in sys.argv[1:]:
+        return login_main("--fix" in sys.argv[1:])
     models = [m for m in sys.argv[1:] if m] or None
     results = run_checks(models)
     print_report(results)

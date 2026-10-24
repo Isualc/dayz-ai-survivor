@@ -44,13 +44,17 @@ class IsuNpcState
 	float heat_comfort;    // Waerme -1..+1 (unter ca. -0.5 friert er ernsthaft)
 	float wet;             // Naesse 0..1 (PlayerStat WET, Vanilla kennt nur 0/1)
 	string in_hands;       // Classname des Items in der Hand, leer = nichts
-	bool fighting;         // eAI-Kampf-FSM aktiv
+	bool fighting;         // eAI-Kampf-FSM aktiv UND Ziel ist kein Item (Expansion
+	                       // nutzt die Fighting-FSM auch zum Ansteuern von Loot)
 	string name;           // Anzeigename des Survivors (Chat-Absender)
 	bool following;        // folgt gerade einem Spieler (Gruppenbeitritt)
 	bool unconscious;      // bewusstlos (Schock) - liegt und kann nicht handeln
 	bool in_vehicle;       // sitzt in einem Fahrzeug (Bewegungsbefehle gesperrt)
 	bool bleeding;         // aktive Blutungsquelle(n) - unbehandelt tödlich
 	int auto_bandages;     // Reflex-Selbstverbände seit Start (run_agent meldet den Verbrauch)
+	int shots;             // Schuesse DIESES Koerpers seit Spawn (modded Weapon_Base.EEFired);
+	                       // ein Respawn startet wieder bei 0
+	string last_shot_weapon; // Classname der zuletzt abgefeuerten Waffe, leer = noch kein Schuss
 	ref IsuDiseaseInfo disease;
 
 	void IsuNpcState()
@@ -91,6 +95,19 @@ class IsuCommandStatus
 	float dist_to_target;   // nur bei move_to sinnvoll
 }
 
+// Neben-Befehl: Sofort-Aktionen (say/intent/ping, ausserdem bubble und
+// say_voice), die waehrend eines laufenden Hauptbefehls ankommen, laufen
+// NICHT ueber den Hauptslot (sonst verdraengten sie z.B. ein Reise-Segment)
+// und melden ihr Ergebnis hier. id bleibt leer, solange noch kein
+// Neben-Befehl lief.
+class IsuSideCommand
+{
+	string id;
+	string action;
+	string status;          // "done" | "failed"
+	string detail;
+}
+
 class IsuEntityInfo
 {
 	string kind;        // player | ai | infected | corpse | animal | item |
@@ -129,6 +146,7 @@ class IsuState
 	ref IsuNpcState npc;
 	ref IsuWorldState world;
 	ref IsuCommandStatus command;
+	ref IsuSideCommand side_command;      // letzter Neben-Befehl (siehe IsuSideCommand)
 	ref array<ref IsuItemInfo> inventory;
 	ref array<ref IsuEntityInfo> nearby;
 	ref array<ref IsuChatMsg> chat;       // Ringpuffer der letzten Nachrichten
@@ -139,6 +157,7 @@ class IsuState
 		npc = new IsuNpcState();
 		world = new IsuWorldState();
 		command = new IsuCommandStatus();
+		side_command = new IsuSideCommand();
 		inventory = new array<ref IsuItemInfo>();
 		nearby = new array<ref IsuEntityInfo>();
 		chat = new array<ref IsuChatMsg>();
@@ -152,13 +171,16 @@ class IsuCommand
 	string action;      // ping | spawn | move_to | stop | despawn | pickup | eat |
 	                    // drink | equip_best | engage | flee | adopt_nearest |
 	                    // teleport_player | spawn_item | spawn_infected |
-	                    // say | follow | unfollow
+	                    // say | intent | follow | unfollow
+	                    // (say/intent/ping/bubble/say_voice waehrend eines laufenden Befehls ->
+	                    // Neben-Befehl, Ergebnis in state.side_command)
 	float x;
 	float y;            // y <= 0 bedeutet: SurfaceY automatisch ermitteln
 	float z;
 	string loadout;     // nur fuer "spawn", leer = HumanLoadout.json
 	string text;        // generischer Parameter: Classname-Filter (pickup, spawn_item,
-	                    // spawn_infected), Spielername (teleport_player)
+	                    // spawn_infected), Spielername (teleport_player),
+	                    // "melee" (engage: Nahkampf-Lock)
 	string faction;     // nur fuer "spawn": civilian (Default) | west | east |
 	                    // insurgent | raiders - bestimmt Feind/Freund-Verhalten
 	string br;          // nur fuer "spawn": "1" = Battle-Royale (Free-for-all,

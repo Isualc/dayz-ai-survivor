@@ -1,8 +1,8 @@
-"""IsuSurvivor Match-Story — rendert eine Session als SVG-Nacherzaehlung.
+"""IsuSurvivor Match-Story — rendert eine Session als SVG-Nacherzählung.
 
 Liest die neueste tracks_<session>.jsonl (Positions-/HP-Snapshots aus
 spectator_server.py) sowie die Journale aller agent_home(s) und schreibt
-arena/story_<session>.html: Laufwege als SVG-Polylines in Identitaetsfarbe,
+arena/story_<session>.html: Laufwege als SVG-Polylines in Identitätsfarbe,
 eine Zeitleiste markanter Ereignisse (Spawn, Tod, Treffer, Kontakt) und
 Zitate (say-Zeilen) aus den Journalen.
 
@@ -11,7 +11,7 @@ Aufruf:
     python daemon\\match_story.py tracks_20260701.jsonl
     python daemon\\match_story.py D:\\...\\tracks_x.jsonl
 
-Nur stdlib, keine Abhaengigkeiten.
+Nur stdlib, keine Abhängigkeiten.
 """
 
 import glob
@@ -55,7 +55,7 @@ def resolve_tracks_arg(arg: str) -> str:
 
 def load_tracks(path: str) -> list:
     """Liste von Snapshots {"t": epoch, "agents": [...]}, tolerant gegen
-    kaputte/abgeschnittene Zeilen (Server kann waehrend Schreiben killed sein)."""
+    kaputte/abgeschnittene Zeilen (Server kann während Schreiben killed sein)."""
     snaps = []
     if not path or not os.path.exists(path):
         return snaps
@@ -109,7 +109,7 @@ def collect_events(t_start: float, t_end: float) -> dict:
             mtime = os.path.getmtime(path)
         except OSError:
             continue
-        # Grobfilter: Datei muss ungefaehr im Session-Fenster liegen (+-2h Puffer,
+        # Grobfilter: Datei muss ungefähr im Session-Fenster liegen (+-2h Puffer,
         # weil Journal-Dateiname/-mtime nicht exakt Session-Grenzen trifft).
         if t_start and t_end and not (t_start - 7200 <= mtime <= t_end + 7200):
             continue
@@ -255,7 +255,7 @@ def build_quotes_html(quotes: dict, agent_ids: list, roster_names: dict) -> str:
     for i, aid in enumerate(agent_ids):
         col = _color_for(i)
         name = roster_names.get(aid, aid.capitalize())
-        for q in quotes.get(aid, [])[-12:]:  # letzte Zitate reichen fuer eine Story
+        for q in quotes.get(aid, [])[-12:]:  # letzte Zitate reichen für eine Story
             rows.append((q["t_str"], col, name, q["text"]))
     rows.sort(key=lambda r: r[0])
     if not rows:

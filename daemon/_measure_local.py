@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Messlauf: Promptgroesse + Erstzug-Dauer eines local/-Backends, OHNE DayZ.
+"""Messlauf: Promptgröße + Erstzug-Dauer eines local/-Backends, OHNE DayZ.
 
 Startet Claude Code headless exakt wie run_agent (gleiche MCP-Tools, gleiche
-Persona, gleiche Tool-Diaet) gegen den lokalen llama-server und misst die
-Zeit bis zum result-Event. Die Promptgroesse steht danach im llama-Log
+Persona, gleiche Tool-Diät) gegen den lokalen llama-server und misst die
+Zeit bis zum result-Event. Die Promptgröße steht danach im llama-Log
 ("prompt eval" / n_prompt_tokens).
 
 Aufruf: python daemon\\_measure_local.py [modell]   (Default local/gemma-4-E4B-it)

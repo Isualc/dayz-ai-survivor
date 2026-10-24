@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""IsuSurvivor Mitspieler-Registry — arena/players.json lesen und Namen aufloesen.
+"""IsuSurvivor Mitspieler-Registry — arena/players.json lesen und Namen auflösen.
 
-Kleine, abhaengigkeitsfreie Datei (nur stdlib), damit dayz_mcp.py und
-voice_router.py sie ohne Risiko per try/except importieren koennen. Ein
-Mensch kann im Funk anders heissen (funk, z.B. "Isualc") als im DayZ-Profil
-(dayz, GetIdentity, z.B. "Clausi") und zusaetzliche Spitznamen haben
+Kleine, abhängigkeitsfreie Datei (nur stdlib), damit dayz_mcp.py und
+voice_router.py sie ohne Risiko per try/except importieren können. Ein
+Mensch kann im Funk anders heißen (funk, z.B. "Isualc") als im DayZ-Profil
+(dayz, GetIdentity, z.B. "Clausi") und zusätzliche Spitznamen haben
 (aliases). resolve() matcht case-insensitiv gegen alle drei Felder.
 
 Format arena/players.json: {"players": [{"funk":..., "dayz":..., "aliases":
@@ -22,7 +22,7 @@ PLAYERS_FILE = os.path.join(REPO_DIR, "arena", "players.json")
 
 
 def _load_raw() -> list:
-    """Roheintraege aus players.json, oder [] bei Fehlen/Fehler. Akzeptiert
+    """Roheinträge aus players.json, oder [] bei Fehlen/Fehler. Akzeptiert
     sowohl {"players": [...]} als auch eine nackte Liste [...] als Root,
     falls die Datei mal von Hand anders angelegt wird."""
     try:
@@ -40,7 +40,7 @@ def _load_raw() -> list:
 
 
 def all_players() -> list:
-    """Alle bekannten Mitspieler-Eintraege (Rohdaten, Reihenfolge wie Datei)."""
+    """Alle bekannten Mitspieler-Einträge (Rohdaten, Reihenfolge wie Datei)."""
     return _load_raw()
 
 

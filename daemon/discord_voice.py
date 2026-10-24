@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""IsuSurvivor Discord-Voice — Viktor spricht UND hoert im Discord-Sprachkanal.
+"""IsuSurvivor Discord-Voice — Viktor spricht UND hört im Discord-Sprachkanal.
 
 Senden:    say/say_voice schreiben in voice_outbox.jsonl -> Bot spielt ab
            (Katalog-Oggs direkt, freie Texte per ElevenLabs-TTS).
-Hoeren:    Bot empfaengt Audio der Nutzer (discord-ext-voice-recv), schneidet
-           Aeusserungen an Sprechpausen, transkribiert sie per ElevenLabs
+Hören:    Bot empfängt Audio der Nutzer (discord-ext-voice-recv), schneidet
+           Äußerungen an Sprechpausen, transkribiert sie per ElevenLabs
            Scribe und schreibt sie in voice_inbox.jsonl -> run_agent weckt
            das Gehirn mit "FUNK von <Name>: ...".
 
-Setup: docs/discord_bot_setup.md. Braucht DISCORD_BOT_TOKEN; Hoeren und
-Live-TTS brauchen zusaetzlich ELEVENLABS_API_KEY.
+Setup: docs/discord_bot_setup.md. Braucht DISCORD_BOT_TOKEN; Hören und
+Live-TTS brauchen zusätzlich ELEVENLABS_API_KEY.
 """
 
 import argparse
@@ -28,7 +28,7 @@ import requests
 
 try:
     from tts_normalize import normalize_for_tts
-except ImportError:  # als Skript ueber Pfad gestartet -> daemon-Dir nachreichen
+except ImportError:  # als Skript über Pfad gestartet -> daemon-Dir nachreichen
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from tts_normalize import normalize_for_tts
 
@@ -39,7 +39,7 @@ API = "https://api.elevenlabs.io/v1"
 
 # Multi-Bot-Betrieb: pro Agent ein eigener Discord-Bot in einem EIGENEN
 # Sprachkanal (eigener Token, eigene Outbox/Inbox, eigene Stimme). Ohne
-# Argumente verhaelt sich das Skript wie bisher: EIN Bot (DISCORD_BOT_TOKEN)
+# Argumente verhält sich das Skript wie bisher: EIN Bot (DISCORD_BOT_TOKEN)
 # liest die gemeinsame Outbox und sitzt im Kanal "DayZ".
 _p = argparse.ArgumentParser()
 _p.add_argument("--label", default="bot", help="Name im Log (z.B. Agenten-Id)")
@@ -50,13 +50,13 @@ _p.add_argument("--channel", default=os.environ.get("ISU_DISCORD_CHANNEL", "DayZ
 _p.add_argument("--voice", default="",
                 help="ElevenLabs-Stimme dieses Bots (sonst phrases.json)")
 _p.add_argument("--outbox", action="append", default=None,
-                help="voice_outbox.jsonl (mehrfach erlaubt fuer Sammel-Bot)")
+                help="voice_outbox.jsonl (mehrfach erlaubt für Sammel-Bot)")
 _p.add_argument("--inbox", action="append", default=None,
-                help="voice_inbox.jsonl fuer transkribierten Funk (mehrfach "
+                help="voice_inbox.jsonl für transkribierten Funk (mehrfach "
                      "erlaubt - Sammel-Bot stellt an alle zu)")
 _p.add_argument("--no-listen", action="store_true",
-                help="Nur sprechen, nicht hoeren - setzen, wenn der lokale "
-                     "Mikro-Router laeuft, sonst kommt jeder Funkspruch "
+                help="Nur sprechen, nicht hören - setzen, wenn der lokale "
+                     "Mikro-Router läuft, sonst kommt jeder Funkspruch "
                      "DOPPELT an (Router + Bot-Ohr)")
 ARGS = _p.parse_args()
 
@@ -68,8 +68,8 @@ BOT_VOICE = ARGS.voice
 ELEVEN_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
 
 # Offsets SOFORT erfassen (nicht erst nach dem Discord-Login): alles, was ab
-# Prozessstart in die (vom Starter frisch geleerte) Outbox faellt, wird
-# gesprochen - nur Eintraege von davor gelten als Altlast.
+# Prozessstart in die (vom Starter frisch geleerte) Outbox fällt, wird
+# gesprochen - nur Einträge von davor gelten als Altlast.
 _INIT_OFFSETS: dict = {}
 for _box in OUTBOXES:
     try:
@@ -93,9 +93,9 @@ def _set_discord_flags(active: bool) -> None:
             pass
 
 
-# Aeusserungs-Erkennung
-GAP_SECONDS = 1.1        # Sprechpause, die eine Aeusserung beendet
-MIN_SECONDS = 0.5        # kuerzere Schnipsel verwerfen (Atmer, Klicks)
+# Äußerungs-Erkennung
+GAP_SECONDS = 1.1        # Sprechpause, die eine Äußerung beendet
+MIN_SECONDS = 0.5        # kürzere Schnipsel verwerfen (Atmer, Klicks)
 MAX_SECONDS = 45.0       # Sicherheitsdeckel
 PCM_BYTES_PER_SECOND = 48000 * 2 * 2  # 48 kHz, stereo, 16 bit
 
@@ -117,7 +117,7 @@ def resolve_voice() -> tuple[str, str]:
 
     log("Verfuegbare Stimmen: " + ", ".join(v["name"] for v in voices[:12]))
 
-    # Teilstring-Match: ElevenLabs-Premades heissen "Callum - Husky Trickster",
+    # Teilstring-Match: ElevenLabs-Premades heißen "Callum - Husky Trickster",
     # in phrases.json reicht "Callum"
     for v in voices:
         if name.lower() in v["name"].lower():
@@ -185,7 +185,7 @@ class ViktorVoice(discord.Client):
         self.offsets: dict[str, int] = dict(_INIT_OFFSETS)
         self.voice_id = ""
         self.model_id = ""
-        # Arena: pro Agent eine eigene Stimme (Name -> voice_id, lazy aufgeloest)
+        # Arena: pro Agent eine eigene Stimme (Name -> voice_id, lazy aufgelöst)
         self.voice_cache: dict[str, str] = {}
         # user_id -> {"name", "chunks": [bytes], "last": float}
         self.buffers: dict[int, dict] = {}
@@ -196,7 +196,7 @@ class ViktorVoice(discord.Client):
         """Callback aus dem Voice-Empfangs-Thread (BasicSink)."""
         if user is None or ELEVEN_KEY == "":
             return
-        # NIE Bot-Audio transkribieren: sonst hoeren sich die Agenten-Bots
+        # NIE Bot-Audio transkribieren: sonst hören sich die Agenten-Bots
         # gegenseitig (TTS-Echo-Schleife) und jede Aussage kommt doppelt an
         if getattr(user, "bot", False):
             return
@@ -252,7 +252,7 @@ class ViktorVoice(discord.Client):
             return
 
         # Voice-Connect mit Wiederholung: Wenn mehrere Bots gleichzeitig
-        # starten, scheitert der Beitritt gern transient - frueher blieb
+        # starten, scheitert der Beitritt gern transient - früher blieb
         # der Bot dann still am Leben und sprach nie wieder
         for attempt in range(4):
             try:
@@ -267,18 +267,18 @@ class ViktorVoice(discord.Client):
             return
         log(f"Im Sprachkanal: {channel.guild.name} / {channel.name}")
         # Ab jetzt sprechen die NPCs per Voice -> dayz_mcp soll den In-Game-Chat
-        # nicht mehr zusaetzlich befuellen (sonst erscheint jede Zeile doppelt).
+        # nicht mehr zusätzlich befüllen (sonst erscheint jede Zeile doppelt).
         _set_discord_flags(True)
 
         if ELEVEN_KEY:
             await self.ensure_voice()
             if ARGS.no_listen:
-                log("Hoeren AUS (--no-listen): der Mikro-Router uebernimmt.")
+                log("Hören AUS (--no-listen): der Mikro-Router übernimmt.")
             else:
                 self.vc.listen(voice_recv.BasicSink(self.on_voice_packet))
                 log("Hoere zu (STT aktiv).")
         else:
-            log("Kein ELEVENLABS_API_KEY - weder Live-TTS noch Hoeren.")
+            log("Kein ELEVENLABS_API_KEY - weder Live-TTS noch Hören.")
 
         self.loop.create_task(self.poll_outbox())
         self.loop.create_task(self.utterance_flusher())
@@ -322,9 +322,9 @@ class ViktorVoice(discord.Client):
         return entries
 
     async def ensure_voice(self) -> bool:
-        """ElevenLabs-Stimme aufloesen, mit Wiederholung: vier Bots fragen
+        """ElevenLabs-Stimme auflösen, mit Wiederholung: vier Bots fragen
         beim Arena-Start gleichzeitig /voices ab, das kann 429 geben -
-        frueher war TTS dann fuer die ganze Session stumm."""
+        früher war TTS dann für die ganze Session stumm."""
         if self.voice_id:
             return True
         if not ELEVEN_KEY:
@@ -341,7 +341,7 @@ class ViktorVoice(discord.Client):
         return False
 
     async def resolve_entry_voice(self, voice_name: str) -> str:
-        """Stimme fuer einen Outbox-Eintrag (Arena: pro Agent verschieden)."""
+        """Stimme für einen Outbox-Eintrag (Arena: pro Agent verschieden)."""
         if not voice_name:
             return self.voice_id
         if voice_name in self.voice_cache:
@@ -357,7 +357,7 @@ class ViktorVoice(discord.Client):
                 return self.voice_id
             vid = await asyncio.to_thread(lookup)
         except Exception as e:
-            # Transienter Fehler (Timeout, 429): NICHT cachen, naechster
+            # Transienter Fehler (Timeout, 429): NICHT cachen, nächster
             # Eintrag versucht den Lookup erneut
             log(f"Stimmen-Lookup '{voice_name}' fehlgeschlagen: {e}")
             return self.voice_id
@@ -373,8 +373,8 @@ class ViktorVoice(discord.Client):
 
     async def ensure_connected(self) -> bool:
         """Voice-Verbindung sicherstellen. Trennt Discord den Bot still (passiert
-        bei mehreren Bots im selben Kanal), kehrte speak() sonst fuer den REST
-        der Session still zurueck - der NPC sprach 'nur am Anfang'. Hier bei
+        bei mehreren Bots im selben Kanal), kehrte speak() sonst für den REST
+        der Session still zurück - der NPC sprach 'nur am Anfang'. Hier bei
         Verlust automatisch neu beitreten."""
         if self.vc and self.vc.is_connected():
             return True
@@ -417,8 +417,8 @@ class ViktorVoice(discord.Client):
                 self._tts_fails = 0
                 cleanup = True
             except requests.exceptions.HTTPError as e:
-                # 401/403 = Key ungueltig, 429 = Kontingent/Rate erschoepft. Genau
-                # das liess in der letzten Session ALLE Stimmen verstummen ("am
+                # 401/403 = Key ungültig, 429 = Kontingent/Rate erschöpft. Genau
+                # das ließ in der letzten Session ALLE Stimmen verstummen ("am
                 # Anfang da, dann nichts"). Nicht bei jeder Nachricht dieselbe
                 # Zeile spammen: EINE klare Warnung, danach still bis Neustart.
                 code = getattr(getattr(e, "response", None), "status_code", 0)
@@ -443,15 +443,15 @@ class ViktorVoice(discord.Client):
             await asyncio.sleep(0.3)
             waited += 0.3
         if self.vc.is_playing():
-            self.vc.stop()   # haengende Vorgaenger-Wiedergabe abbrechen, nicht ewig warten
+            self.vc.stop()   # hängende Vorgänger-Wiedergabe abbrechen, nicht ewig warten
 
         source = await discord.FFmpegOpusAudio.from_probe(path)
         done = asyncio.Event()
         self.vc.play(source, after=lambda err: done.set())
         try:
             # NICHT ewig warten: feuert der after-Callback nicht (stiller Voice-
-            # Disconnect mitten im Abspielen), wuerde die Outbox-Schleife sonst
-            # fuer den Rest der Session einfrieren -> "sprach nur am Anfang".
+            # Disconnect mitten im Abspielen), würde die Outbox-Schleife sonst
+            # für den Rest der Session einfrieren -> "sprach nur am Anfang".
             await asyncio.wait_for(done.wait(), timeout=30.0)
         except asyncio.TimeoutError:
             log("Wiedergabe haengt (>30 s) - abgebrochen, weiter.")

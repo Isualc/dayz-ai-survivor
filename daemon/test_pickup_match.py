@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Offline-Test fuer den pickup-Namensmatch-Fix (2026-06-16). Laeuft OHNE
+"""Offline-Test für den pickup-Namensmatch-Fix (2026-06-16). Läuft OHNE
 DayZ-Server, ohne NPC, ohne File-Bridge - reines Python.
 
 Hintergrund: pickup griff oft das FALSCHE Bodenitem (pickup(WolfSteakMeat) ->
 FieldShovel). Ursache war ein exakter Vollname-Vergleich plus ein leerer Filter
-(vertippter MCP-Parameter), der das naechste beliebige Item nahm.
+(vertippter MCP-Parameter), der das nächste beliebige Item nahm.
 
 Zwei Teile:
   1. SPEC - reine Python-Spiegelung der Mod-Regel IsuBridge.FindNearestGroundItem
-     (EnforceScript). Prueft exakt-vor-Teilstring, das Leerer-Filter-Verhalten
+     (EnforceScript). Prüft exakt-vor-Teilstring, das Leerer-Filter-Verhalten
      und - der eigentliche Bug - dass ein gesuchter, aber nicht vorhandener Name
-     NICHT das naechste beliebige Item greift. Der EnforceScript-Code steht als
-     Kommentar daneben; aendert sich die Mod-Regel, hier nachziehen. Das testet
-     die ALGORITHMUS-Logik, nicht die Kompilierung (die prueft der Server-Start).
+     NICHT das nächste beliebige Item greift. Der EnforceScript-Code steht als
+     Kommentar daneben; ändert sich die Mod-Regel, hier nachziehen. Das testet
+     die ALGORITHMUS-Logik, nicht die Kompilierung (die prüft der Server-Start).
   2. REAL - monkeypatcht die Bridge und ruft das ECHTE dayz_mcp.pickup() mit
-     vertippten Parametern auf: prueft, dass die Alias-Params item/name den
+     vertippten Parametern auf: prüft, dass die Alias-Params item/name den
      richtigen needle erzeugen statt eines leeren.
 
-Live-Vollpruefung (separat, braucht laufenden Server):
+Live-Vollprüfung (separat, braucht laufenden Server):
   python daemon\\test_driver.py pickup --item Apple
 
 Start: python daemon\\test_pickup_match.py
@@ -95,7 +95,7 @@ def _cls(item):
 
 print("== TEIL 1: Matching-Regel (Spec-Spiegelung des Mods) ==")
 
-# A) DER BUG: gesuchtes Item da, aber ein naeheres Fremd-Item -> exakt gewinnt
+# A) DER BUG: gesuchtes Item da, aber ein näheres Fremd-Item -> exakt gewinnt
 cands = [{"classname": "FieldShovel", "dist": 1},
          {"classname": "WolfSteakMeat", "dist": 3}]
 check("A pickup(WolfSteakMeat) -> WolfSteakMeat statt FieldShovel",
@@ -106,13 +106,13 @@ check("A pickup(WolfSteakMeat) -> WolfSteakMeat statt FieldShovel",
 check("B pickup(WolfSteak) -> WolfSteakMeat (Teilstring)",
       _cls(pick_ground_item("WolfSteak", cands)) == "WolfSteakMeat")
 
-# C) exakter Treffer schlaegt naeheren Teilstring
+# C) exakter Treffer schlägt näheren Teilstring
 cands2 = [{"classname": "SharpWoodenStick", "dist": 1},
           {"classname": "WoodenStick", "dist": 4}]
 check("C pickup(WoodenStick) -> WoodenStick (exakt vor naeherem Teilstring)",
       _cls(pick_ground_item("WoodenStick", cands2)) == "WoodenStick")
 
-# D) leerer Filter -> naechstes beliebiges (nur fuer bewusstes pickup())
+# D) leerer Filter -> nächstes beliebiges (nur für bewusstes pickup())
 check("D pickup('') -> FieldShovel (naechstes, argloses pickup)",
       _cls(pick_ground_item("", cands)) == "FieldShovel")
 
@@ -126,21 +126,21 @@ check("F pickup(Matchbox) bei [Plum,Apple] -> None (nicht Plum)",
                        [{"classname": "Plum", "dist": 1},
                         {"classname": "Apple", "dist": 2}]) is None)
 
-# G) beanspruchtes Item (anderer Bot) wird uebersprungen
+# G) beanspruchtes Item (anderer Bot) wird übersprungen
 gc = [{"classname": "Apple", "dist": 1, "claimed": True},
       {"classname": "Apple", "dist": 5}]
 g = pick_ground_item("Apple", gc)
 check("G beanspruchtes Apple@1 uebersprungen -> Apple@5",
       g is not None and g["dist"] == 5)
 
-# H) Item in fremdem Inventar (parent) wird uebersprungen
+# H) Item in fremdem Inventar (parent) wird übersprungen
 hc = [{"classname": "Apple", "dist": 1, "parent": True},
       {"classname": "Apple", "dist": 5}]
 h = pick_ground_item("Apple", hc)
 check("H Apple in Inventar (parent) uebersprungen -> Apple@5",
       h is not None and h["dist"] == 5)
 
-# I) mehrere Teilstring-Treffer -> naechster gewinnt
+# I) mehrere Teilstring-Treffer -> nächster gewinnt
 ic = [{"classname": "LongWoodenStick", "dist": 8},
       {"classname": "SharpWoodenStick", "dist": 2}]
 check("I pickup(Stick) -> SharpWoodenStick (naechster Teilstring)",
@@ -199,7 +199,7 @@ if dayz_mcp:
     check("Vorrang classname vor item-Alias",
           needle_for(classname="A", item="B") == "A")
 
-    # Aufraeumen: evtl. angelegte Test-Outbox entfernen
+    # Aufräumen: evtl. angelegte Test-Outbox entfernen
     try:
         os.remove(os.path.join(DAEMON_DIR, "_test_outbox.jsonl"))
     except OSError:

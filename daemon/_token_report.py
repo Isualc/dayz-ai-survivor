@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Token-Tagesreport: summiert [TOKENS ZUG]-Zeilen aller Agenten-Journale
 eines Tages, gruppiert nach Phase (vor/nach einem Schnitt-Zeitpunkt) und
-Modell. Zeigt Zuege, Tokens pro Zug und USD.
+Modell. Zeigt Züge, Tokens pro Zug und USD.
 
 WICHTIG zur USD-Summe: Der 'Session: ..., X USD'-Wert im Journal ist
-Claude-Code-sessionkumulativ und FAELLT bei jeder Kontext-Rotation und nach
-jedem Tod zurueck auf 0 (frischer Claude-Prozess = neuer total_cost_usd). Nur
-das letzte Segment zu nehmen unterschaetzt die echten Kosten teils um die
-Haelfte. Darum erkennen wir Resets (USD-Wert sinkt) und summieren die
+Claude-Code-sessionkumulativ und FÄLLT bei jeder Kontext-Rotation und nach
+jedem Tod zurück auf 0 (frischer Claude-Prozess = neuer total_cost_usd). Nur
+das letzte Segment zu nehmen unterschätzt die echten Kosten teils um die
+Hälfte. Darum erkennen wir Resets (USD-Wert sinkt) und summieren die
 Segment-Spitze VOR jedem Reset plus das Schluss-Segment. Die Token-Zahlen
 selbst sind Pro-Zug-Deltas und brauchen keine Reset-Behandlung.
 
@@ -35,7 +35,7 @@ journals += glob.glob(os.path.join(REPO, "agent_home", "journal",
 journals += glob.glob(os.path.join(REPO, "agent_homes", "*", "journal",
                                    f"journal_{DAY}_*.log"))
 
-# (phase, model) -> [zuege, in, out, cache_read, cache_write]
+# (phase, model) -> [züge, in, out, cache_read, cache_write]
 agg: dict = {}
 usd: dict = {}   # (phase, model) -> USD (Summe der Session-Endwerte)
 
@@ -46,7 +46,7 @@ for path in sorted(journals):
         phase = "nachher"
 
     model_of_file = ""
-    # Reset-bewusste USD-Summe: prev = laufender Sessionwert; faellt er, war
+    # Reset-bewusste USD-Summe: prev = laufender Sessionwert; fällt er, war
     # das vorige Segment komplett (Rotation/Tod) und wird verbucht.
     file_usd = 0.0
     prev_usd = 0.0

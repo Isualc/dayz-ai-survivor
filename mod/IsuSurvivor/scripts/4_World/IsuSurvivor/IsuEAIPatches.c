@@ -21,6 +21,19 @@ class IsuAgentRegistry
 	// menschlichen Spieler als Feind (Free-for-all). Gesetzt bei jedem Spawn (cmd.br).
 	static ref set<eAIBase> s_BrAgents = new set<eAIBase>();
 
+	// Nahkampf-Lock (engage mode="melee"): solange ein Agent hier steht und
+	// eine Nahkampfwaffe haelt, darf Expansions TakeItemToHands-Zustand nicht
+	// auf die Schusswaffe zurueckwechseln (siehe modded eAIState_TakeItemToHands
+	// unten). Die Bridge setzt/loest den Lock (CmdEngage/UpdateEngage/Dispatch).
+	static ref set<eAIBase> s_MeleeLock = new set<eAIBase>();
+
+	// Schusszaehler pro Koerper seit Spawn (modded Weapon_Base.EEFired unten)
+	// plus Typ der zuletzt abgefeuerten Waffe - State npc.shots /
+	// npc.last_shot_weapon. Expansion kaempft selbststaendig (follow, regroup,
+	// loot), ohne Zaehler erfuhr das Gehirn davon nichts.
+	static ref map<eAIBase, int> s_Shots = new map<eAIBase, int>();
+	static ref map<eAIBase, string> s_ShotWeapon = new map<eAIBase, string>();
+
 	static bool IsAgent(eAIBase ai)
 	{
 		return ai != null && s_Npcs.Contains(ai);
@@ -61,7 +74,10 @@ class IsuAgentRegistry
 				stale.Insert(other);
 		}
 		foreach (eAIBase s : stale)
+		{
 			s_Npcs.Remove(s);
+			ForgetBody(s);
+		}
 
 		s_Npcs.Set(ai, name);
 	}
@@ -71,12 +87,70 @@ class IsuAgentRegistry
 		if (!ai)
 			return;
 		s_Npcs.Remove(ai);
+		ForgetBody(ai);
+	}
+
+	// Neben-Sets/-Maps eines Koerpers aufraeumen (Despawn, Tod, Respawn-
+	// Nachfolger). s_Npcs selbst pflegen die Aufrufer.
+	static void ForgetBody(eAIBase ai)
+	{
+		if (!ai)
+			return;
 		int idx = s_VehicleExitAllowed.Find(ai);
 		if (idx > -1)
 			s_VehicleExitAllowed.Remove(idx);
 		int bidx = s_BrAgents.Find(ai);
 		if (bidx > -1)
 			s_BrAgents.Remove(bidx);
+		int midx = s_MeleeLock.Find(ai);
+		if (midx > -1)
+			s_MeleeLock.Remove(midx);
+		if (s_Shots.Contains(ai))
+			s_Shots.Remove(ai);
+		if (s_ShotWeapon.Contains(ai))
+			s_ShotWeapon.Remove(ai);
+	}
+
+	static bool HasMeleeLock(eAIBase ai)
+	{
+		return ai != null && s_MeleeLock.Find(ai) > -1;
+	}
+
+	static void SetMeleeLock(eAIBase ai, bool on)
+	{
+		if (!ai)
+			return;
+		int idx = s_MeleeLock.Find(ai);
+		if (on && idx == -1)
+			s_MeleeLock.Insert(ai);
+		else if (!on && idx > -1)
+			s_MeleeLock.Remove(idx);
+	}
+
+	static void CountShot(eAIBase ai, string weaponType)
+	{
+		if (!ai)
+			return;
+		int n = 0;
+		s_Shots.Find(ai, n);
+		s_Shots.Set(ai, n + 1);
+		s_ShotWeapon.Set(ai, weaponType);
+	}
+
+	static int ShotCount(eAIBase ai)
+	{
+		int n = 0;
+		if (ai)
+			s_Shots.Find(ai, n);
+		return n;
+	}
+
+	static string LastShotWeapon(eAIBase ai)
+	{
+		string w = "";
+		if (ai)
+			s_ShotWeapon.Find(ai, w);
+		return w;
 	}
 
 	static bool MayExitVehicle(eAIBase ai)
@@ -233,5 +307,66 @@ modded class eAIState_GetOutVehicle
 		}
 
 		super.OnEntry(Event, From);
+	}
+}
+
+// NAHKAMPF-LOCK (engage mode="melee"). Hintergrund (Quellcode-Analyse
+// 24.10.2026, eaistate_takeitemtohands.c:45-232 + Master.xml:268-277):
+// Expansion prueft im Zustand TakeItemToHands (Transition aus Idle, Flank,
+// Fighting, TraversingWaypoints, FollowFormation, TakeItemToInventory) staendig
+// neu und nimmt jede geladene Feuerwaffe mit mehr DPS, sobald "preferMelee"
+// nicht gilt (kein Ziel, Viability < 2 s, keine Sichtlinie, HP <= 80 % oder
+// mehr als ein akuter Gegner, eAIBase.c:6990-6993). equip_melee hielt das
+// Messer deshalb oft nur Sekunden - der NPC schoss und funkte "leise".
+// Guard() ist die einzige Stelle, an der Expansion die Hand-Waffe tauscht
+// (einziger eAI_TakeItemToHands-Aufruf: eaistate_takeitemtohands.c:35).
+// Signatur "int Guard()" laut eaistate_takeitemtohands.c:45, Rueckgabe
+// eAITransition.FAIL (= ExpansionTransition.FAIL = 0, ExpansionTransition.c:3)
+// blockiert den Eintritt. Ruinierte Waffe und Verband laufen weiter ueber super
+// (Abwurf bzw. Bandage-Wechsel); geloest wird der Lock von der Bridge
+// (Ende, Tod, Timeout, neuer Befehl, Eskalation bei HP < 50 % / 3+ Gegnern).
+modded class eAIState_TakeItemToHands
+{
+	override int Guard()
+	{
+		// unit ist laut eAIState.c:3 bereits ein eAIBase
+		if (IsuAgentRegistry.HasMeleeLock(unit))
+		{
+			ItemBase lockHands = unit.GetItemInHands();
+			bool keepMelee = false;
+			if (lockHands && lockHands.Expansion_IsMeleeWeapon())
+				keepMelee = true;
+			if (keepMelee && lockHands.IsDamageDestroyed())
+				keepMelee = false;
+			if (keepMelee && unit.eAI_ShouldBandage())
+				keepMelee = false;
+			if (keepMelee)
+				return eAITransition.FAIL;
+		}
+
+		return super.Guard();
+	}
+}
+
+// SCHUSSZAEHLER: jeder Schuss eines registrierten Agenten zaehlt (State
+// npc.shots / npc.last_shot_weapon). Vanilla-Signatur EEFired(int muzzleType,
+// int mode, string ammoType) laut weapon_base.c:341; Expansion ueberschreibt
+// sie selbst mit einem g_Game.IsServer()-Zweig (Expansion Weapon_Base.c:329-341),
+// der Hook feuert also auf dem Dedicated Server. super zuerst, damit Effekte
+// und Expansions Laerm-System unveraendert bleiben.
+modded class Weapon_Base
+{
+	override void EEFired(int muzzleType, int mode, string ammoType)
+	{
+		super.EEFired(muzzleType, mode, ammoType);
+
+		if (!GetGame().IsServer())
+			return;
+		eAIBase isuShooter = eAIBase.Cast(GetHierarchyRootPlayer());
+		if (!isuShooter)
+			return;
+		if (!IsuAgentRegistry.IsAgent(isuShooter))
+			return;
+		IsuAgentRegistry.CountShot(isuShooter, GetType());
 	}
 }

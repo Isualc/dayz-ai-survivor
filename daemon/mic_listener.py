@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""IsuSurvivor Mikrofon-Listener — Viktor hoert dich ueber das lokale Mikro.
+"""IsuSurvivor Mikrofon-Listener — Viktor hört dich über das lokale Mikro.
 
-Hintergrund: Discord erzwingt seit Maerz 2026 DAVE-E2EE auf Voice-Kanaelen,
-Bot-Bibliotheken koennen Nutzer-Audio derzeit nicht entschluesseln (Senden
+Hintergrund: Discord erzwingt seit März 2026 DAVE-E2EE auf Voice-Kanälen,
+Bot-Bibliotheken können Nutzer-Audio derzeit nicht entschlüsseln (Senden
 geht weiter). Dieser Listener nimmt stattdessen das lokale Mikrofon,
-schneidet Aeusserungen an Sprechpausen, transkribiert per ElevenLabs Scribe
+schneidet Äußerungen an Sprechpausen, transkribiert per ElevenLabs Scribe
 und schreibt in dieselbe Funk-Inbox wie der Discord-Empfang.
 
-Das Mikrofon wird beim Start AUTOMATISCH gesucht: Default-Geraet zuerst,
-dann alle echten Eingaenge, jeweils kurz angetestet. Endpunkte, die nur
+Das Mikrofon wird beim Start AUTOMATISCH gesucht: Default-Gerät zuerst,
+dann alle echten Eingänge, jeweils kurz angetestet. Endpunkte, die nur
 digitale Stille liefern (gemutetes Headset, totes G-HUB-Routing), werden
-uebersprungen, virtuelle Kabel (VB-Cable, Stereomix...) ignoriert.
+übersprungen, virtuelle Kabel (VB-Cable, Stereomix...) ignoriert.
 
 Wird von run_agent.py automatisch mitgestartet (abschaltbar mit --no-mic).
 Env: ISU_MIC_NAME (Absendername, Default "Player"),
-     ISU_MIC_DEVICE (Index oder Namens-Teil, erzwingt ein Geraet),
+     ISU_MIC_DEVICE (Index oder Namens-Teil, erzwingt ein Gerät),
      ISU_MIC_THRESHOLD (RMS-Schwelle, Default automatisch kalibriert).
 
 Standalone-Test:  python mic_listener.py --test 10
@@ -40,10 +40,10 @@ ELEVEN_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
 MIC_NAME = os.environ.get("ISU_MIC_NAME", "Player")
 API = "https://api.elevenlabs.io/v1"
 
-GAP_SECONDS = 1.0               # Sprechpause beendet die Aeusserung
+GAP_SECONDS = 1.0               # Sprechpause beendet die Äußerung
 MIN_SECONDS = 0.4
 MAX_SECONDS = 45.0
-PREROLL_SECONDS = 0.3           # Vorlauf, damit Wortanfaenge nicht fehlen
+PREROLL_SECONDS = 0.3           # Vorlauf, damit Wortanfänge nicht fehlen
 
 # Virtuelle/Loopback-Endpunkte, die niemals das Spieler-Mikro sind
 VIRTUAL_HINTS = ("cable", "virtual", "vdvad", "stereomix", "stereo mix",
@@ -91,9 +91,9 @@ def _probe_device(idx: int) -> tuple[float, int]:
     """(Rauschteppich, nutzbare Rate) eines Endpunkts; (-1, 0) wenn unbrauchbar.
 
     Testet BEIDE Raten und nimmt die mit echtem Signal. Manche Headsets (z.B.
-    PRO X 2 LIGHTSPEED) lassen sich bei 16 kHz oeffnen, liefern dort aber nur
-    Stille (Teppich 0) und funktionieren erst bei 48 kHz - frueher wurde 16 kHz
-    zuerst genommen und der Endpunkt galt faelschlich als stumm."""
+    PRO X 2 LIGHTSPEED) lassen sich bei 16 kHz öffnen, liefern dort aber nur
+    Stille (Teppich 0) und funktionieren erst bei 48 kHz - früher wurde 16 kHz
+    zuerst genommen und der Endpunkt galt fälschlich als stumm."""
     best_floor, best_rate = -1.0, 0
     for rate in (48000, 16000):
         try:
@@ -114,13 +114,13 @@ def pick_input_device(logger=log) -> tuple[int, int, float]:
     """Lebendes Mikrofon finden: (device_index, capture_rate, rauschteppich).
 
     Reihenfolge: ISU_MIC_DEVICE (wenn gesetzt) > Windows-Default > weitere
-    echte Eingaenge. Der erste Endpunkt mit echtem Signal (Teppich >= 3)
-    gewinnt - ein gemutetes Headset liefert ~0 und wird uebersprungen.
+    echte Eingänge. Der erste Endpunkt mit echtem Signal (Teppich >= 3)
+    gewinnt - ein gemutetes Headset liefert ~0 und wird übersprungen.
     """
     devices = sd.query_devices()
     hostapis = sd.query_hostapis()
 
-    # Hoechste Prioritaet: per Mikrofon-Check gespeicherte Wahl (arena/mic.json)
+    # Höchste Priorität: per Mikrofon-Check gespeicherte Wahl (arena/mic.json)
     mic_cfg_path = os.path.join(REPO_DIR, "arena", "mic.json")
     try:
         with open(mic_cfg_path, "r", encoding="utf-8") as f:
@@ -129,7 +129,7 @@ def pick_input_device(logger=log) -> tuple[int, int, float]:
         cfg = {}
     if cfg and not cfg.get("auto"):
         idx = -1
-        # Geraete-Indizes koennen sich verschieben: erst per Name suchen
+        # Geräte-Indizes können sich verschieben: erst per Name suchen
         saved_name = cfg.get("device_name", "")
         if saved_name:
             for i, dev in enumerate(devices):
@@ -177,7 +177,7 @@ def pick_input_device(logger=log) -> tuple[int, int, float]:
         if any(h in dev["name"].lower() for h in VIRTUAL_HINTS):
             continue
         api = hostapis[dev["hostapi"]]["name"]
-        # pro physischem Geraet reicht der robuste MME-Endpunkt
+        # pro physischem Gerät reicht der robuste MME-Endpunkt
         if "MME" not in api:
             continue
         candidates.append(i)
@@ -212,7 +212,7 @@ def is_noise_transcript(text: str) -> bool:
     stripped = text.strip()
     if not stripped:
         return True
-    # alle Klammergruppen entfernen; bleibt nichts Sinnvolles -> Geraeusch
+    # alle Klammergruppen entfernen; bleibt nichts Sinnvolles -> Geräusch
     import re
     rest = re.sub(r"\([^)]*\)", "", stripped)
     rest = re.sub(r"[\s.,!?…-]+", "", rest)
@@ -221,7 +221,7 @@ def is_noise_transcript(text: str) -> bool:
 
 def watch_parent(parent_pid: int):
     """Beendet den Prozess, wenn der Eltern-Runner stirbt (kein Zombie-
-    Listener, der eine Inbox fuettert, die niemand liest)."""
+    Listener, der eine Inbox füttert, die niemand liest)."""
     import ctypes
     import threading
 
@@ -241,8 +241,8 @@ def watch_parent(parent_pid: int):
 # Push-to-Talk: global abgefragte Taste (funktioniert auch, wenn DayZ den
 # Fokus hat). Default ist PTT mit CAPSLOCK - dieselbe Taste wie DayZs
 # eingebauter Funk (VON), ein Druck bedient also Spieler UND Agenten.
-# Ein dauerhaft offenes Raummikro hoert sonst Familie, Fernseher und
-# Selbstgespraeche mit.
+# Ein dauerhaft offenes Raummikro hört sonst Familie, Fernseher und
+# Selbstgespräche mit.
 VK_KEYS = {"F1": 0x70, "F2": 0x71, "F3": 0x72, "F4": 0x73, "F5": 0x74,
            "F6": 0x75, "F7": 0x76, "F8": 0x77, "F9": 0x78, "F10": 0x79,
            "F11": 0x7A, "F12": 0x7B, "CAPSLOCK": 0x14,
@@ -314,7 +314,7 @@ def main() -> int:
     last_voice = 0.0
     started = time.monotonic()
 
-    # Pegel-Anzeige fuer die ersten 30 s: zeigt, ob Sprache ueberhaupt ankommt
+    # Pegel-Anzeige für die ersten 30 s: zeigt, ob Sprache überhaupt ankommt
     level_window_max = 0.0
     next_level_report = started + 5.0
 

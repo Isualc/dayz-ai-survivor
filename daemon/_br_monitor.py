@@ -1,6 +1,6 @@
 """Battle-Royale-Monitor: pollt die state-Dateien und loggt Kampf-Telemetrie.
 
-Endet, wenn hoechstens einer der gespawnten Agenten lebt (Sieger) oder
+Endet, wenn höchstens einer der gespawnten Agenten lebt (Sieger) oder
 --max-seconds erreicht ist (Zwischenstand).
 """
 
@@ -58,7 +58,7 @@ def main():
     near = set()                     # Paare aktuell im Nahkontakt
     deadline = time.monotonic() + args.max_seconds
 
-    print(f"[{stamp()}] Monitor laeuft (max {args.max_seconds}s)...")
+    print(f"[{stamp()}] Monitor läuft (max {args.max_seconds}s)...")
     while time.monotonic() < deadline:
         npcs = {}
         for i in IDS:

@@ -1,7 +1,7 @@
 """End-to-End-Verifikation der neuen Mod-Features ohne LLM.
 
-Testet direkt ueber die Bridge: Spawn mit IsuSurvivorLoadout (warme
-Kleidung, keine Waffen), heat_comfort im State, Dose oeffnen + trinken,
+Testet direkt über die Bridge: Spawn mit IsuSurvivorLoadout (warme
+Kleidung, keine Waffen), heat_comfort im State, Dose öffnen + trinken,
 Apfel essen, equip_best ohne Waffen, wear-Fehlerpfad. Despawnt am Ende.
 """
 
@@ -64,7 +64,7 @@ print("eat (Apfel)...")
 r = bridge.run("eat", timeout=30)
 check("eat", r.get("status") == "done", r.get("detail") or "")
 
-# Apfel-Reste wegraeumen, damit eat garantiert die Konserve angeht
+# Apfel-Reste wegräumen, damit eat garantiert die Konserve angeht
 bridge.run("drop", text="Apple", timeout=20)
 bridge.run("drop", text="Apple", timeout=20)
 

@@ -215,6 +215,8 @@ class IsuArenaControl
 			return Vector(7900.0, 0, 6700.0);
 		if (world.Contains("sakhal"))
 			return Vector(7680.0, 0, 7800.0);
+		if (world.Contains("nasdara"))
+			return Vector(8528.0, 0, 8669.0);
 		return Vector(x, 0, z);
 	}
 

@@ -135,6 +135,29 @@ class RunnerIntegrationTests(unittest.TestCase):
         self.assertIn("Kosten nicht gemeldet", message)
         self.assertNotIn("0.0000 USD", message)
 
+    def test_cli_auth_error_never_reaches_nameplate(self):
+        # Nachgestellt aus journal_20261016_023801.log: die CLI meldet den
+        # abgelaufenen Login als "<synthetic>"-Assistant-Text + Error-Result.
+        err = "Failed to authenticate: OAuth session expired and could not be refreshed"
+        lines = [
+            {"type": "assistant", "message": {"model": "<synthetic>", "role": "assistant",
+                                              "content": [{"type": "text", "text": err}]}},
+            {"type": "result", "subtype": "success", "is_error": True, "result": err,
+             "duration_ms": 500, "num_turns": 1, "total_cost_usd": 0},
+        ]
+        process = Mock(stdout=io.StringIO("".join(json.dumps(x) + "\n" for x in lines)))
+        journal = Mock()
+        reader = run_agent.BrainReader(process, journal, run_agent.TokenTracker())
+        with patch.object(run_agent, "_set_nameplate_intent") as nameplate:
+            reader.run()
+        shown = [c.args[0] for c in nameplate.call_args_list]
+        self.assertNotIn(err, shown)
+        self.assertIn(run_agent.AUTH_NAMEPLATE, shown)
+        self.assertEqual(reader.auth_error, err)
+        self.assertEqual(reader.recent, [])
+        logged = " ".join(c.args[0] for c in journal.log.call_args_list)
+        self.assertIn("[SYSTEM] " + err, logged)
+
 
 class ObservationTests(unittest.TestCase):
     def state(self):

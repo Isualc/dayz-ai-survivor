@@ -211,5 +211,53 @@ class MenuAndSupervisorTests(unittest.TestCase):
         self.assertEqual(native_providers, llm_backends.PROVIDERS)
 
 
+class ClaudeLoginTests(unittest.TestCase):
+    """Abgelaufener OAuth-Login (16.10.): Preflight muss ihn lokal erkennen,
+    run_agent darf den CLI-Fehlertext nie ins Spiel geben."""
+
+    def _status(self, stdout, returncode=0):
+        proc = subprocess.CompletedProcess(["claude"], returncode, stdout=stdout, stderr="")
+        with patch.object(preflight.subprocess, "run", return_value=proc) as run:
+            result = preflight.claude_auth_status(["mock-claude.exe"])
+        self.assertEqual(run.call_args.args[0], ["mock-claude.exe", "auth", "status", "--json"])
+        return result
+
+    def test_auth_status_parses_cli_json(self):
+        self.assertIs(self._status('{"loggedIn": true, "authMethod": "claude.ai"}')[0], True)
+        self.assertIs(self._status('{"loggedIn": false, "authMethod": "none"}', 1)[0], False)
+        self.assertIsNone(self._status("Error: something odd", 1)[0])
+
+    def test_auth_status_timeout_is_unknown(self):
+        with patch.object(preflight.subprocess, "run",
+                          side_effect=subprocess.TimeoutExpired("claude", 20)):
+            self.assertIsNone(preflight.claude_auth_status(["mock-claude.exe"])[0])
+
+    def test_login_check_only_for_plan_models(self):
+        with patch.object(preflight, "claude_auth_status",
+                          side_effect=AssertionError("login checked")):
+            self.assertIsNone(preflight.check_claude_login(["openai/gpt-5.6", "api/opus"]))
+        with patch.object(preflight, "claude_auth_status", return_value=(False, "nicht eingeloggt")):
+            self.assertEqual(preflight.check_claude_login(["sonnet"])[1], "fail")
+        with patch.object(preflight, "claude_auth_status", return_value=(True, "eingeloggt")):
+            self.assertEqual(preflight.check_claude_login(["sonnet"])[1], "ok")
+        with patch.object(preflight, "claude_auth_status", return_value=(None, "timeout")):
+            self.assertEqual(preflight.check_claude_login(["sonnet"])[1], "warn")
+
+    def test_expired_login_blocks_round_start(self):
+        with patch.object(preflight, "check_cli", return_value=("Claude-CLI", "ok", "mock")), \
+             patch.object(preflight, "claude_auth_status", return_value=(False, "nicht eingeloggt")), \
+             patch.object(preflight, "_port_open", return_value=False):
+            result = preflight.run_checks(["sonnet"])
+        self.assertIn(("Claude-Login", "fail"), [(n, lv) for n, lv, _ in result])
+
+    def test_runner_recognises_cli_auth_errors(self):
+        import run_agent
+        self.assertTrue(run_agent._is_auth_error(
+            "Failed to authenticate: OAuth session expired and could not be refreshed"))
+        self.assertTrue(run_agent._is_auth_error("Invalid API key · Please run /login"))
+        self.assertFalse(run_agent._is_auth_error("Ich gehe zum Brunnen und fülle die Flasche."))
+        self.assertFalse(run_agent._is_auth_error(None))
+
+
 if __name__ == "__main__":
     unittest.main()

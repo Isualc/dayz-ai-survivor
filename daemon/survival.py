@@ -376,7 +376,7 @@ def choose_action(state, memory, now, agent_name="", allow_explore=True):
                   _matches(e, ("BandageDressing", "Rag")) and _distance(npc, e) <= 12]
         for e in sorted(ground, key=lambda e: _distance(npc, e)):
             p = _pickup_plan(e, npc, inventory, "bleeding_supply",
-                             "Verband fuer aktive Blutung beschaffen", 1)
+                             "Verband für aktive Blutung beschaffen", 1)
             if available(p) and near_threat > 8:
                 return p
         if not threats:
@@ -542,7 +542,7 @@ def choose_action(state, memory, now, agent_name="", allow_explore=True):
                                        _number(held.get("quantity")) > 0):
                         plans.append(_plan("equip_best", "hunt_prepare", "Geladene Jagdwaffe vorbereiten", 41))
                     else:
-                        plans.append(_plan("hunt", "hunt", "Sichtbares Wild fuer Nahrung jagen", 42,
+                        plans.append(_plan("hunt", "hunt", "Sichtbares Wild für Nahrung jagen", 42,
                                            text=prey["classname"]))
     if raw:
         for fire in nearby:
@@ -573,7 +573,7 @@ def choose_action(state, memory, now, agent_name="", allow_explore=True):
     if memory.get("inventory_full"):
         return {"needs_llm": True, "reason": "Inventar voll: geschuetzte Ausruestung gezielt sortieren oder verstauen."}
     if raw:
-        return {"needs_llm": True, "reason": "Rohes Fleisch vorhanden: Feuer benoetigt vorhandenes Material und craft/cook_meal."}
+        return {"needs_llm": True, "reason": "Rohes Fleisch vorhanden: Feuer benötigt vorhandenes Material und craft/cook_meal."}
     # Only route to actual reported shelter/entrance coordinates. A building
     # classname or remembered map stereotype does not establish a safe doorway.
     shelter_needed = heat < -.3 or heat > .6 or _number(npc.get("wet")) > .25 or _number(state.get("world", {}).get("rain")) > .2
@@ -609,7 +609,7 @@ def choose_action(state, memory, now, agent_name="", allow_explore=True):
                   "Suchkreis beendet: zum bekannten Ausgangspunkt zurueckkehren", 90)
         if available(p):
             return p
-        return {"needs_llm": True, "reason": "Bekannter Rueckweg blockiert; neue Route benoetigt."}
+        return {"needs_llm": True, "reason": "Bekannter Rückweg blockiert; neue Route benötigt."}
     if _number(memory.get("search_rest_until")) > now:
         return {"needs_llm": False, "reason": "Nach Rueckkehr kurz Umgebung pruefen; naechster Suchsektor folgt."}
     # Useful landmarks already in sight beat an arbitrary compass step.
@@ -672,8 +672,14 @@ def _record_outcome(memory, pending, state, command, now):
             verified = True
             evidence = "Verband verbraucht; weitere Blutung gemeldet, naechste Quelle versorgen"
     elif action == "pickup":
+        # Munition/Magazine zählen seit dem Mod-Fix MVS-M1 echte Patronen:
+        # verschießt oder lädt Expansion währenddessen, sinkt die Zahl, ohne
+        # dass etwas verloren ging. Als verloren gilt so eine Klasse nur, wenn
+        # sie ganz aus dem Inventar verschwindet.
         lost = [name for name, quantity in before["counts"].items()
-                if name != cn and _number(after["counts"].get(name)) < _number(quantity)]
+                if name != cn and _number(after["counts"].get(name)) < _number(quantity)
+                and not (name.startswith(("Ammo_", "Mag_"))
+                         and _number(after["counts"].get(name)) > 0)]
         verified = count_delta > 0 and not lost and command.get("status") == "done"
         evidence = f"{cn}-Zuwachs {count_delta:.1f}; verlorene Inventarklassen: " + (", ".join(lost) or "keine")
         target = pending.get("loot_target") or {"classname": cn, "x": _pos(old)[0], "z": _pos(old)[1]}
@@ -696,17 +702,17 @@ def _record_outcome(memory, pending, state, command, now):
         evidence = f"{vital}-Delta {deltas.get(vital, 0):.1f}; Magen-Delta {deltas.get('stomach_volume', 0):.1f}"
     elif goal == "medicine":
         verified = count_delta < 0
-        evidence = "Medikamentverbrauch nachgewiesen; Heilung NICHT bestaetigt" if verified else evidence
+        evidence = "Medikamentverbrauch nachgewiesen; Heilung NICHT bestätigt" if verified else evidence
     elif action == "harvest_crops":
         gained_ground = set(after["ground"]) - set(before.get("ground", []))
         verified = bool(gained_ground) or sum(after["counts"].values()) > sum(before["counts"].values())
         evidence = f"Neue Ernte-Objekte sichtbar: {len(gained_ground)}" if verified else evidence
     elif action == "wear":
         verified = any(i.get("classname") == cn and i.get("worn") for i in state.get("inventory", []))
-        evidence = "Kleidung am Koerper bestaetigt" if verified else evidence
+        evidence = "Kleidung am Körper bestätigt" if verified else evidence
     elif action in ("equip", "equip_best"):
         verified = bool(npc.get("in_hands")) and (npc.get("in_hands") == cn if cn else npc.get("in_hands") != old.get("in_hands"))
-        evidence = "Handbelegung bestaetigt" if verified else evidence
+        evidence = "Handbelegung bestätigt" if verified else evidence
     elif action == "reload":
         held = npc.get("in_hands")
         ammo = lambda snap: sum(_number(i.get("quantity")) for i in snap["inventory"] if i.get("classname") == held)
@@ -886,7 +892,7 @@ def survival_tick(bridge, agent_name="", memory_path=None, allow_explore=True, n
             decision = choose_action(state, memory, now, agent_name, allow_explore)
             if pending:
                 if cmd.get("id") != pending.get("command_id") and now - pending["started_at"] > 10:
-                    return finish("handoff", "Befehl noch nicht bestaetigt; keine blinde Wiederholung.", True,
+                    return finish("handoff", "Befehl noch nicht bestätigt; keine blinde Wiederholung.", True,
                                   action=pending["action"])
                 if now - pending["started_at"] > 180:
                     # Do not report a timeout as a successful action or keep
@@ -896,7 +902,7 @@ def survival_tick(bridge, agent_name="", memory_path=None, allow_explore=True, n
                 # Safety can interrupt only our own routine, never player commands.
                 urgent = decision.get("action") and decision.get("priority", 99) <= 2
                 if not urgent or decision.get("priority", 99) >= pending.get("priority", 99):
-                    return finish("running", "Eigene Aktion laeuft; auf Ergebnis warten.", action=pending["action"])
+                    return finish("running", "Eigene Aktion läuft; auf Ergebnis warten.", action=pending["action"])
                 memory["episodes"].append({"at": now, "action": pending["action"],
                                            "status": "safety_interrupted", "verified": None})
             if not decision.get("action"):

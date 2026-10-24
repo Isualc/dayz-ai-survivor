@@ -4,6 +4,8 @@
 // Der Server (IsuSurvivor-Mod) sendet RPCs:
 //   ISU_RPC_PLAY_VOICE: SoundSet-Name + Position -> 3D-Sound abspielen
 //   ISU_RPC_NAMETAG:    NetworkID + Name         -> IsuNametagStore
+//   ISU_RPC_AGENTPOS:   NetworkID + Position     -> IsuNametagStore (Squad-HUD
+//                       fuer Agenten ausserhalb der Netzwerk-Bubble)
 // Die Namen fliessen in GetDisplayName() der eAI - damit zeigen die
 // Expansion-Nametags (NameTagsSettings: ShowNPCTags=1) beim Anvisieren
 // "Viktor" statt des Skin-Namens ("Naomi").
@@ -17,6 +19,11 @@ const int ISU_RPC_INTENT = 0x4953554E;       // "ISUN" - Gedanke/Absicht -> Clie
 const int ISU_RPC_SAY = 0x4953554F;          // "ISUO" - gesagter Text -> Client (Comic-Sprechblase)
 const int ISU_RPC_UI_LANGUAGE_REQUEST = 0x4953554C; // "ISUL" - client asks for server UI language
 const int ISU_RPC_UI_LANGUAGE = 0x49535555;         // "ISUU" - server replies only to requesting client
+// Muss zu RPC_AGENTPOS in IsuSurvivor/isubridge.c passen. Param3<int, int, vector>
+// (low, high, Position), ungarantiert, alle 3 s mit dem Nametag-Takt. Ein
+// alter Server sendet ihn nicht -> Squad-HUD zeigt dann wie bisher nur
+// replizierte (sichtbare) Agenten.
+const int ISU_RPC_AGENTPOS = 0x49535550;     // "ISUP" - Agenten-Position -> Client (Squad-HUD "fern")
 
 // Letzter vom Server gefunkter Supervisor-Status (Anzeige im Arena-Menue)
 class IsuArenaStatusStore
@@ -209,6 +216,9 @@ class IsuAgentTag
 	string intent; // einzeilige Absicht (Gedanken-HUD), spaeter gefuellt
 	string speech;     // letzte gesagte Zeile (Comic-Sprechblase)
 	int speechExpiry;  // GetGame().GetTime()-Zeitpunkt, ab dem die Blase verschwindet
+	vector pos;        // letzte per RPC_AGENTPOS gefunkte Position (auch ausserhalb der Bubble)
+	bool hasPos;       // pos gueltig; ein alter Server ohne RPC_AGENTPOS setzt es nie
+	int lastRpcMs;     // GetGame().GetTime() des letzten Server-RPCs (Nametag/Intent/Position)
 }
 
 // Vom Server gemeldete Agenten (Schluessel: "low_high" der NetworkID).
@@ -217,6 +227,13 @@ class IsuNametagStore
 	static ref map<string, ref IsuAgentTag> s_Agents = new map<string, ref IsuAgentTag>();
 	static bool s_LoggedFirst;
 	static bool s_LoggedIntent;
+
+	// Ablauf eines Eintrags: so lange ohne Server-RPC gilt der Agent als
+	// despawnt bzw. nicht mehr gefuehrt. Der Server funkt jeden lebenden
+	// Agenten alle 3 s an jeden Spieler (ohne Distanzfilter); 10 s Puffer
+	// ueberbruecken verlorene ungarantierte Positions-Pakete und kurze
+	// Server-Ruckler. Leichen raeumt das Remove-Signal weiterhin sofort ab.
+	static const int STALE_MS = 10000;
 
 	static IsuAgentTag GetOrCreate(int low, int high)
 	{
@@ -227,11 +244,34 @@ class IsuNametagStore
 			t = new IsuAgentTag();
 			t.low = low;
 			t.high = high;
+			// Neutral anlegen: kommt Position/Intent/Sprechblase vor dem
+			// Nametag-RPC an, darf der Eintrag keinen festen Pool-Slot (0 =
+			// Viktor) belegen und kein namenloses Schild zeigen. Update()
+			// setzt Name und Slot beim ersten Nametag-RPC.
+			t.name = "";
+			t.slot = 7;
+			t.actionId = 4;
 			t.intent = "";
 			t.speech = "";
+			t.pos = vector.Zero;
+			t.hasPos = false;
+			t.lastRpcMs = GetGame().GetTime();
 			s_Agents.Set(key, t);
 		}
 		return t;
+	}
+
+	// true = Eintrag abgelaufen (kein RPC seit STALE_MS). Eine deutlich
+	// negative Spanne heisst: Missionsuhr neu gestartet (Reconnect), der
+	// Eintrag stammt aus der vorigen Mission (s_Agents ist statisch).
+	static bool IsStale(IsuAgentTag t, int nowMs)
+	{
+		if (!t)
+			return true;
+		int ageMs = nowMs - t.lastRpcMs;
+		if (ageMs < -1000)
+			return true;
+		return ageMs > STALE_MS;
 	}
 
 	static void Update(int low, int high, string name, int hp, int slot, int actionId)
@@ -246,17 +286,55 @@ class IsuNametagStore
 		t.hp = hp;
 		t.slot = slot;
 		t.actionId = actionId;
+		t.lastRpcMs = GetGame().GetTime();
+
+		// Gleichnamiger Eintrag unter einer anderen NetID = alter Koerper
+		// desselben Agenten (Respawn/Adopt). Der Server meldet nur lebende
+		// registrierte Koerper und erzwingt eindeutige Namen. Kam das Remove-
+		// Signal der Leiche nicht an (Register() des Nachfolgers lief vor dem
+		// naechsten 3-s-Tick), wuerde der Alt-Eintrag sonst Pool-Slot und
+		// Squad-Zeile des neuen Koerpers belegen. Erst sammeln, dann loeschen
+		// (Map nicht waehrend der Iteration veraendern). Namenlose Eintraege
+		// (nur Intent/Sprechblase/Position) bleiben unberuehrt.
+		if (name == "")
+			return;
+		string myKey = low.ToString() + "_" + high.ToString();
+		array<string> dupes = new array<string>();
+		foreach (string dk, IsuAgentTag dt : s_Agents)
+		{
+			if (dk != myKey && dt && dt.name == name)
+				dupes.Insert(dk);
+		}
+		for (int ri = 0; ri < dupes.Count(); ri++)
+			s_Agents.Remove(dupes[ri]);
 	}
 
+	// Absicht IMMER uebernehmen, auch leer: der Server funkt eine geleerte
+	// intent-Datei als "" - die Gedankenzeile leert sich dann, statt die
+	// letzte (evtl. Vor-Tod-) Absicht stehen zu lassen.
 	static void UpdateIntent(int low, int high, string intent)
 	{
-		if (!s_LoggedIntent)
+		if (!s_LoggedIntent && intent != "")
 		{
+			// Nur die erste NICHT-leere Absicht loggen (Diagnose: welche
+			// Zeile kam beim Start an), leere kommen jetzt jeden Takt.
 			s_LoggedIntent = true;
 			Print("[IsuVoice] Erster Intent-RPC empfangen: " + intent);
 		}
 		IsuAgentTag t = GetOrCreate(low, high);
 		t.intent = intent;
+		t.lastRpcMs = GetGame().GetTime();
+	}
+
+	// Agenten-Position (RPC_AGENTPOS): kommt auch fuer Agenten ausserhalb der
+	// Netzwerk-Bubble (~1 km), deren Objekt der Client nicht kennt. Das
+	// Squad-HUD zeigt sie damit weiter mit Distanz und Zusatz "(fern)".
+	static void UpdatePos(int low, int high, vector pos)
+	{
+		IsuAgentTag t = GetOrCreate(low, high);
+		t.pos = pos;
+		t.hasPos = true;
+		t.lastRpcMs = GetGame().GetTime();
 	}
 
 	// Comic-Sprechblase: gesagte Zeile mit Ablaufzeit (~8 s) speichern.
@@ -358,6 +436,15 @@ modded class PlayerBase
 					IsuNametagStore.Update(tag.param1, tag.param2, tag.param3, hp, slot, tag.param5);
 				}
 			}
+			return;
+		}
+
+		if (rpc_type == ISU_RPC_AGENTPOS)
+		{
+			// Param3: low, high, Position (Server-Takt 3 s, ungarantiert)
+			Param3<int, int, vector> ap = new Param3<int, int, vector>(0, 0, vector.Zero);
+			if (ctx.Read(ap))
+				IsuNametagStore.UpdatePos(ap.param1, ap.param2, ap.param3);
 			return;
 		}
 
