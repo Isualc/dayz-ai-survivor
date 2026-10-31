@@ -1,13 +1,13 @@
 # Traffic-Gesamtstatistik
 
-Zeitraum: **2026-08-02 bis 2026-10-28** (57 erfasste Tage)
+Zeitraum: **2026-08-02 bis 2026-10-29** (58 erfasste Tage)
 
 | Kennzahl | Gesamt |
 |---|---:|
-| Seitenaufrufe | 308 |
-| Eindeutige Besucher (Summe pro Tag) | 152 |
-| Clones | 1131 |
-| Eindeutige Cloner (Summe pro Tag) | 886 |
+| Seitenaufrufe | 324 |
+| Eindeutige Besucher (Summe pro Tag) | 164 |
+| Clones | 1136 |
+| Eindeutige Cloner (Summe pro Tag) | 889 |
 | Release-Downloads | 31 |
 
 ## Release-Downloads im Detail
